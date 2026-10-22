@@ -35,11 +35,12 @@ class LyricsWidget extends StatelessWidget {
                               ? "lyricsNotAvailable".tr
                               : playerController.lyrics["plainLyrics"],
                           textAlign: TextAlign.center,
-                          style: (playerController.lyricFontFamily.value == 'System'
-                                  ? Theme.of(context).textTheme.titleMedium!
-                                  : GoogleFonts.getFont(
-                                      playerController.lyricFontFamily.value,
-                                      textStyle: Theme.of(context).textTheme.titleMedium,
+                          style: (playerController.lyricFontFamily.value == 'Poppins'
+                                  ? GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleMedium)
+                                  : Theme.of(context).textTheme.titleMedium!.copyWith(
+                                      fontFamily: playerController.lyricFontFamily.value == 'System'
+                                          ? null
+                                          : playerController.lyricFontFamily.value,
                                     )).copyWith(
                               color: playerController.isLyricsDialogOpen
                                   ? Theme.of(context).textTheme.titleMedium!.color
@@ -101,54 +102,94 @@ class LyricsWidget extends StatelessWidget {
       backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(sheetContext).viewInsets.bottom),
-          child: Obx(() => Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Lyrics appearance', style: Theme.of(sheetContext).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: controller.lyricFontFamily.value,
-                decoration: const InputDecoration(labelText: 'Font family'),
-                items: PlayerController.lyricFontFamilies.map((font) => DropdownMenuItem(
-                  value: font,
-                  child: Text(font, style: TextStyle(fontFamily: font == 'System' ? null : font)),
-                )).toList(),
-                onChanged: (value) { if (value != null) controller.setLyricFontFamily(value); },
-              ),
-              const SizedBox(height: 18),
-              Row(children: [
-                const Expanded(child: Text('Active lyric size')),
-                Text('${controller.activeLyricSize.value.round()} px'),
-              ]),
-              Slider(
-                min: 16, max: 36, divisions: 20,
-                value: controller.activeLyricSize.value,
-                label: '${controller.activeLyricSize.value.round()} px',
-                onChanged: controller.setActiveLyricSize,
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Bold active lyric'),
-                value: controller.boldActiveLyric.value,
-                onChanged: controller.setBoldActiveLyric,
-              ),
-              const SizedBox(height: 8),
-              Center(child: Text(
-                'Preview · MuziiNap lyrics',
-                textAlign: TextAlign.center,
-                style: (controller.lyricFontFamily.value == 'System'
-                    ? const TextStyle()
-                    : GoogleFonts.getFont(controller.lyricFontFamily.value)).copyWith(
-                  fontSize: controller.activeLyricSize.value,
-                  fontWeight: controller.boldActiveLyric.value ? FontWeight.bold : FontWeight.normal,
-                ),
-              )),
-            ],
-          )),
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.of(sheetContext).viewInsets.bottom),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.82),
+            child: Obx(() {
+              final selectedFont = controller.lyricFontFamily.value;
+              final activeSize = controller.activeLyricSize.value;
+              final isBold = controller.boldActiveLyric.value;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.text_fields),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text('Lyrics appearance', style: Theme.of(sheetContext).textTheme.titleLarge)),
+                    IconButton(tooltip: 'Close', onPressed: () => Navigator.of(sheetContext).pop(), icon: const Icon(Icons.close)),
+                  ]),
+                  Row(children: [
+                    const Expanded(child: Text('Active lyric size')),
+                    Text('${activeSize.round()} px'),
+                  ]),
+                  Slider(
+                    min: 16, max: 36, divisions: 20, value: activeSize,
+                    label: '${activeSize.round()} px',
+                    onChanged: controller.setActiveLyricSize,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Bold active lyric'),
+                    value: isBold,
+                    onChanged: controller.setBoldActiveLyric,
+                  ),
+                  const SizedBox(height: 6),
+                  Text('Choose a font', style: Theme.of(sheetContext).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: PlayerController.lyricFontFamilies.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (context, index) {
+                        final font = PlayerController.lyricFontFamilies[index];
+                        final selected = font == selectedFont;
+                        return Material(
+                          color: selected
+                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.16)
+                              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(14),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () => controller.setLyricFontFamily(font),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                              child: Row(children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(font, style: Theme.of(context).textTheme.labelMedium),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        'Sitting in the music, feel every word',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: _fontPreviewStyle(font, size: 19, weight: isBold ? FontWeight.bold : FontWeight.normal),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(selected ? Icons.check_circle : Icons.circle_outlined,
+                                  color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).hintColor),
+                              ]),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
         ),
       ),
     );
+  }
+
+  TextStyle _fontPreviewStyle(String font, {required double size, required FontWeight weight}) {
+    if (font == 'Poppins') return GoogleFonts.poppins(fontSize: size, fontWeight: weight);
+    return TextStyle(fontFamily: font == 'System' ? null : font, fontSize: size, fontWeight: weight);
   }
 }

@@ -102,6 +102,92 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/icons/
+    - assets/fonts/
+  fonts:
+    - family: 'Bold'
+      fonts:
+        - asset: assets/fonts/Bold.ttf
+    - family: 'Classic'
+      fonts:
+        - asset: assets/fonts/Classic.ttf
+    - family: 'Directional'
+      fonts:
+        - asset: assets/fonts/Directional.ttf
+    - family: 'Elegant'
+      fonts:
+        - asset: assets/fonts/Elegant.otf
+    - family: 'Gujarati Bold'
+      fonts:
+        - asset: assets/fonts/Gujarati Bold.ttf
+    - family: 'Gujarati Thin'
+      fonts:
+        - asset: assets/fonts/Gujarati Thin.ttf
+    - family: 'Hindi Bold'
+      fonts:
+        - asset: assets/fonts/Hindi Bold.ttf
+    - family: 'Hindi Thin'
+      fonts:
+        - asset: assets/fonts/Hindi Thin.ttf
+    - family: 'Journal'
+      fonts:
+        - asset: assets/fonts/Journal.ttf
+    - family: 'Meme'
+      fonts:
+        - asset: assets/fonts/Meme.ttf
+    - family: 'Modern'
+      fonts:
+        - asset: assets/fonts/Modern.ttf
+    - family: 'Neon'
+      fonts:
+        - asset: assets/fonts/Neon.otf
+    - family: 'PermanentMaker'
+      fonts:
+        - asset: assets/fonts/PermanentMaker.ttf
+    - family: 'Rosalia'
+      fonts:
+        - asset: assets/fonts/Rosalia.ttf
+    - family: 'SFProDisplay'
+      fonts:
+        - asset: assets/fonts/SFProDisplay.ttf
+    - family: 'SFProMedium'
+      fonts:
+        - asset: assets/fonts/SFProMedium.ttf
+    - family: 'Strong'
+      fonts:
+        - asset: assets/fonts/Strong.ttf
+    - family: 'Typewriter'
+      fonts:
+        - asset: assets/fonts/Typewriter.ttf
+    - family: 'iOS Bold'
+      fonts:
+        - asset: assets/fonts/iOS Bold.ttf
+    - family: 'iOS Comic Sans'
+      fonts:
+        - asset: assets/fonts/iOS Comic Sans.ttf
+    - family: 'iOS Cursive italic'
+      fonts:
+        - asset: assets/fonts/iOS Cursive italic.ttf
+    - family: 'iOS Hindi Bold'
+      fonts:
+        - asset: assets/fonts/iOS Hindi Bold.ttf
+    - family: 'iOS Hindi Light'
+      fonts:
+        - asset: assets/fonts/iOS Hindi Light.ttf
+    - family: 'iOS New Money'
+      fonts:
+        - asset: assets/fonts/iOS New Money.ttf
+    - family: 'iOS Semibold'
+      fonts:
+        - asset: assets/fonts/iOS Semibold.ttf
+    - family: 'iOS Strong'
+      fonts:
+        - asset: assets/fonts/iOS Strong.ttf
+    - family: 'iOS Typewriter'
+      fonts:
+        - asset: assets/fonts/iOS Typewriter.ttf
+    - family: 'literature'
+      fonts:
+        - asset: assets/fonts/literature.ttf
   #   - images/a_dot_ham.jpeg
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

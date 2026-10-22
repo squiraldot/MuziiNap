@@ -124,10 +124,13 @@ class PlayerController extends GetxController
     _setInitLyricsMode();
     final appPrefs = Hive.box(appPrefsBoxName);
     final savedFont = appPrefs.get('lyricsFontFamily');
-    lyricFontFamily.value = ['Poppins', 'Roboto', 'System'].contains(savedFont) ? savedFont as String : 'Poppins';
+    lyricFontFamily.value = lyricFontFamilies.contains(savedFont) ? savedFont as String : 'Poppins';
     final savedSize = appPrefs.get('activeLyricSize');
     activeLyricSize.value = savedSize is num && savedSize >= 16 && savedSize <= 36 ? savedSize.toDouble() : 22.0;
     boldActiveLyric.value = appPrefs.get('boldActiveLyric') is bool ? appPrefs.get('boldActiveLyric') as bool : true;
+    lyricUi.fontFamily = lyricFontFamily.value == 'System' ? null : lyricFontFamily.value;
+    lyricUi.defaultSize = activeLyricSize.value;
+    lyricUi.boldActiveLyric = boldActiveLyric.value;
     isLoopModeEnabled.value = appPrefs.get("isLoopModeEnabled") ?? false;
     isShuffleModeEnabled.value = appPrefs.get("isShuffleModeEnabled") ?? false;
     isQueueLoopModeEnabled.value =
@@ -322,7 +325,7 @@ class PlayerController extends GetxController
     return false;
   }
 
-  static const lyricFontFamilies = <String>['Poppins', 'Roboto', 'System'];
+  static const lyricFontFamilies = <String>["Poppins","System","Bold","Classic","Directional","Elegant","Gujarati Bold","Gujarati Thin","Hindi Bold","Hindi Thin","Journal","Meme","Modern","Neon","PermanentMaker","Rosalia","SFProDisplay","SFProMedium","Strong","Typewriter","iOS Bold","iOS Comic Sans","iOS Cursive italic","iOS Hindi Bold","iOS Hindi Light","iOS New Money","iOS Semibold","iOS Strong","iOS Typewriter","literature"];
 
   Future<void> setLyricFontFamily(String value) async {
     if (!lyricFontFamilies.contains(value)) return;
@@ -1274,14 +1277,17 @@ class MuziiNapLyricUI extends LyricUI {
     required double size,
     FontWeight? weight,
   }) {
-    if (fontFamily == null) {
+    if (fontFamily == null || fontFamily == 'System') {
       return TextStyle(color: color, fontSize: size, fontWeight: weight);
     }
-    return GoogleFonts.getFont(
-      fontFamily!,
+    if (fontFamily == 'Poppins') {
+      return GoogleFonts.poppins(color: color, fontSize: size, fontWeight: weight);
+    }
+    return TextStyle(
       color: color,
       fontSize: size,
       fontWeight: weight,
+      fontFamily: fontFamily,
     );
   }
 
