@@ -337,10 +337,18 @@ class PlayerController extends GetxController
   }
 
   void panellistener(double x) {
-    if (x >= 0 && x <= 0.2) {
-      playerPaneOpacity.value = 1 - (x * 5);
-      isPlayerpanelTopVisible.value = true;
-    } else if (x > 0.2) {
+    // PanelController.close() emits slide callbacks while dismissMiniPlayer is
+    // animating. Do not let those callbacks restore the header/opacity after
+    // the user explicitly dismissed the mini player.
+    if (!isMiniPlayerDismissed.value) {
+      if (x >= 0 && x <= 0.2) {
+        playerPaneOpacity.value = 1 - (x * 5);
+        isPlayerpanelTopVisible.value = true;
+      } else if (x > 0.2) {
+        isPlayerpanelTopVisible.value = false;
+      }
+    } else {
+      playerPaneOpacity.value = 0;
       isPlayerpanelTopVisible.value = false;
     }
 
