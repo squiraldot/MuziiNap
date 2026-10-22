@@ -3,13 +3,7 @@ name: Code quality check # branch validation
 on:
   push:
     branches:
-      - feature/advanced-equalizer
-      - feature/eq314-native-dsp-integration
-      - feature/custom-pcm-dsp-engine
-      - feature/pcm-dsp-chain
-      - feature/pcm-audio-processor
-      - feature/pcm-dsp-lifecycle-validation
-      - fix/player-youtube-playlist-action
+      - main
   workflow_dispatch:
 
 concurrency:
