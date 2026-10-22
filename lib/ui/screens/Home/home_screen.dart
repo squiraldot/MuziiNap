@@ -41,11 +41,13 @@ class HomeScreen extends StatelessWidget {
               ? Obx(
                   () => Padding(
                     padding: EdgeInsets.only(
-                        bottom: playerController.playerPanelMinHeight.value >
-                                Get.mediaQuery.padding.bottom
-                            ? playerController.playerPanelMinHeight.value -
-                                Get.mediaQuery.padding.bottom
-                            : playerController.playerPanelMinHeight.value),
+                        bottom: playerController.isMiniPlayerDismissed.value
+                            ? 0
+                            : playerController.playerPanelMinHeight.value >
+                                    Get.mediaQuery.padding.bottom
+                                ? playerController.playerPanelMinHeight.value -
+                                    Get.mediaQuery.padding.bottom
+                                : playerController.playerPanelMinHeight.value),
                     child: SizedBox(
                       height: 60,
                       width: 60,
