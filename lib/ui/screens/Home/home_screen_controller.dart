@@ -698,7 +698,8 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       isHomeSreenOnTop.value = isHomeOnTop;
 
       // Set miniplayer height accordingly
-      if (!playerCon.initFlagForPlayer) {
+      if (!playerCon.initFlagForPlayer &&
+          !playerCon.isMiniPlayerDismissed.value) {
         if (isHomeOnTop) {
           playerCon.playerPanelMinHeight.value = 75.0;
         } else {
@@ -706,8 +707,10 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
               isResultScreenOnTop
                   ? const Duration(milliseconds: 300)
                   : Duration.zero, () {
-            playerCon.playerPanelMinHeight.value =
-                75.0 + Get.mediaQuery.viewPadding.bottom;
+            if (!playerCon.isMiniPlayerDismissed.value) {
+              playerCon.playerPanelMinHeight.value =
+                  75.0 + Get.mediaQuery.viewPadding.bottom;
+            }
           });
         }
       }
