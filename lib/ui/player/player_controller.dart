@@ -222,6 +222,7 @@ class PlayerController extends GetxController
       }
 
       if (event.logicalKey == LogicalKeyboardKey.keyF) {
+        if (isMiniPlayerDismissed.value) return true;
         if (playerPanelController.isPanelOpen) {
           playerPanelController.close();
         } else {
@@ -312,28 +313,28 @@ class PlayerController extends GetxController
     lyricsMode.value = Hive.box(appPrefsBoxName).get("lyricsMode") ?? 0;
   }
 
-  /// Stop playback, collapse the expanded player, and remove its layout space.
+  /// Fully hide the player panel and stop playback until a song is selected again.
   Future<void> dismissMiniPlayer() async {
-    // Set dismissal before stop emits its asynchronous mediaItem=null event.
+    if (isMiniPlayerDismissed.value) return;
+
+    // Mark dismissal first so slide/media callbacks cannot resurrect the UI.
     isMiniPlayerDismissed.value = true;
     isPlayerpanelTopVisible.value = false;
     playerPaneOpacity.value = 0;
     isPanelGTHOpened.value = false;
-    playerPanelMinHeight.value = 0;
 
+    // close() only collapses to minHeight; hide() removes the panel itself.
     if (playerPanelController.isAttached) {
-      await playerPanelController.close();
+      await playerPanelController.hide();
     }
 
     await _audioHandler.stop();
 
-    // The collapsed panel normally reserves minHeight even when its header is
-    // hidden. Clear it so the home screen reclaims that space immediately.
-    // A new media item restores the mini-player height in the mediaItem listener.
+    // Keep minHeight as layout configuration; dismissal is controlled by the
+    // panel's hidden state and the dismissal flag, not by mutating its size.
     isPlayerpanelTopVisible.value = false;
     playerPaneOpacity.value = 0;
     isPanelGTHOpened.value = false;
-    playerPanelMinHeight.value = 0;
   }
 
   void panellistener(double x) {
@@ -360,10 +361,16 @@ class PlayerController extends GetxController
   }
 
   void _listenForKeyboardActivity() {
-    var keyboardVisibilityController = KeyboardVisibilityController();
+    final keyboardVisibilityController = KeyboardVisibilityController();
     keyboardSubscription =
         keyboardVisibilityController.onChange.listen((bool visible) {
-      visible ? playerPanelController.hide() : playerPanelController.show();
+      if (!playerPanelController.isAttached) return;
+      if (visible) {
+        playerPanelController.hide();
+      } else if (!isMiniPlayerDismissed.value) {
+        // Keyboard dismissal must not undo an explicit Mini Player dismissal.
+        playerPanelController.show();
+      }
     });
   }
 
@@ -463,19 +470,19 @@ class PlayerController extends GetxController
         isPlayerpanelTopVisible.value = false;
         playerPaneOpacity.value = 0;
         isPanelGTHOpened.value = false;
-        playerPanelMinHeight.value = 0;
       } else {
         final dismissed = isMiniPlayerDismissed.value;
         isPlayerpanelTopVisible.value = !dismissed;
         playerPaneOpacity.value = dismissed ? 0 : 1;
         final miniPlayerHeight = Get.size.width > 800 ? 105.0 : 75.0;
         final settings = Get.find<SettingsScreenController>();
-        playerPanelMinHeight.value = dismissed
-            ? 0
-            : (settings.isBottomNavBarEnabled.isFalse ||
-                    getCurrentRouteName() != '/homeScreen')
-                ? miniPlayerHeight + Get.mediaQuery.viewPadding.bottom
-                : miniPlayerHeight;
+        if (!dismissed) {
+          playerPanelMinHeight.value =
+              (settings.isBottomNavBarEnabled.isFalse ||
+                      getCurrentRouteName() != '/homeScreen')
+                  ? miniPlayerHeight + Get.mediaQuery.viewPadding.bottom
+                  : miniPlayerHeight;
+        }
         printINFO(mediaItem.title);
         _newSongFlag = true;
         isCurrentSongBuffered.value = false;
@@ -527,7 +534,7 @@ class PlayerController extends GetxController
         final int position = prevSessionData.get("position");
         prevSessionData.close();
         await _audioHandler.addQueueItems(songList);
-        _playerPanelCheck(restoreSession: true);
+        await _playerPanelCheck(restoreSession: true);
         await _audioHandler.customAction("playByIndex", {
           "index": currentIndex,
           "position": position,
@@ -578,7 +585,7 @@ class PlayerController extends GetxController
       },
     ).then((value) async {
       if (playlistid != null) {
-        _playerPanelCheck();
+        await _playerPanelCheck();
         await _audioHandler.customAction("playByIndex", {"index": 0});
       } else {
         if (Hive.box(appPrefsBoxName).get("discoverContentType") == "BOLI") {
@@ -593,7 +600,7 @@ class PlayerController extends GetxController
       return;
     }
 
-    _playerPanelCheck();
+    await _playerPanelCheck();
     await _audioHandler
         .customAction("setSourceNPlay", {'mediaItem': mediaItem});
 
@@ -622,7 +629,7 @@ class PlayerController extends GetxController
       }
     });
 
-    _playerPanelCheck();
+    await _playerPanelCheck();
     await _audioHandler.updateQueue(mediaItems);
     if (isShuffleModeEnabled.value) {
       await _audioHandler.customAction("shuffleCmd", {"index": index});
@@ -728,24 +735,35 @@ class PlayerController extends GetxController
     }
   }
 
-  void _playerPanelCheck({bool restoreSession = false}) {
+  Future<void> _playerPanelCheck({bool restoreSession = false}) async {
     // Only a deliberate new song selection clears a user-requested dismissal.
-    if (!restoreSession) isMiniPlayerDismissed.value = false;
+    final wasDismissed = isMiniPlayerDismissed.value;
+    if (!restoreSession && wasDismissed) {
+      isMiniPlayerDismissed.value = false;
+      // A dismissed panel was hidden at the widget level. Restore it before
+      // any optional auto-open, otherwise open() animates an invisible panel.
+      if (playerPanelController.isAttached) {
+        await playerPanelController.show();
+      }
+    }
+
     final isWideScreen = Get.size.width > 800;
     final autoOpenPlayer = Hive.box(appPrefsBoxName).get("autoOpenPlayer") ?? false;
     if ((!isWideScreen && autoOpenPlayer && playerPanelController.isAttached) &&
         !restoreSession) {
-      playerPanelController.open();
+      await playerPanelController.open();
     }
 
     if (initFlagForPlayer) {
       final miniPlayerHeight = isWideScreen ? 105.0 : 75.0;
-      if (Get.find<SettingsScreenController>().isBottomNavBarEnabled.isFalse ||
-          getCurrentRouteName() != '/homeScreen') {
-        playerPanelMinHeight.value =
-            miniPlayerHeight + Get.mediaQuery.viewPadding.bottom;
-      } else {
-        playerPanelMinHeight.value = miniPlayerHeight;
+      if (!isMiniPlayerDismissed.value) {
+        if (Get.find<SettingsScreenController>().isBottomNavBarEnabled.isFalse ||
+            getCurrentRouteName() != '/homeScreen') {
+          playerPanelMinHeight.value =
+              miniPlayerHeight + Get.mediaQuery.viewPadding.bottom;
+        } else {
+          playerPanelMinHeight.value = miniPlayerHeight;
+        }
       }
       initFlagForPlayer = false;
     }
