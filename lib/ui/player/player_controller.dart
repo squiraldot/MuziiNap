@@ -472,8 +472,15 @@ class PlayerController extends GetxController
         isPanelGTHOpened.value = false;
       } else {
         final dismissed = isMiniPlayerDismissed.value;
-        isPlayerpanelTopVisible.value = !dismissed;
-        playerPaneOpacity.value = dismissed ? 0 : 1;
+        // A mediaItem event is emitted for every Next/Previous action. The
+        // panel's header is attached to the top of the expanded player, so
+        // showing it unconditionally duplicates the Mini Player over Player.
+        // Derive header visibility from the actual panel position instead.
+        final panelIsExpanded = playerPanelController.isAttached &&
+            playerPanelController.panelPosition > 0.2;
+        final showMiniPlayerHeader = !dismissed && !panelIsExpanded;
+        isPlayerpanelTopVisible.value = showMiniPlayerHeader;
+        playerPaneOpacity.value = showMiniPlayerHeader ? 1 : 0;
         final miniPlayerHeight = Get.size.width > 800 ? 105.0 : 75.0;
         final settings = Get.find<SettingsScreenController>();
         if (!dismissed) {
