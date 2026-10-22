@@ -140,6 +140,15 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 5, right: 10),
+                leading: const Icon(Icons.text_fields),
+                title: const Text('Lyrics appearance'),
+                subtitle: const Text(
+                  'Font, live preview, active lyric size and bold style',
+                ),
+                onTap: () => _showLyricsAppearanceSettings(context),
+              ),
               CustomExpansionTile(
                   title: "YouTube Account",
                   icon: Icons.account_circle,
