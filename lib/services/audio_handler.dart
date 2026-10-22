@@ -184,10 +184,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           MediaControl.skipToPrevious,
           if (playing) MediaControl.pause else MediaControl.play,
           MediaControl.skipToNext,
-          // Android's expanded media notification exposes this stop/dismiss
-          // action. It clears the active media item so the notification can
-          // be removed instead of leaving a paused card behind.
-          MediaControl.stop,
+          // Use a custom close action so Android shows an X instead of the
+          // default square stop glyph. The action also hides the in-app panel.
+          MediaControl.custom(
+            androidIcon: 'drawable/ic_close_24',
+            label: 'Close player',
+            name: 'dismiss_player',
+          ),
         ],
         systemActions: const {
           MediaAction.seek,
@@ -535,6 +538,19 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   @override
   Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
     switch (name) {
+      case 'dismiss_player':
+        // Stop clears AudioService metadata; also hide the attached Flutter
+        // panel so stopping from the notification cannot reveal Player Screen.
+        await stop();
+        final playerController = Get.find<PlayerController>();
+        playerController.isMiniPlayerDismissed.value = true;
+        playerController.isPlayerpanelTopVisible.value = false;
+        playerController.playerPaneOpacity.value = 0;
+        playerController.isPanelGTHOpened.value = false;
+        if (playerController.playerPanelController.isAttached) {
+          await playerController.playerPanelController.hide();
+        }
+        break;
 
       case 'dispose':
         if (_activeEqualizerSessionId != null) {
