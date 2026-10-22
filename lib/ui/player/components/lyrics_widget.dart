@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/loader.dart';
 import '../player_controller.dart';
@@ -34,12 +35,17 @@ class LyricsWidget extends StatelessWidget {
                               ? "lyricsNotAvailable".tr
                               : playerController.lyrics["plainLyrics"],
                           textAlign: TextAlign.center,
-                          style: playerController.isLyricsDialogOpen
-                              ? Theme.of(context).textTheme.titleMedium!
-                              : Theme.of(context)
-                                  .textTheme
-                                  .titleMedium!
-                                  .copyWith(color: Colors.white, fontFamily: playerController.lyricFontFamily.value == 'System' ? null : playerController.lyricFontFamily.value, fontSize: playerController.activeLyricSize.value),
+                          style: (playerController.lyricFontFamily.value == 'System'
+                                  ? Theme.of(context).textTheme.titleMedium!
+                                  : GoogleFonts.getFont(
+                                      playerController.lyricFontFamily.value,
+                                      textStyle: Theme.of(context).textTheme.titleMedium,
+                                    )).copyWith(
+                              color: playerController.isLyricsDialogOpen
+                                  ? Theme.of(context).textTheme.titleMedium!.color
+                                  : Colors.white,
+                              fontSize: playerController.activeLyricSize.value,
+                            ),
                         ),
                       ),
                     ),
@@ -132,8 +138,9 @@ class LyricsWidget extends StatelessWidget {
               Center(child: Text(
                 'Preview · MuziiNap lyrics',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: controller.lyricFontFamily.value == 'System' ? null : controller.lyricFontFamily.value,
+                style: (controller.lyricFontFamily.value == 'System'
+                    ? const TextStyle()
+                    : GoogleFonts.getFont(controller.lyricFontFamily.value)).copyWith(
                   fontSize: controller.activeLyricSize.value,
                   fontWeight: controller.boldActiveLyric.value ? FontWeight.bold : FontWeight.normal,
                 ),
