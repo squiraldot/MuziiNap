@@ -328,25 +328,25 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ]),
               CustomExpansionTile(
+                title: 'Lyrics Preference',
+                icon: Icons.lyrics_outlined,
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.only(left: 5, right: 10),
+                    leading: const Icon(Icons.text_fields),
+                    title: const Text('Set Fonts on Lyrics'),
+                    subtitle: const Text(
+                      'Choose font, preview styles, size and bold active lyrics',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showLyricsAppearanceSettings(context),
+                  ),
+                ],
+              ),
+              CustomExpansionTile(
                 title: "music&Playback".tr,
                 icon: Icons.music_note,
                 children: [
-                  CustomExpansionTile(
-                    title: 'Lyrics Preference',
-                    icon: Icons.lyrics_outlined,
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.only(left: 5, right: 10),
-                        leading: const Icon(Icons.text_fields),
-                        title: const Text('Set Fonts on Lyrics'),
-                        subtitle: const Text(
-                          'Choose font, preview styles, size and bold active lyrics',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showLyricsAppearanceSettings(context),
-                      ),
-                    ],
-                  ),
                   ListTile(
                       contentPadding:
                           const EdgeInsets.only(left: 5, right: 10, top: 0),
