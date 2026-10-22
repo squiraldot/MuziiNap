@@ -1241,7 +1241,7 @@ class PlayerController extends GetxController
 enum PlayButtonState { paused, playing, loading }
 
 class MuziiNapLyricUI extends LyricUI {
-  final double defaultSize;
+  double defaultSize;
   final double defaultExtSize;
   final double otherMainSize;
   final double bias;
