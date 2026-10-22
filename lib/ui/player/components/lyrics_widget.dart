@@ -12,8 +12,12 @@ class LyricsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final playerController = Get.find<PlayerController>();
-    return Obx(
-      () => playerController.isLyricsLoading.isTrue
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Obx(() {
+            playerController.lyricsStyleRevision.value;
+            return playerController.isLyricsLoading.isTrue
           ? const Center(
               child: LoadingIndicator(),
             )
@@ -35,7 +39,7 @@ class LyricsWidget extends StatelessWidget {
                               : Theme.of(context)
                                   .textTheme
                                   .titleMedium!
-                                  .copyWith(color: Colors.white),
+                                  .copyWith(color: Colors.white, fontFamily: playerController.lyricFontFamily.value == 'System' ? null : playerController.lyricFontFamily.value, fontSize: playerController.activeLyricSize.value),
                         ),
                       ),
                     ),
@@ -63,7 +67,81 @@ class LyricsWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                );
+          }),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: Material(
+            color: Colors.black.withOpacity(0.45),
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: 'Lyrics appearance',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.text_fields, color: Colors.white),
+              onPressed: () => _showLyricsAppearance(context, playerController),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showLyricsAppearance(BuildContext context, PlayerController controller) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(sheetContext).viewInsets.bottom),
+          child: Obx(() => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Lyrics appearance', style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: controller.lyricFontFamily.value,
+                decoration: const InputDecoration(labelText: 'Font family'),
+                items: PlayerController.lyricFontFamilies.map((font) => DropdownMenuItem(
+                  value: font,
+                  child: Text(font, style: TextStyle(fontFamily: font == 'System' ? null : font)),
+                )).toList(),
+                onChanged: (value) { if (value != null) controller.setLyricFontFamily(value); },
+              ),
+              const SizedBox(height: 18),
+              Row(children: [
+                const Expanded(child: Text('Active lyric size')),
+                Text('${controller.activeLyricSize.value.round()} px'),
+              ]),
+              Slider(
+                min: 16, max: 36, divisions: 20,
+                value: controller.activeLyricSize.value,
+                label: '${controller.activeLyricSize.value.round()} px',
+                onChanged: controller.setActiveLyricSize,
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Bold active lyric'),
+                value: controller.boldActiveLyric.value,
+                onChanged: controller.setBoldActiveLyric,
+              ),
+              const SizedBox(height: 8),
+              Center(child: Text(
+                'Preview · MuziiNap lyrics',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: controller.lyricFontFamily.value == 'System' ? null : controller.lyricFontFamily.value,
+                  fontSize: controller.activeLyricSize.value,
+                  fontWeight: controller.boldActiveLyric.value ? FontWeight.bold : FontWeight.normal,
                 ),
+              )),
+            ],
+          )),
+        ),
+      ),
     );
   }
 }
