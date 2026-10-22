@@ -707,7 +707,7 @@ Future<void> _showLyricsAppearanceSettings(BuildContext context) async {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(font, style: Theme.of(context).textTheme.bodyMedium),
+                                    Text(font, style: Theme.of(context).textTheme.titleMedium),
                                     const SizedBox(height: 3),
                                     Text(
                                       'Sitting in the music, feel every word',
@@ -715,7 +715,7 @@ Future<void> _showLyricsAppearanceSettings(BuildContext context) async {
                                       overflow: TextOverflow.ellipsis,
                                       style: _lyricsFontPreviewStyle(
                                         font,
-                                        size: Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14,
+                                        size: Theme.of(context).textTheme.bodyMedium!.fontSize!,
                                         weight: isBold ? FontWeight.bold : FontWeight.normal,
                                       ),
                                     ),
