@@ -39,7 +39,7 @@ jobs:
 
       - name: Verify pinned Flutter submodule
         env:
-          FLUTTER_COMMIT: 4cf269e36de2573851eaef3c763994f8f9be494d
+          FLUTTER_COMMIT: 84abdf7372654171e0a66174be2846f53331f6ab
         run: |
           test "$(git -C flutter rev-parse HEAD)" = "$FLUTTER_COMMIT"
           git -C flutter show -s --format='%H %s' HEAD
