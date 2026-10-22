@@ -81,20 +81,35 @@ jobs:
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -n "$SDKMANAGER"
 
-          # A transient/corrupt SDK download can leave a non-ZIP NDK archive
-          # cached by sdkmanager. Remove partial state before retrying.
-          rm -rf "$SDK_ROOT/ndk/27.0.12077973" "$HOME/.android/cache"
+          NDK_DIR="$SDK_ROOT/ndk/27.0.12077973"
+          # Clear stale SDK Manager downloads and partial NDK extraction.
+          rm -rf "$NDK_DIR" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
+
+          # Accept licenses separately. Do not use pipefail for the 'yes'
+          # producer: sdkmanager can close stdin early after accepting input,
+          # which makes yes exit with SIGPIPE even when sdkmanager succeeds.
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses
+          set -o pipefail
+
           for attempt in 1 2 3; do
             echo "Installing NDK 27.0.12077973 (attempt $attempt/3)"
-            if yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973"; then
-              test -x "$SDK_ROOT/ndk/27.0.12077973/ndk-build"
-              echo "NDK 27.0.12077973 installed and verified."
-              exit 0
+            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973"; then
+              if [ -f "$NDK_DIR/source.properties" ] && [ -x "$NDK_DIR/ndk-build" ]; then
+                grep -F "Pkg.Revision = 27.0.12077973" "$NDK_DIR/source.properties"
+                echo "NDK 27.0.12077973 installed and verified."
+                exit 0
+              fi
+              echo "::warning::sdkmanager returned success but NDK files are incomplete."
+            else
+              echo "::warning::sdkmanager failed on attempt $attempt."
             fi
-            rm -rf "$SDK_ROOT/ndk/27.0.12077973" "$HOME/.android/cache"
+
+            rm -rf "$NDK_DIR" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
           done
-          echo "NDK installation failed after 3 attempts." >&2
+
+          echo "::error::NDK installation failed after 3 clean attempts." >&2
           exit 1
 
       - name: Generate localization
