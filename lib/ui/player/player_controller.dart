@@ -323,12 +323,16 @@ class PlayerController extends GetxController
     playerPaneOpacity.value = 0;
     isPanelGTHOpened.value = false;
 
+    // Stop immediately, before waiting for the panel animation. A stream URL
+    // request may otherwise finish during the hide animation and start playback.
+    // AudioHandler.stop() invalidates the in-flight play session synchronously.
+    final stopFuture = _audioHandler.stop();
+
     // close() only collapses to minHeight; hide() removes the panel itself.
     if (playerPanelController.isAttached) {
       await playerPanelController.hide();
     }
-
-    await _audioHandler.stop();
+    await stopFuture;
 
     // Keep minHeight as layout configuration; dismissal is controlled by the
     // panel's hidden state and the dismissal flag, not by mutating its size.
