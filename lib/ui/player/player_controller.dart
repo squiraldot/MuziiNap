@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/playling_from.dart';
 import '../../services/downloader.dart';
@@ -76,8 +77,15 @@ class PlayerController extends GetxController
   bool isLyricsDialogOpen = false;
   // 0 for play, 1 for pause, 2 for blank
   final gesturePlayerVisibleState = 2.obs;
-  final lyricUi =
-      MuziiNapLyricUI(highlight: true, defaultSize: 20, defaultExtSize: 12);
+  final lyricFontFamily = 'Poppins'.obs;
+  final activeLyricSize = 22.0.obs;
+  final boldActiveLyric = true.obs;
+  final lyricsStyleRevision = 0.obs;
+  late final MuziiNapLyricUI lyricUi = MuziiNapLyricUI(
+    highlight: true, defaultSize: activeLyricSize.value, defaultExtSize: 12,
+    fontFamily: lyricFontFamily.value,
+    boldActiveLyric: boldActiveLyric.value,
+  );
   RxMap<String, dynamic> lyrics =
       <String, dynamic>{"synced": "", "plainLyrics": ""}.obs;
   ScrollController scrollController = ScrollController();
@@ -115,6 +123,11 @@ class PlayerController extends GetxController
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _setInitLyricsMode();
     final appPrefs = Hive.box(appPrefsBoxName);
+    final savedFont = appPrefs.get('lyricsFontFamily');
+    lyricFontFamily.value = ['Poppins', 'Roboto', 'System'].contains(savedFont) ? savedFont as String : 'Poppins';
+    final savedSize = appPrefs.get('activeLyricSize');
+    activeLyricSize.value = savedSize is num && savedSize >= 16 && savedSize <= 36 ? savedSize.toDouble() : 22.0;
+    boldActiveLyric.value = appPrefs.get('boldActiveLyric') is bool ? appPrefs.get('boldActiveLyric') as bool : true;
     isLoopModeEnabled.value = appPrefs.get("isLoopModeEnabled") ?? false;
     isShuffleModeEnabled.value = appPrefs.get("isShuffleModeEnabled") ?? false;
     isQueueLoopModeEnabled.value =
@@ -307,6 +320,31 @@ class PlayerController extends GetxController
       }
     }
     return false;
+  }
+
+  static const lyricFontFamilies = <String>['Poppins', 'Roboto', 'System'];
+
+  Future<void> setLyricFontFamily(String value) async {
+    if (!lyricFontFamilies.contains(value)) return;
+    lyricFontFamily.value = value;
+    lyricUi.fontFamily = value == 'System' ? null : value;
+    lyricsStyleRevision.value++;
+    await Hive.box(appPrefsBoxName).put('lyricsFontFamily', value);
+  }
+
+  Future<void> setActiveLyricSize(double value) async {
+    final size = value.clamp(16.0, 36.0).toDouble();
+    activeLyricSize.value = size;
+    lyricUi.defaultSize = size;
+    lyricsStyleRevision.value++;
+    await Hive.box(appPrefsBoxName).put('activeLyricSize', size);
+  }
+
+  Future<void> setBoldActiveLyric(bool value) async {
+    boldActiveLyric.value = value;
+    lyricUi.boldActiveLyric = value;
+    lyricsStyleRevision.value++;
+    await Hive.box(appPrefsBoxName).put('boldActiveLyric', value);
   }
 
   void _setInitLyricsMode() {
@@ -1213,6 +1251,8 @@ class MuziiNapLyricUI extends LyricUI {
   final LyricBaseLine lyricBaseLine;
   final bool highlight;
   final HighlightDirection highlightDirection;
+  String? fontFamily;
+  bool boldActiveLyric;
 
   MuziiNapLyricUI({
     this.defaultSize = 20,
@@ -1225,27 +1265,31 @@ class MuziiNapLyricUI extends LyricUI {
     this.lyricBaseLine = LyricBaseLine.CENTER,
     this.highlight = true,
     this.highlightDirection = HighlightDirection.LTR,
+    this.fontFamily = 'Poppins',
+    this.boldActiveLyric = true,
   });
 
   @override
   TextStyle getPlayingExtTextStyle() =>
-      TextStyle(color: Colors.grey[300], fontSize: defaultExtSize);
+      GoogleFonts.getFont(fontFamily ?? 'Roboto', color: Colors.grey[300], fontSize: defaultExtSize);
 
   @override
   TextStyle getOtherExtTextStyle() => TextStyle(
         color: Colors.grey[300],
         fontSize: defaultExtSize,
+        fontFamily: fontFamily,
       );
 
   @override
   TextStyle getOtherMainTextStyle() =>
-      TextStyle(color: Colors.grey[200], fontSize: otherMainSize);
+      GoogleFonts.getFont(fontFamily ?? 'Roboto', color: Colors.grey[200], fontSize: otherMainSize);
 
   @override
   TextStyle getPlayingMainTextStyle() => TextStyle(
         color: Colors.white,
         fontSize: defaultSize,
-        fontWeight: FontWeight.bold, // BOLD ACTIVE LYRIC
+        fontFamily: fontFamily,
+        fontWeight: boldActiveLyric ? FontWeight.bold : FontWeight.normal,
       );
 
   @override
