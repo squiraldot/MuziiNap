@@ -30,6 +30,7 @@ class Home extends StatelessWidget {
     final isWideScreen = size.width > 800;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!playerController.initFlagForPlayer &&
+          !playerController.isMiniPlayerDismissed.value &&
           settingsScreenController.isBottomNavBarEnabled.isFalse) {
         if (isWideScreen) {
           playerController.playerPanelMinHeight.value =
