@@ -29,7 +29,9 @@ class ArtistScreen extends StatelessWidget {
       floatingActionButton: Obx(
         () => Padding(
           padding: EdgeInsets.only(
-              bottom: playerController.playerPanelMinHeight.value),
+              bottom: playerController.isMiniPlayerDismissed.value
+                  ? 0
+                  : playerController.playerPanelMinHeight.value),
           child: SizedBox(
             height: 60,
             width: 60,
