@@ -72,6 +72,31 @@ jobs:
           channel: stable
           flutter-version: '3.47.5'
           cache: true
+      - name: Repair and install Android NDK with retries
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+
+          # A transient/corrupt SDK download can leave a non-ZIP NDK archive
+          # cached by sdkmanager. Remove partial state before retrying.
+          rm -rf "$SDK_ROOT/ndk/27.0.12077973" "$HOME/.android/cache"
+          for attempt in 1 2 3; do
+            echo "Installing NDK 27.0.12077973 (attempt $attempt/3)"
+            if yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973"; then
+              test -x "$SDK_ROOT/ndk/27.0.12077973/ndk-build"
+              echo "NDK 27.0.12077973 installed and verified."
+              exit 0
+            fi
+            rm -rf "$SDK_ROOT/ndk/27.0.12077973" "$HOME/.android/cache"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+          echo "NDK installation failed after 3 attempts." >&2
+          exit 1
+
       - name: Generate localization
         run: dart localization/generator.dart
 
