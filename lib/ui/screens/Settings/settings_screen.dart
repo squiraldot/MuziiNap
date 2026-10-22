@@ -331,14 +331,21 @@ class SettingsScreen extends StatelessWidget {
                 title: "music&Playback".tr,
                 icon: Icons.music_note,
                 children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.only(left: 5, right: 10),
-                    leading: const Icon(Icons.text_fields),
-                    title: const Text('Lyrics appearance'),
-                    subtitle: const Text(
-                      'Font, live preview, active lyric size and bold style',
-                    ),
-                    onTap: () => _showLyricsAppearanceSettings(context),
+                  CustomExpansionTile(
+                    title: 'Lyrics Preference',
+                    icon: Icons.lyrics_outlined,
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.only(left: 5, right: 10),
+                        leading: const Icon(Icons.text_fields),
+                        title: const Text('Set Fonts on Lyrics'),
+                        subtitle: const Text(
+                          'Choose font, preview styles, size and bold active lyrics',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showLyricsAppearanceSettings(context),
+                      ),
+                    ],
                   ),
                   ListTile(
                       contentPadding:
