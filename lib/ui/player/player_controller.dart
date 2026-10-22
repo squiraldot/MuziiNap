@@ -710,7 +710,7 @@ class PlayerController extends GetxController
 
   void _playerPanelCheck({bool restoreSession = false}) {
     final isWideScreen = Get.size.width > 800;
-    final autoOpenPlayer = Hive.box(appPrefsBoxName).get("autoOpenPlayer") ?? true;
+    final autoOpenPlayer = Hive.box(appPrefsBoxName).get("autoOpenPlayer") ?? false;
     if ((!isWideScreen && autoOpenPlayer && playerPanelController.isAttached) &&
         !restoreSession) {
       playerPanelController.open();
