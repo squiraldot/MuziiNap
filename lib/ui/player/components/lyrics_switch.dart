@@ -26,12 +26,12 @@ void _showLyricsAppearance(BuildContext context, PlayerController controller) {
                 Row(children: [
                   const Icon(Icons.text_fields),
                   const SizedBox(width: 10),
-                  Expanded(child: Text('Lyrics appearance', style: Theme.of(sheetContext).textTheme.titleLarge)),
+                  Expanded(child: Text('Lyrics appearance', style: Theme.of(sheetContext).textTheme.titleMedium)),
                   IconButton(tooltip: 'Close', onPressed: () => Navigator.of(sheetContext).pop(), icon: const Icon(Icons.close)),
                 ]),
                 Row(children: [
-                  const Expanded(child: Text('Active lyric size')),
-                  Text('${activeSize.round()} px'),
+                  Expanded(child: Text('Active lyric size', style: Theme.of(sheetContext).textTheme.bodyMedium)),
+                  Text('${activeSize.round()} px', style: Theme.of(sheetContext).textTheme.bodyMedium),
                 ]),
                 Slider(
                   min: 16, max: 36, divisions: 20, value: activeSize,
@@ -40,12 +40,12 @@ void _showLyricsAppearance(BuildContext context, PlayerController controller) {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Bold active lyric'),
+                  title: Text('Bold active lyric', style: Theme.of(sheetContext).textTheme.bodyMedium),
                   value: isBold,
                   onChanged: controller.setBoldActiveLyric,
                 ),
                 const SizedBox(height: 6),
-                Text('Choose a font', style: Theme.of(sheetContext).textTheme.titleMedium),
+                Text('Choose a font', style: Theme.of(sheetContext).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView.separated(
@@ -63,19 +63,19 @@ void _showLyricsAppearance(BuildContext context, PlayerController controller) {
                           borderRadius: BorderRadius.circular(14),
                           onTap: () => controller.setLyricFontFamily(font),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             child: Row(children: [
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(font, style: Theme.of(context).textTheme.labelMedium),
+                                    Text(font, style: Theme.of(context).textTheme.titleMedium),
                                     const SizedBox(height: 3),
                                     Text(
                                       'Sitting in the music, feel every word',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: _fontPreviewStyle(font, size: 19, weight: isBold ? FontWeight.bold : FontWeight.normal),
+                                      style: _fontPreviewStyle(font, size: Theme.of(context).textTheme.bodyMedium!.fontSize!, weight: isBold ? FontWeight.bold : FontWeight.normal),
                                     ),
                                   ],
                                 ),
