@@ -36,6 +36,8 @@ class PlayerController extends GetxController
   final currentQueue = <MediaItem>[].obs;
 
   final playerPaneOpacity = (1.0).obs;
+  // Prevent route and media updates from resurrecting a dismissed mini player.
+  final isMiniPlayerDismissed = false.obs;
   final isPlayerpanelTopVisible = true.obs;
   final isPanelGTHOpened = false.obs;
   final playerPanelMinHeight = 0.0.obs;
@@ -312,6 +314,13 @@ class PlayerController extends GetxController
 
   /// Stop playback, collapse the expanded player, and remove its layout space.
   Future<void> dismissMiniPlayer() async {
+    // Set dismissal before stop emits its asynchronous mediaItem=null event.
+    isMiniPlayerDismissed.value = true;
+    isPlayerpanelTopVisible.value = false;
+    playerPaneOpacity.value = 0;
+    isPanelGTHOpened.value = false;
+    playerPanelMinHeight.value = 0;
+
     if (playerPanelController.isAttached) {
       await playerPanelController.close();
     }
@@ -441,18 +450,21 @@ class PlayerController extends GetxController
       if (mediaItem == null) {
         // AudioService.stop() (including the notification's dismiss action)
         // clears the media item. Keep the in-app mini player in sync.
+        isMiniPlayerDismissed.value = true;
         currentSong.value = null;
         isPlayerpanelTopVisible.value = false;
         playerPaneOpacity.value = 0;
         isPanelGTHOpened.value = false;
         playerPanelMinHeight.value = 0;
       } else {
-        isPlayerpanelTopVisible.value = true;
-        playerPaneOpacity.value = 1;
+        final dismissed = isMiniPlayerDismissed.value;
+        isPlayerpanelTopVisible.value = !dismissed;
+        playerPaneOpacity.value = dismissed ? 0 : 1;
         final miniPlayerHeight = Get.size.width > 800 ? 105.0 : 75.0;
         final settings = Get.find<SettingsScreenController>();
-        playerPanelMinHeight.value =
-            (settings.isBottomNavBarEnabled.isFalse ||
+        playerPanelMinHeight.value = dismissed
+            ? 0
+            : (settings.isBottomNavBarEnabled.isFalse ||
                     getCurrentRouteName() != '/homeScreen')
                 ? miniPlayerHeight + Get.mediaQuery.viewPadding.bottom
                 : miniPlayerHeight;
@@ -709,6 +721,8 @@ class PlayerController extends GetxController
   }
 
   void _playerPanelCheck({bool restoreSession = false}) {
+    // Only a deliberate new song selection clears a user-requested dismissal.
+    if (!restoreSession) isMiniPlayerDismissed.value = false;
     final isWideScreen = Get.size.width > 800;
     final autoOpenPlayer = Hive.box(appPrefsBoxName).get("autoOpenPlayer") ?? false;
     if ((!isWideScreen && autoOpenPlayer && playerPanelController.isAttached) &&
