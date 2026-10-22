@@ -652,7 +652,7 @@ Future<void> _showLyricsAppearanceSettings(
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(sheetContext).size.height * 0.86,
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.72,
           ),
           child: Obx(() {
             final selectedFont = controller.lyricFontFamily.value;
