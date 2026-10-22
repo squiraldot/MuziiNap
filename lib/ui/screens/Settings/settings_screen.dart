@@ -339,7 +339,10 @@ class SettingsScreen extends StatelessWidget {
                       'Choose font, preview styles, size and bold active lyrics',
                     ),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showLyricsAppearanceSettings(context),
+                    onTap: () => _showLyricsAppearanceSettings(
+                      context,
+                      hasBottomNavigation: isBottomNavActive,
+                    ),
                   ),
                 ],
               ),
@@ -627,7 +630,10 @@ Widget radioWidget(
       ));
 }
 
-Future<void> _showLyricsAppearanceSettings(BuildContext context) async {
+Future<void> _showLyricsAppearanceSettings(
+  BuildContext context, {
+  required bool hasBottomNavigation,
+}) async {
   final controller = Get.find<PlayerController>();
   await showModalBottomSheet<void>(
     context: context,
@@ -635,8 +641,14 @@ Future<void> _showLyricsAppearanceSettings(BuildContext context) async {
     backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (sheetContext) => SafeArea(
       child: Padding(
+        // Keep the font list above the app's persistent bottom navigation.
         padding: EdgeInsets.fromLTRB(
-          20, 18, 20, 20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+          20,
+          18,
+          20,
+          20 +
+              MediaQuery.of(sheetContext).viewInsets.bottom +
+              (hasBottomNavigation ? 88 : 0),
         ),
         child: ConstrainedBox(
           constraints: BoxConstraints(
