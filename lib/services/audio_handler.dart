@@ -600,6 +600,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
         try {
           await _player.setAudioSource(await _createAudioSource(currentSong));
+          if (currentSession != _playSessionId) return;
         } catch (sourceError) {
           // setAudioSource can throw before playbackEventStream emits an
           // error. Refresh the URL once here as well so the first tap is not
@@ -616,6 +617,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
           await _normalizeVolume(streamInfo.audio!.loudnessDb);
         }
+        if (currentSession != _playSessionId) return;
 
         if (restoreSession) {
             final position = extras['position'];
@@ -730,12 +732,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currMed.extras!['streamHeaders'] = streamInfo.streamHeaders;
 
         await _player.setAudioSource(await _createAudioSource(currMed));
+        if (currentSession != _playSessionId) return;
         isSongLoading = false;
 
         // Normalize audio
         if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
           await _normalizeVolume(streamInfo.audio!.loudnessDb);
         }
+        if (currentSession != _playSessionId) return;
 
         final playFuture = _player.play();
         _applyEqualizerAfterPlaybackStarts();
@@ -1000,9 +1004,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   @override
   Future<void> stop() async {
-    await _player.stop();
-    currentSongUrl = null;
+    // Invalidate any in-flight stream lookup/source setup immediately. Without
+    // this, a tap-to-play request can finish after dismissal and start audio
+    // (and recreate the Android media notification) after stop() returns.
+    _playSessionId++;
+    _playbackRecoverySongId = null;
     isSongLoading = false;
+    currentSongUrl = null;
+    await _player.stop();
     mediaItem.add(null);
     queue.add(<MediaItem>[]);
     playbackState.add(playbackState.value.copyWith(
