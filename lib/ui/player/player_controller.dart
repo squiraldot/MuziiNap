@@ -1269,27 +1269,39 @@ class MuziiNapLyricUI extends LyricUI {
     this.boldActiveLyric = true,
   });
 
-  @override
-  TextStyle getPlayingExtTextStyle() =>
-      GoogleFonts.getFont(fontFamily ?? 'Roboto', color: Colors.grey[300], fontSize: defaultExtSize);
+  TextStyle _fontStyle({
+    required Color? color,
+    required double size,
+    FontWeight? weight,
+  }) {
+    if (fontFamily == null) {
+      return TextStyle(color: color, fontSize: size, fontWeight: weight);
+    }
+    return GoogleFonts.getFont(
+      fontFamily!,
+      color: color,
+      fontSize: size,
+      fontWeight: weight,
+    );
+  }
 
   @override
-  TextStyle getOtherExtTextStyle() => TextStyle(
-        color: Colors.grey[300],
-        fontSize: defaultExtSize,
-        fontFamily: fontFamily,
-      );
+  TextStyle getPlayingExtTextStyle() =>
+      _fontStyle(color: Colors.grey[300], size: defaultExtSize);
+
+  @override
+  TextStyle getOtherExtTextStyle() =>
+      _fontStyle(color: Colors.grey[300], size: defaultExtSize);
 
   @override
   TextStyle getOtherMainTextStyle() =>
-      GoogleFonts.getFont(fontFamily ?? 'Roboto', color: Colors.grey[200], fontSize: otherMainSize);
+      _fontStyle(color: Colors.grey[200], size: otherMainSize);
 
   @override
-  TextStyle getPlayingMainTextStyle() => TextStyle(
+  TextStyle getPlayingMainTextStyle() => _fontStyle(
         color: Colors.white,
-        fontSize: defaultSize,
-        fontFamily: fontFamily,
-        fontWeight: boldActiveLyric ? FontWeight.bold : FontWeight.normal,
+        size: defaultSize,
+        weight: boldActiveLyric ? FontWeight.bold : FontWeight.normal,
       );
 
   @override
