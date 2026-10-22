@@ -15,7 +15,7 @@ void _showLyricsAppearance(BuildContext context, PlayerController controller) {
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + MediaQuery.of(sheetContext).viewInsets.bottom),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.82),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.72),
           child: Obx(() {
             final selectedFont = controller.lyricFontFamily.value;
             final activeSize = controller.activeLyricSize.value;
