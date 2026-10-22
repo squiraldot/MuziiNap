@@ -3,7 +3,7 @@ name: MuziiNap Android APK
 on:
   push:
     branches:
-      - feature/advanced-equalizer
+      - main
   workflow_dispatch:
 
 concurrency:
