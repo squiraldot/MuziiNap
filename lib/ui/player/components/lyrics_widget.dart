@@ -76,61 +76,6 @@ class LyricsWidget extends StatelessWidget {
                 );
           }),
         ),
-        Positioned(
-          left: 12,
-          right: 12,
-          bottom: 4,
-          child: Obx(() {
-            final offset = playerController.lyricsSyncOffsetMs.value;
-            final isSynced = playerController.lyricsMode.value == 0 &&
-                playerController.lyrics['synced'].toString().trim().isNotEmpty;
-            return Material(
-              color: Colors.black.withValues(alpha: 0.42),
-              borderRadius: BorderRadius.circular(14),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Row(children: [
-                    const Icon(Icons.sync, color: Colors.white70, size: 18),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(
-                      isSynced ? 'Sync offset: ${offset} ms' : 'Sync adjustment works with synced lyrics',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                    )),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Reset sync offset',
-                      onPressed: isSynced ? playerController.resetLyricsSyncOffset : null,
-                      icon: const Icon(Icons.restart_alt, color: Colors.white, size: 20),
-                    ),
-                  ]),
-                  Row(children: [
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Delay lyrics by 0.5 seconds',
-                      onPressed: isSynced ? () => playerController.setLyricsSyncOffset(offset + 500) : null,
-                      icon: const Icon(Icons.remove, color: Colors.white),
-                    ),
-                    Expanded(child: Slider(
-                      min: -10000, max: 10000, divisions: 40,
-                      value: offset.toDouble(),
-                      onChanged: isSynced ? (value) => playerController.setLyricsSyncOffset(value.round()) : null,
-                    )),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'Advance lyrics by 0.5 seconds',
-                      onPressed: isSynced ? () => playerController.setLyricsSyncOffset(offset - 500) : null,
-                      icon: const Icon(Icons.add, color: Colors.white),
-                    ),
-                  ]),
-                  const Text('Positive = lyrics later • Negative = lyrics earlier',
-                    style: TextStyle(color: Colors.white70, fontSize: 10)),
-                ]),
-              ),
-            );
-          }),
-        ),
       ],
     );
   }
