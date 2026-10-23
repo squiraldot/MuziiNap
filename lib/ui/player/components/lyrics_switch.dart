@@ -6,6 +6,88 @@ import 'package:toggle_switch/toggle_switch.dart';
 import '../player_controller.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+void _showLyricsSyncAdjustment(BuildContext context, PlayerController controller) {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) => Dialog(
+      backgroundColor: Theme.of(dialogContext).colorScheme.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+        child: Obx(() {
+          final offset = controller.lyricsSyncOffsetMs.value;
+          final isSynced = controller.lyricsMode.value == 0 &&
+              controller.lyrics['synced'].toString().trim().isNotEmpty;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                const Icon(Icons.sync),
+                const SizedBox(width: 10),
+                Expanded(child: Text('Lyrics Sync Adjustment',
+                    style: Theme.of(dialogContext).textTheme.titleMedium)),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ]),
+              Text(
+                isSynced
+                    ? 'Sync offset: $offset ms'
+                    : 'Sync adjustment works with synced lyrics only.',
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                IconButton(
+                  tooltip: 'Delay lyrics by 500 ms',
+                  onPressed: isSynced
+                      ? () => controller.setLyricsSyncOffset(offset + 500)
+                      : null,
+                  icon: const Icon(Icons.remove_circle_outline),
+                ),
+                Expanded(child: Slider(
+                  min: -10000,
+                  max: 10000,
+                  divisions: 40,
+                  value: offset.toDouble(),
+                  label: '$offset ms',
+                  onChanged: isSynced
+                      ? (value) => controller.setLyricsSyncOffset(value.round())
+                      : null,
+                )),
+                IconButton(
+                  tooltip: 'Advance lyrics by 500 ms',
+                  onPressed: isSynced
+                      ? () => controller.setLyricsSyncOffset(offset - 500)
+                      : null,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ]),
+              const Text(
+                'Positive = lyrics later  •  Negative = lyrics earlier',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: isSynced ? controller.resetLyricsSyncOffset : null,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reset'),
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
+    ),
+  );
+}
+
 void _showLyricsAppearance(BuildContext context, PlayerController controller) {
   showModalBottomSheet<void>(
     context: context,
@@ -118,8 +200,10 @@ class LyricsSwitch extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   ToggleSwitch(
-                    minWidth: 90.0,
-                    cornerRadius: 20.0,
+                    minWidth: 66.0,
+                    minHeight: 34.0,
+                    fontSize: 12.0,
+                    cornerRadius: 18.0,
                     activeBgColors: [
                       [Theme.of(context).primaryColor.withLightness(0.4)],
                       [Theme.of(context).primaryColor.withLightness(0.4)]
@@ -141,10 +225,20 @@ class LyricsSwitch extends StatelessWidget {
                     tooltip: "Reload Lyrics",
                   ),
                   IconButton(
+                    constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+                    padding: EdgeInsets.zero,
                     onPressed: () => _showLyricsAppearance(context, playerController),
-                    icon: const Icon(Icons.text_fields),
+                    icon: const Icon(Icons.text_fields, size: 25),
                     color: Colors.white,
                     tooltip: "Lyrics appearance",
+                  ),
+                  IconButton(
+                    constraints: const BoxConstraints.tightFor(width: 42, height: 42),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _showLyricsSyncAdjustment(context, playerController),
+                    icon: const Icon(Icons.sync, size: 25),
+                    color: Colors.white,
+                    tooltip: "Lyrics sync adjustment",
                   ),
                 ],
               ),
