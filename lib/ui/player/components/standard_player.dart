@@ -18,6 +18,8 @@ import 'player_control.dart';
 class StandardPlayer extends StatelessWidget {
   const StandardPlayer({super.key});
 
+  static final GlobalKey _albumArtKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -30,7 +32,20 @@ class StandardPlayer extends StatelessWidget {
     playerArtImageSize = playerArtImageSize > spaceAvailableForArtImage
         ? spaceAvailableForArtImage
         : playerArtImageSize;
-    return Stack(
+    return Listener(
+      onPointerDown: (event) {
+        if (!playerController.showLyricsflag.value) return;
+        final artContext = _albumArtKey.currentContext;
+        final renderObject = artContext?.findRenderObject();
+        if (renderObject is RenderBox && renderObject.hasSize) {
+          final topLeft = renderObject.localToGlobal(Offset.zero);
+          final artRect = topLeft & renderObject.size;
+          if (!artRect.contains(event.position)) {
+            playerController.showLyrics();
+          }
+        }
+      },
+      child: Stack(
       children: [
         /// Stack first child
         /// Album art image in background covering the whole screen.
@@ -103,6 +118,7 @@ class StandardPlayer extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 40),
                           child: Center(
                             child: AlbumArtNLyrics(
+                              key: _albumArtKey,
                               playerArtImageSize: size.width * .29,
                             ),
                           ),
@@ -146,6 +162,7 @@ class StandardPlayer extends StatelessWidget {
                         ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 500),
                             child: AlbumArtNLyrics(
+                                key: _albumArtKey,
                                 playerArtImageSize: playerArtImageSize)),
                       ],
                     ),
@@ -277,6 +294,7 @@ class StandardPlayer extends StatelessWidget {
             ),
           )
       ],
+      ),
     );
   }
 }
