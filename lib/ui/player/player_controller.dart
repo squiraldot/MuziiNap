@@ -1301,7 +1301,7 @@ class MuziiNapLyricUI extends LyricUI {
 
   @override
   TextStyle getOtherMainTextStyle() =>
-      _fontStyle(color: Colors.grey[200], size: otherMainSize);
+      _fontStyle(color: Colors.white.withOpacity(0.45), size: otherMainSize);
 
   @override
   TextStyle getPlayingMainTextStyle() => _fontStyle(
