@@ -141,7 +141,12 @@ class SyncedLyricsService {
       final response = await _dio.get(
         "https://lrclib.net/api/search",
         queryParameters: {
-          "q": [title, artist, album].where((part) => part.isNotEmpty).join(" "),
+          // Use LRCLIB's structured metadata filters instead of one broad q
+          // query. q searches across fields and can crowd the 20-result limit
+          // with unrelated records before the correct track is considered.
+          "track_name": title,
+          if (artist.isNotEmpty) "artist_name": artist,
+          if (album.isNotEmpty) "album_name": album,
         },
       );
       if (response.statusCode != 200 || response.data is! List) return null;
@@ -158,17 +163,25 @@ class SyncedLyricsService {
         a, title: title, artist: artist, album: album, duration: duration,
       )));
 
+      // Do not return a high-ranked plain-only result before checking
+      // the remaining candidates: LRCLIB can return multiple editions of the
+      // same track, and a later record may contain synced lyrics.
+      Map<String, dynamic>? plainCandidate;
       for (final candidate in candidates) {
         if (_lrclibScore(
           candidate, title: title, artist: artist, album: album, duration: duration,
         ) < 80) continue;
         final normalized = _normalizeLrclibRecord(candidate);
-        if (normalized != null) {
-          printINFO(_hasSynced(normalized["synced"])
-              ? "Synced lyrics found (LRCLIB search)"
-              : "Plain lyrics found (LRCLIB search)");
+        if (normalized == null) continue;
+        if (_hasSynced(normalized["synced"])) {
+          printINFO("Synced lyrics found (LRCLIB search)");
           return normalized;
         }
+        plainCandidate ??= normalized;
+      }
+      if (plainCandidate != null) {
+        printINFO("Plain lyrics found (LRCLIB search; no synced candidate matched)");
+        return plainCandidate;
       }
     } on DioException catch (error) {
       printINFO("LRCLIB search failed: " + error.toString());
