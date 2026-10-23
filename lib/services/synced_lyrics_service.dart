@@ -286,7 +286,8 @@ class SyncedLyricsService {
       final searchUrl =
           'https://music.163.com/api/search/get/web?csrf_token=&hl=m&s=${Uri.encodeComponent(query)}&type=1&offset=0&total=true&limit=10';
       final searchRes = (await _dio.get(searchUrl)).data;
-      final songs = searchRes is Map ? searchRes["result"]?["songs"] : null;
+      final searchResult = searchRes is Map ? searchRes["result"] : null;
+      final songs = searchResult is Map ? searchResult["songs"] : null;
       if (songs is List) {
         Map<String, dynamic>? plainCandidate;
         for (final song in songs) {
@@ -295,9 +296,9 @@ class SyncedLyricsService {
           final lyricUrl =
               'https://music.163.com/api/song/lyric?id=$songId&lv=-1&kv=-1&tv=-1';
           final lyricRes = (await _dio.get(lyricUrl)).data;
-          final lyricStr = lyricRes is Map
-              ? lyricRes["lrc"]?["lyric"]?.toString() ?? ""
-              : "";
+          final lrc = lyricRes is Map ? lyricRes["lrc"] : null;
+          final lyricValue = lrc is Map ? lrc["lyric"] : null;
+          final lyricStr = lyricValue?.toString() ?? "";
           if (lyricStr.trim().isEmpty) continue;
 
           // LRC permits timestamps with or without fractional seconds.
