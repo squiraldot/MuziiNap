@@ -284,29 +284,39 @@ class SyncedLyricsService {
     try {
       final query = "$title $artist".trim();
       final searchUrl =
-          'https://music.163.com/api/search/get/web?csrf_token=&hl=m&s=${Uri.encodeComponent(query)}&type=1&offset=0&total=true&limit=1';
+          'https://music.163.com/api/search/get/web?csrf_token=&hl=m&s=${Uri.encodeComponent(query)}&type=1&offset=0&total=true&limit=10';
       final searchRes = (await _dio.get(searchUrl)).data;
-      if (searchRes != null &&
-          searchRes["result"] != null &&
-          searchRes["result"]["songs"] != null &&
-          (searchRes["result"]["songs"] as List).isNotEmpty) {
-        final songId = searchRes["result"]["songs"][0]["id"];
-        final lyricUrl = 'https://music.163.com/api/song/lyric?id=$songId&lv=-1&kv=-1&tv=-1';
-        final lyricRes = (await _dio.get(lyricUrl)).data;
-        if (lyricRes != null && lyricRes["lrc"] != null && lyricRes["lrc"]["lyric"] != null) {
-          final String lyricStr = lyricRes["lrc"]["lyric"];
-          if (lyricStr.trim().isNotEmpty) {
-            // Accept valid LRC timestamps both with and without fractions.
-            final isSynced = _hasSynced(lyricStr);
-            printINFO("Lyrics Found (NetEase)");
-            return {
-              "synced": isSynced ? lyricStr : "",
-              "plainLyrics": isSynced ? "" : lyricStr
-            };
+      final songs = searchRes is Map ? searchRes["result"]?["songs"] : null;
+      if (songs is List) {
+        Map<String, dynamic>? plainCandidate;
+        for (final song in songs) {
+          if (song is! Map || song["id"] == null) continue;
+          final songId = song["id"];
+          final lyricUrl =
+              'https://music.163.com/api/song/lyric?id=$songId&lv=-1&kv=-1&tv=-1';
+          final lyricRes = (await _dio.get(lyricUrl)).data;
+          final lyricStr = lyricRes is Map
+              ? lyricRes["lrc"]?["lyric"]?.toString() ?? ""
+              : "";
+          if (lyricStr.trim().isEmpty) continue;
+
+          // LRC permits timestamps with or without fractional seconds.
+          final isSynced = _hasSynced(lyricStr);
+          final candidate = <String, dynamic>{
+            "synced": isSynced ? lyricStr : "",
+            "plainLyrics": isSynced ? _stripTimestamps(lyricStr) : lyricStr,
+          };
+          if (isSynced) {
+            printINFO("Synced lyrics found (NetEase)");
+            return candidate;
           }
+          plainCandidate ??= candidate;
         }
-      }
-    } catch (_) {}
+        if (plainCandidate != null) {
+          printINFO("Plain lyrics found (NetEase)");
+          return plainCandidate;
+        }
+      }    } catch (_) {}
     return null;
   }
 
