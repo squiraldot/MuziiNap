@@ -180,8 +180,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
       children: [
         NotificationListener<UserScrollNotification>(
           onNotification: (notification) {
-            if (!_autoScrolling &&
-                notification.direction != ScrollDirection.idle &&
+            if (notification.direction != ScrollDirection.idle &&
                 _followPlayback) {
               setState(() => _followPlayback = false);
             }
