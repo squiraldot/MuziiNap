@@ -159,8 +159,8 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
       0,
       widget.controller.progressBarStatus.value.total.inMilliseconds > 0
           ? widget.controller.progressBarStatus.value.total.inMilliseconds
-          : 0,
-    );
+          : line.startMs + widget.controller.lyricsSyncOffsetMs.value,
+    ).toInt();
     widget.controller.seek(Duration(milliseconds: audioPositionMs));
     final activeIndex = LyricsTimeline.activeIndex(_lines, line.startMs);
     _resumeFollow(activeIndex);
