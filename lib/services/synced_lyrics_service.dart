@@ -17,7 +17,7 @@ class SyncedLyricsService {
   ));
 
   static final RegExp _timestampPattern =
-      RegExp(r'\\[\\d{1,3}:\\d{2}(?:\\.\\d{1,3})?\\]');
+      RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]');
 
   static Future<Map<String, dynamic>?> getSyncedLyrics(
       MediaItem song, int durInSec, {bool forceReload = false}) async {
