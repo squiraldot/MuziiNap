@@ -112,9 +112,6 @@ class _SyncedLyricsView extends StatefulWidget {
 class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
   final ScrollController _scrollController = ScrollController();
   late final List<TimedLyricLine> _lines = LyricsTimeline.parse(widget.source);
-  late final List<GlobalKey> _lineKeys =
-      List<GlobalKey>.generate(_lines.length, (_) => GlobalKey());
-
   bool _followPlayback = true;
   bool _autoScrolling = false;
   int _lastActiveIndex = -2;
@@ -125,20 +122,30 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
     super.dispose();
   }
 
-  void _scrollToActiveLine(int index, {bool animate = true}) {
-    if (!_followPlayback || index < 0 || index >= _lineKeys.length) return;
-    final context = _lineKeys[index].currentContext;
-    if (context == null) return;
+  static const double _lineExtent = 88;
 
+  void _scrollToActiveLine(int index, {bool animate = true}) {
+    if (!_followPlayback ||
+        index < 0 ||
+        index >= _lines.length ||
+        !_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final target = (index * _lineExtent -
+            (position.viewportDimension - _lineExtent) / 2)
+        .clamp(0.0, position.maxScrollExtent)
+        .toDouble();
     _autoScrolling = true;
-    Scrollable.ensureVisible(
-      context,
-      alignment: 0.5,
-      duration: animate
-          ? const Duration(milliseconds: 320)
-          : Duration.zero,
-      curve: Curves.easeInOut,
-    ).whenComplete(() {
+    final movement = animate
+        ? _scrollController.animateTo(
+            target,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeInOut,
+          )
+        : _scrollController.jumpTo(target);
+    Future<void>.value(movement).whenComplete(() {
       if (mounted) _autoScrolling = false;
     });
   }
@@ -181,6 +188,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
             physics: const BouncingScrollPhysics(),
             padding: widget.padding,
             itemCount: _lines.length,
+            itemExtent: _lineExtent,
             itemBuilder: (context, index) {
               return Obx(() {
                 final positionMs =
@@ -200,11 +208,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
 
                 final active = index == activeIndex;
                 return Padding(
-                  key: _lineKeys[index],
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -215,8 +219,11 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                           horizontal: 8,
                           vertical: 5,
                         ),
-                        child: Text(
+                        child: Center(
+                          child: Text(
                           _lines[index].text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
                           style: _lyricsTextStyle(context, widget.controller)
                               .copyWith(
@@ -240,6 +247,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                                 : (active
                                     ? Colors.white
                                     : Colors.white.withValues(alpha: 0.58)),
+                          ),
                           ),
                         ),
                       ),
