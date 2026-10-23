@@ -327,6 +327,36 @@ class PlayerController extends GetxController
 
   static const lyricFontFamilies = <String>["Poppins","System","Bold","Classic","Directional","Elegant","Gujarati Bold","Gujarati Thin","Hindi Bold","Hindi Thin","Journal","Meme","Modern","Neon","PermanentMaker","Rosalia","SFProDisplay","SFProMedium","Strong","Typewriter","iOS Bold","iOS Comic Sans","iOS Cursive italic","iOS Hindi Bold","iOS Hindi Light","iOS New Money","iOS Semibold","iOS Strong","iOS Typewriter","literature"];
 
+  /// Positive values delay lyric highlighting; negative values advance it.
+  final lyricsSyncOffsetMs = 0.obs;
+
+  int get effectiveLyricsPositionMs {
+    final audioMs = progressBarStatus.value.current.inMilliseconds;
+    final totalMs = progressBarStatus.value.total.inMilliseconds;
+    return (audioMs - lyricsSyncOffsetMs.value).clamp(0, totalMs > 0 ? totalMs : 0).toInt();
+  }
+
+  Future<void> loadLyricsSyncOffsetForCurrentSong() async {
+    final songId = currentSong.value?.id;
+    if (songId == null) {
+      lyricsSyncOffsetMs.value = 0;
+      return;
+    }
+    final value = Hive.box(appPrefsBoxName).get('lyricsSyncOffset:$songId', defaultValue: 0);
+    lyricsSyncOffsetMs.value = value is num ? value.toInt().clamp(-10000, 10000) : 0;
+  }
+
+  Future<void> setLyricsSyncOffset(int milliseconds) async {
+    final safeValue = milliseconds.clamp(-10000, 10000).toInt();
+    lyricsSyncOffsetMs.value = safeValue;
+    final songId = currentSong.value?.id;
+    if (songId != null) {
+      await Hive.box(appPrefsBoxName).put('lyricsSyncOffset:$songId', safeValue);
+    }
+  }
+
+  Future<void> resetLyricsSyncOffset() => setLyricsSyncOffset(0);
+
   Future<void> setLyricFontFamily(String value) async {
     if (!lyricFontFamilies.contains(value)) return;
     lyricFontFamily.value = value;
@@ -539,6 +569,7 @@ class PlayerController extends GetxController
         _newSongFlag = true;
         isCurrentSongBuffered.value = false;
         currentSong.value = mediaItem;
+        await loadLyricsSyncOffsetForCurrentSong();
         currentSongIndex.value = currentQueue
             .indexWhere((element) => element.id == currentSong.value!.id);
         await _checkFav();
