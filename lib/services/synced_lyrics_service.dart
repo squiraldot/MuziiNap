@@ -316,7 +316,8 @@ class SyncedLyricsService {
           printINFO("Plain lyrics found (NetEase)");
           return plainCandidate;
         }
-      }    } catch (_) {}
+      }
+    } catch (_) {}
     return null;
   }
 
