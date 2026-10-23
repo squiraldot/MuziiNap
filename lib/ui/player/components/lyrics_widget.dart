@@ -113,7 +113,6 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
   final ScrollController _scrollController = ScrollController();
   late final List<TimedLyricLine> _lines = LyricsTimeline.parse(widget.source);
   bool _followPlayback = true;
-  bool _autoScrolling = false;
   int _lastActiveIndex = -2;
 
   @override
@@ -137,7 +136,6 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
             (position.viewportDimension - _lineExtent) / 2)
         .clamp(0.0, position.maxScrollExtent)
         .toDouble();
-    _autoScrolling = true;
     if (animate) {
       _scrollController
           .animateTo(
@@ -146,11 +144,9 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
             curve: Curves.easeInOut,
           )
           .whenComplete(() {
-        if (mounted) _autoScrolling = false;
       });
     } else {
       _scrollController.jumpTo(target);
-      _autoScrolling = false;
     }
   }
 
