@@ -138,16 +138,20 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
         .clamp(0.0, position.maxScrollExtent)
         .toDouble();
     _autoScrolling = true;
-    final movement = animate
-        ? _scrollController.animateTo(
+    if (animate) {
+      _scrollController
+          .animateTo(
             target,
             duration: const Duration(milliseconds: 320),
             curve: Curves.easeInOut,
           )
-        : _scrollController.jumpTo(target);
-    Future<void>.value(movement).whenComplete(() {
-      if (mounted) _autoScrolling = false;
-    });
+          .whenComplete(() {
+        if (mounted) _autoScrolling = false;
+      });
+    } else {
+      _scrollController.jumpTo(target);
+      _autoScrolling = false;
+    }
   }
 
   void _resumeFollow(int activeIndex) {
