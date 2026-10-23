@@ -154,18 +154,15 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
   void _seekToLine(TimedLyricLine line) {
     // The renderer position is audio position minus the saved sync offset.
     // Invert that mapping so tapping a line lands on the matching audio time.
+    final totalMs = widget.controller.progressBarStatus.value.total.inMilliseconds;
+    final requestedMs =
+        line.startMs + widget.controller.lyricsSyncOffsetMs.value;
     final audioPositionMs =
-        (line.startMs + widget.controller.lyricsSyncOffsetMs.value).clamp(
-      0,
-      widget.controller.progressBarStatus.value.total.inMilliseconds > 0
-          ? widget.controller.progressBarStatus.value.total.inMilliseconds
-          : line.startMs + widget.controller.lyricsSyncOffsetMs.value,
-    ).toInt();
+        requestedMs.clamp(0, totalMs > 0 ? totalMs : 1 << 31).toInt();
     widget.controller.seek(Duration(milliseconds: audioPositionMs));
     final activeIndex = LyricsTimeline.activeIndex(_lines, line.startMs);
     _resumeFollow(activeIndex);
   }
-
   @override
   Widget build(BuildContext context) {
     return Stack(
