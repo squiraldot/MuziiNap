@@ -124,7 +124,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
     super.dispose();
   }
 
-  static const double _lineExtent = 88;
+  static const double _lineExtent = 58;
 
   void _scrollToActiveLine(int index, {bool animate = true}) {
     if (!_followPlayback ||
