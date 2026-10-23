@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_lyric/lyrics_reader.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/loader.dart';
 import '../player_controller.dart';
+import '../../../utils/lyrics_timeline.dart';
 
 class LyricsWidget extends StatelessWidget {
   final EdgeInsetsGeometry padding;
@@ -12,72 +12,264 @@ class LyricsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playerController = Get.find<PlayerController>();
+    final controller = Get.find<PlayerController>();
     return Stack(
       children: [
         Positioned.fill(
           child: Obx(() {
-            playerController.lyricsStyleRevision.value;
-            return playerController.isLyricsLoading.isTrue
-          ? const Center(
-              child: LoadingIndicator(),
-            )
-          : playerController.lyricsMode.toInt() == 1
-              ? Center(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: padding,
-                    child: Obx(
-                      () => TextSelectionTheme(
-                        data: Theme.of(context).textSelectionTheme,
-                        child: SelectableText(
-                          playerController.lyrics["plainLyrics"] == "NA"
-                              ? "lyricsNotAvailable".tr
-                              : playerController.lyrics["plainLyrics"],
-                          textAlign: TextAlign.center,
-                          style: (playerController.lyricFontFamily.value == 'Poppins'
-                                  ? GoogleFonts.poppins(textStyle: Theme.of(context).textTheme.titleMedium)
-                                  : Theme.of(context).textTheme.titleMedium!.copyWith(
-                                      fontFamily: playerController.lyricFontFamily.value == 'System'
-                                          ? null
-                                          : playerController.lyricFontFamily.value,
-                                    )).copyWith(
-                              color: playerController.isLyricsDialogOpen
-                                  ? Theme.of(context).textTheme.titleMedium!.color
-                                  : Colors.white,
-                              fontSize: playerController.activeLyricSize.value,
-                            ),
+            controller.lyricsStyleRevision.value;
+            if (controller.isLyricsLoading.isTrue) {
+              return const Center(child: LoadingIndicator());
+            }
+
+            if (controller.lyricsMode.toInt() == 1) {
+              return Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: padding,
+                  child: Obx(
+                    () => TextSelectionTheme(
+                      data: Theme.of(context).textSelectionTheme,
+                      child: SelectableText(
+                        controller.lyrics["plainLyrics"] == "NA"
+                            ? "lyricsNotAvailable".tr
+                            : controller.lyrics["plainLyrics"],
+                        textAlign: TextAlign.center,
+                        style: _lyricsTextStyle(context, controller).copyWith(
+                          color: controller.isLyricsDialogOpen
+                              ? Theme.of(context).textTheme.titleMedium!.color
+                              : Colors.white,
                         ),
                       ),
                     ),
                   ),
-                )
-              : IgnorePointer(
-                  child: LyricsReader(
-                    padding: const EdgeInsets.only(left: 5, right: 5),
-                    lyricUi: playerController.lyricUi,
-                    position: playerController.effectiveLyricsPositionMs,
-                    model: LyricsModelBuilder.create()
-                        .bindLyricToMain(
-                            playerController.lyrics['synced'].toString())
-                        .getModel(),
-                    emptyBuilder: () => Center(
-                      child: Text(
-                        "syncedLyricsNotAvailable".tr,
-                        style: playerController.isLyricsDialogOpen
-                              ? Theme.of(context).textTheme.titleMedium!
-                              : Theme.of(context)
-                                  .textTheme
-                                  .titleMedium!
-                                  .copyWith(color: Colors.white),
-                      ),
-                    ),
-                  ),
-                );
+                ),
+              );
+            }
+
+            final synced = controller.lyrics['synced']?.toString() ?? '';
+            final songId = controller.currentSong.value?.id ?? '';
+            if (synced.trim().isEmpty || synced == 'NA') {
+              return Center(
+                child: Text(
+                  'syncedLyricsNotAvailable'.tr,
+                  style: controller.isLyricsDialogOpen
+                      ? Theme.of(context).textTheme.titleMedium
+                      : Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: Colors.white),
+                ),
+              );
+            }
+
+            return _SyncedLyricsView(
+              key: ValueKey('$songId:$synced'),
+              controller: controller,
+              source: synced,
+              padding: padding,
+            );
           }),
         ),
       ],
     );
   }
+}
 
+TextStyle _lyricsTextStyle(BuildContext context, PlayerController controller) {
+  final base = Theme.of(context).textTheme.titleMedium!;
+  final style = controller.lyricFontFamily.value == 'Poppins'
+      ? GoogleFonts.poppins(textStyle: base)
+      : base.copyWith(
+          fontFamily: controller.lyricFontFamily.value == 'System'
+              ? null
+              : controller.lyricFontFamily.value,
+        );
+  return style.copyWith(
+    fontSize: controller.activeLyricSize.value,
+    fontWeight: controller.boldActiveLyric.value
+        ? FontWeight.bold
+        : FontWeight.normal,
+  );
+}
+
+class _SyncedLyricsView extends StatefulWidget {
+  const _SyncedLyricsView({
+    super.key,
+    required this.controller,
+    required this.source,
+    required this.padding,
+  });
+
+  final PlayerController controller;
+  final String source;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  State<_SyncedLyricsView> createState() => _SyncedLyricsViewState();
+}
+
+class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
+  final ScrollController _scrollController = ScrollController();
+  late final List<TimedLyricLine> _lines = LyricsTimeline.parse(widget.source);
+  late final List<GlobalKey> _lineKeys =
+      List<GlobalKey>.generate(_lines.length, (_) => GlobalKey());
+
+  bool _followPlayback = true;
+  bool _autoScrolling = false;
+  int _lastActiveIndex = -2;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToActiveLine(int index, {bool animate = true}) {
+    if (!_followPlayback || index < 0 || index >= _lineKeys.length) return;
+    final context = _lineKeys[index].currentContext;
+    if (context == null) return;
+
+    _autoScrolling = true;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.5,
+      duration: animate
+          ? const Duration(milliseconds: 320)
+          : Duration.zero,
+      curve: Curves.easeInOut,
+    ).whenComplete(() {
+      if (mounted) _autoScrolling = false;
+    });
+  }
+
+  void _resumeFollow(int activeIndex) {
+    setState(() => _followPlayback = true);
+    _lastActiveIndex = activeIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToActiveLine(activeIndex);
+    });
+  }
+
+  void _seekToLine(TimedLyricLine line) {
+    // The renderer position is audio position minus the saved sync offset.
+    // Invert that mapping so tapping a line lands on the matching audio time.
+    final audioPositionMs =
+        (line.startMs + widget.controller.lyricsSyncOffsetMs.value).clamp(
+      0,
+      widget.controller.progressBarStatus.value.total.inMilliseconds > 0
+          ? widget.controller.progressBarStatus.value.total.inMilliseconds
+          : 0,
+    );
+    widget.controller.seek(Duration(milliseconds: audioPositionMs));
+    final activeIndex = LyricsTimeline.activeIndex(_lines, line.startMs);
+    _resumeFollow(activeIndex);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        NotificationListener<UserScrollNotification>(
+          onNotification: (notification) {
+            if (!_autoScrolling &&
+                notification.direction != ScrollDirection.idle &&
+                _followPlayback) {
+              setState(() => _followPlayback = false);
+            }
+            return false;
+          },
+          child: ListView.builder(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            padding: widget.padding,
+            itemCount: _lines.length,
+            itemBuilder: (context, index) {
+              return Obx(() {
+                final positionMs =
+                    widget.controller.effectiveLyricsPositionMs;
+                final activeIndex = LyricsTimeline.activeIndex(
+                  _lines,
+                  positionMs,
+                );
+                if (activeIndex != _lastActiveIndex) {
+                  _lastActiveIndex = activeIndex;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _followPlayback) {
+                      _scrollToActiveLine(activeIndex);
+                    }
+                  });
+                }
+
+                final active = index == activeIndex;
+                return Padding(
+                  key: _lineKeys[index],
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _seekToLine(_lines[index]),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        child: Text(
+                          _lines[index].text,
+                          textAlign: TextAlign.center,
+                          style: _lyricsTextStyle(context, widget.controller)
+                              .copyWith(
+                            fontSize: widget.controller.activeLyricSize.value *
+                                (active ? 1 : 0.88),
+                            fontWeight: active &&
+                                    widget.controller.boldActiveLyric.value
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: widget.controller.isLyricsDialogOpen
+                                ? (active
+                                    ? Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.color
+                                    : Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.color
+                                        ?.withValues(alpha: 0.55))
+                                : (active
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.58)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              });
+            },
+          ),
+        ),
+        if (!_followPlayback)
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: FilledButton.tonalIcon(
+              onPressed: () {
+                final activeIndex = LyricsTimeline.activeIndex(
+                  _lines,
+                  widget.controller.effectiveLyricsPositionMs,
+                );
+                _resumeFollow(activeIndex);
+              },
+              icon: const Icon(Icons.my_location, size: 18),
+              label: const Text('Resume follow'),
+            ),
+          ),
+      ],
+    );
+  }
 }
