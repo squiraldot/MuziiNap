@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -137,14 +139,13 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
         .clamp(0.0, position.maxScrollExtent)
         .toDouble();
     if (animate) {
-      _scrollController
-          .animateTo(
-            target,
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeInOut,
-          )
-          .whenComplete(() {
-      });
+      unawaited(
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOut,
+        ),
+      );
     } else {
       _scrollController.jumpTo(target);
     }
