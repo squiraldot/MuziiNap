@@ -10,7 +10,6 @@ import '../../../services/lyrics_quote_export_service.dart';
 import '../../widgets/loader.dart';
 import '../player_controller.dart';
 import '../../../utils/lyrics_timeline.dart';
-import '../../../utils/hindi_romanizer.dart';
 
 class LyricsWidget extends StatelessWidget {
   final EdgeInsetsGeometry padding;
@@ -24,12 +23,6 @@ class LyricsWidget extends StatelessWidget {
         Positioned.fill(
           child: Obx(() {
             controller.lyricsStyleRevision.value;
-            final translatedMode = controller.lyricsDisplayMode.value == 'translated';
-            final romanizedMode = controller.lyricsDisplayMode.value == 'romanized';
-            final bothMode = controller.lyricsDisplayMode.value == 'both';
-            if (translatedMode && controller.translatedLyrics.value.isEmpty && controller.lyricsTranslationError.value.isEmpty && !controller.isLyricsTranslationLoading.value) {
-              WidgetsBinding.instance.addPostFrameCallback((_) => controller.ensureLyricsTranslated());
-            }
             if (controller.isLyricsLoading.isTrue) {
               return const Center(child: LoadingIndicator());
             }
@@ -43,15 +36,9 @@ class LyricsWidget extends StatelessWidget {
                     () => TextSelectionTheme(
                       data: Theme.of(context).textSelectionTheme,
                       child: SelectableText(
-                        translatedMode && controller.translatedLyrics.value.isNotEmpty
-                            ? controller.translatedLyrics.value
-                            : _formatLyricsForDisplay(
-                                controller.lyrics["plainLyrics"] == "NA"
-                                    ? "lyricsNotAvailable".tr
-                                    : (controller.lyrics["plainLyrics"]?.toString() ?? ''),
-                                romanized: romanizedMode,
-                                both: bothMode,
-                              ),
+                        controller.lyrics["plainLyrics"] == "NA"
+                            ? "lyricsNotAvailable".tr
+                            : (controller.lyrics["plainLyrics"]?.toString() ?? ''),
                         textAlign: TextAlign.center,
                         style: _lyricsTextStyle(context, controller).copyWith(
                           height: 1.38,
@@ -67,12 +54,8 @@ class LyricsWidget extends StatelessWidget {
             }
 
             final originalSynced = controller.lyrics['synced']?.toString() ?? '';
-            final translatedSynced = translatedMode ? controller.translatedLyrics.value : '';
-            final synced = translatedSynced.isNotEmpty && translatedSynced.contains(RegExp(r'\[\d{1,3}:\d{2}')) ? translatedSynced : originalSynced;
+            final synced = controller.lyrics['synced']?.toString() ?? '';
             final songId = controller.currentSong.value?.id ?? '';
-            if (translatedMode && controller.isLyricsTranslationLoading.value) {
-              return const Center(child: LoadingIndicator());
-            }
             if (synced.trim().isEmpty || synced == 'NA') {
               return Center(
                 child: Text(
@@ -95,32 +78,6 @@ class LyricsWidget extends StatelessWidget {
             );
           }),
         ),
-        if (controller.lyricsDisplayMode.value == 'translated' &&
-            controller.lyricsTranslationError.value.isNotEmpty &&
-            !controller.isLyricsTranslationLoading.value)
-          Positioned(
-            top: 8,
-            left: 16,
-            right: 16,
-            child: IgnorePointer(
-              child: Center(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.68),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    child: Text(
-                      'Translation unavailable • showing original lyrics',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -217,13 +174,6 @@ Future<void> _showLyricsQuotePreview(BuildContext context, PlayerController cont
       ),
     ),
   );
-}
-
-String _formatLyricsForDisplay(String text, {required bool romanized, required bool both}) {
-  if (!romanized && !both) return text;
-  final converted = HindiRomanizer.transliterate(text);
-  if (romanized) return converted;
-  return '$text\n$converted';
 }
 
 TextStyle _lyricsTextStyle(BuildContext context, PlayerController controller) {
@@ -370,11 +320,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                               child: Center(
                                 child: Text(
-                                  _formatLyricsForDisplay(
-                                    _lines[index].text,
-                                    romanized: widget.controller.lyricsDisplayMode.value == 'romanized',
-                                    both: widget.controller.lyricsDisplayMode.value == 'both',
-                                  ),
+                                  _lines[index].text,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
