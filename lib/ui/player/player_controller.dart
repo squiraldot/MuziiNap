@@ -22,6 +22,7 @@ import '../../services/synced_lyrics_service.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
+import '../../utils/lyrics_timeline.dart';
 import '../../utils/home_history.dart';
 import '../../models/media_Item_builder.dart';
 import '../screens/Home/home_screen_controller.dart';
@@ -88,6 +89,39 @@ class PlayerController extends GetxController
   );
   RxMap<String, dynamic> lyrics =
       <String, dynamic>{"synced": "", "plainLyrics": ""}.obs;
+  static const MethodChannel _homeLyricsWidgetChannel =
+      MethodChannel('muziinap/home_lyrics_widget');
+  List<TimedLyricLine> _homeWidgetTimeline = const <TimedLyricLine>[];
+  String? _lastHomeWidgetLine;
+  Worker? _homeWidgetLyricsWorker;
+  Worker? _homeWidgetSongWorker;
+
+  void _publishCurrentLyricToHomeWidget() {
+    if (!GetPlatform.isAndroid) return;
+    final activeIndex = LyricsTimeline.activeIndex(
+      _homeWidgetTimeline,
+      effectiveLyricsPositionMs,
+    );
+    final line = activeIndex >= 0 ? _homeWidgetTimeline[activeIndex].text : '';
+    if (line == _lastHomeWidgetLine) return;
+    _lastHomeWidgetLine = line;
+    unawaited(
+      _homeLyricsWidgetChannel.invokeMethod<void>(
+        'updateLine',
+        <String, String>{'line': line},
+      ).catchError((Object error) {
+        printINFO('Home-screen lyrics widget update failed: $error');
+      }),
+    );
+  }
+
+  @override
+  void onClose() {
+    _homeWidgetLyricsWorker?.dispose();
+    _homeWidgetSongWorker?.dispose();
+    super.onClose();
+  }
+
   ScrollController scrollController = ScrollController();
   final GlobalKey<ScaffoldState> homeScaffoldkey = GlobalKey<ScaffoldState>();
 
@@ -116,6 +150,18 @@ class PlayerController extends GetxController
   void _init() async {
     _listenForChangesInPlayerState();
     _listenForChangesInPosition();
+    _homeWidgetLyricsWorker = ever(lyrics, (_) {
+      _homeWidgetTimeline = LyricsTimeline.parse(
+        lyrics['synced']?.toString() ?? '',
+      );
+      _lastHomeWidgetLine = null;
+      _publishCurrentLyricToHomeWidget();
+    });
+    _homeWidgetSongWorker = ever(currentSong, (_) {
+      _homeWidgetTimeline = const <TimedLyricLine>[];
+      _lastHomeWidgetLine = null;
+      _publishCurrentLyricToHomeWidget();
+    });
     _listenForChangesInBufferedPosition();
     _listenForChangesInDuration();
     _listenForPlaylistChange();
@@ -505,6 +551,7 @@ class PlayerController extends GetxController
         val.buffered = oldState.buffered;
         val.total = oldState.total;
       });
+      _publishCurrentLyricToHomeWidget();
     });
   }
 
