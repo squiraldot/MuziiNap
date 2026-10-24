@@ -109,7 +109,10 @@ class PlayerController extends GetxController
         : '';
     final current = activeIndex >= 0 && activeIndex < _homeWidgetTimeline.length
         ? _homeWidgetTimeline[activeIndex].text
-        : '';
+        : (_homeWidgetTimeline.isEmpty &&
+                lyrics['plainLyrics']?.toString() == 'Synced lyrics not available'
+            ? 'Synced lyrics not available'
+            : '');
     final next = activeIndex >= 0 && activeIndex + 1 < _homeWidgetTimeline.length
         ? _homeWidgetTimeline[activeIndex + 1].text
         : '';
@@ -1180,20 +1183,38 @@ class PlayerController extends GetxController
   Future<void> _loadLyricsForSong(MediaItem song) async {
     isLyricsLoading.value = true;
     try {
-      final lyricsResult = await SyncedLyricsService.getSyncedLyrics(
-        song,
-        progressBarStatus.value.total.inSeconds,
-      );
-      // A slow lookup for an older track must never overwrite the current one.
-      if ((currentSong.value == null || currentSong.value?.id == song.id) &&
-          lyricsResult != null) {
-        lyrics.value = lyricsResult;
-      } else if (currentSong.value == null || currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      Map<String, dynamic>? lyricsResult;
+      // Each attempt runs the full provider fallback chain (LRCLIB exact,
+      // LRCLIB search, NetEase, YouTube Music). Prefer synced lyrics only;
+      // plain-only matches must not stop the retry sequence.
+      for (var attempt = 1; attempt <= 3; attempt++) {
+        if (currentSong.value != null && currentSong.value?.id != song.id) return;
+        lyricsResult = await SyncedLyricsService.getSyncedLyrics(
+          song,
+          progressBarStatus.value.total.inSeconds,
+          forceReload: attempt > 1,
+        );
+        final synced = lyricsResult?['synced']?.toString().trim() ?? '';
+        if (synced.isNotEmpty &&
+            RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced)) {
+          break;
+        }
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
+        }
+      }
+
+      if (currentSong.value == null || currentSong.value?.id == song.id) {
+        final synced = lyricsResult?['synced']?.toString().trim() ?? '';
+        final hasSynced = synced.isNotEmpty &&
+            RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced);
+        lyrics.value = hasSynced
+            ? lyricsResult!
+            : {"synced": "", "plainLyrics": "Synced lyrics not available"};
       }
     } catch (_) {
       if (currentSong.value == null || currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+        lyrics.value = {"synced": "", "plainLyrics": "Synced lyrics not available"};
       }
     } finally {
       if (currentSong.value == null || currentSong.value?.id == song.id) {
