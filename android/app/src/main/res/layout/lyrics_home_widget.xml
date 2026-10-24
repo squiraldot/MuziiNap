@@ -13,8 +13,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:inAnimation="@android:anim/fade_in"
-        android:outAnimation="@android:anim/fade_out">
+        android:inAnimation="@anim/lyrics_slide_in_up"
+        android:outAnimation="@anim/lyrics_slide_out_up">
 
         <LinearLayout
             android:id="@+id/lyrics_home_widget_page_a"
