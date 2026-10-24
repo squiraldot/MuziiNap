@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:hive/hive.dart';
 
@@ -68,7 +67,7 @@ class LyricsTranslationService {
     try {
       final response = await _dio.get(
         'https://api.mymemory.translated.net/get',
-        queryParameters: {'q': text, 'langpair': '$source|$target'},
+        queryParameters: {'q': text, 'langpair': '${source == 'auto' ? 'autodetect' : source}|$target'},
       );
       if (response.statusCode != 200 || response.data is! Map) return null;
       final data = Map<String, dynamic>.from(response.data as Map);
