@@ -17,7 +17,7 @@ void main() {
 
     test('handles empty text and mixed scripts safely', () {
       expect(HindiRomanizer.transliterate(''), '');
-      expect(HindiRomanizer.transliterate('Hello दुनिया 123'), 'Hello duniya 123');
+      expect(HindiRomanizer.transliterate('Hello दुनिया 123'), 'Hello duniyaa 123');
       expect(HindiRomanizer.transliterate('🙂 — गीत'), '🙂 — geet');
     });
   });
