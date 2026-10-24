@@ -24,7 +24,7 @@ class LyricsWidget extends StatelessWidget {
           child: Obx(() {
             controller.lyricsStyleRevision.value;
             final translatedMode = controller.lyricsDisplayMode.value == 'translated';
-            if (translatedMode && controller.translatedLyrics.value.isEmpty && !controller.isLyricsTranslationLoading.value) {
+            if (translatedMode && controller.translatedLyrics.value.isEmpty && controller.lyricsTranslationError.value.isEmpty && !controller.isLyricsTranslationLoading.value) {
               WidgetsBinding.instance.addPostFrameCallback((_) => controller.ensureLyricsTranslated());
             }
             if (controller.isLyricsLoading.isTrue) {
@@ -61,7 +61,7 @@ class LyricsWidget extends StatelessWidget {
 
             final originalSynced = controller.lyrics['synced']?.toString() ?? '';
             final translatedSynced = translatedMode ? controller.translatedLyrics.value : '';
-            final synced = translatedSynced.isNotEmpty && translatedSynced.contains(RegExp(r'\\[\\d{1,3}:\\d{2}')) ? translatedSynced : originalSynced;
+            final synced = translatedSynced.isNotEmpty && translatedSynced.contains(RegExp(r'\[\d{1,3}:\d{2}')) ? translatedSynced : originalSynced;
             final songId = controller.currentSong.value?.id ?? '';
             if (translatedMode && controller.isLyricsTranslationLoading.value) {
               return const Center(child: LoadingIndicator());
