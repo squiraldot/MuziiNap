@@ -19,7 +19,6 @@ import '../../services/downloader.dart';
 import '../screens/Playlist/playlist_screen_controller.dart';
 import '../widgets/snackbar.dart';
 import '../../services/synced_lyrics_service.dart';
-import '../../services/lyrics_translation_service.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
@@ -75,19 +74,6 @@ class PlayerController extends GetxController
   final showLyricsflag = false.obs;
   final isLyricsLoading = false.obs;
   final lyricsMode = 0.obs;
-  final lyricsTranslationLanguage = 'hi'.obs;
-  final lyricsDisplayMode = 'original'.obs;
-  final translatedLyrics = ''.obs;
-  final isLyricsTranslationLoading = false.obs;
-  final lyricsTranslationError = ''.obs;
-  String _lyricsTranslationRequestKey = '';
-  static const lyricsTranslationLanguages = <String, String>{
-    'hi': 'Hindi', 'en': 'English', 'es': 'Spanish', 'fr': 'French',
-    'de': 'German', 'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian',
-    'ja': 'Japanese', 'ko': 'Korean', 'zh-CN': 'Chinese (Simplified)',
-    'ar': 'Arabic', 'bn': 'Bengali', 'ur': 'Urdu', 'ta': 'Tamil',
-    'te': 'Telugu', 'mr': 'Marathi', 'gu': 'Gujarati', 'pa': 'Punjabi',
-  };
   bool isLyricsDialogOpen = false;
   // 0 for play, 1 for pause, 2 for blank
   final gesturePlayerVisibleState = 2.obs;
@@ -137,11 +123,6 @@ class PlayerController extends GetxController
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _setInitLyricsMode();
     final appPrefs = Hive.box(appPrefsBoxName);
-    lyricsTranslationLanguage.value = lyricsTranslationLanguages.containsKey(appPrefs.get('lyricsTranslationLanguage')) ? appPrefs.get('lyricsTranslationLanguage') as String : 'hi';
-    final savedLyricsDisplayMode = appPrefs.get('lyricsDisplayMode');
-    lyricsDisplayMode.value = const {'original', 'romanized', 'both', 'translated'}.contains(savedLyricsDisplayMode)
-        ? savedLyricsDisplayMode as String
-        : 'original';
     final savedFont = appPrefs.get('lyricsFontFamily');
     lyricFontFamily.value = lyricFontFamilies.contains(savedFont) ? savedFont as String : 'Poppins';
     final savedSize = appPrefs.get('activeLyricSize');
@@ -1207,57 +1188,6 @@ class PlayerController extends GetxController
       printERROR(e);
     }
     isLyricsLoading.value = false;
-  }
-
-  Future<void> setLyricsTranslationLanguage(String language) async {
-    if (!lyricsTranslationLanguages.containsKey(language)) return;
-    lyricsTranslationLanguage.value = language;
-    translatedLyrics.value = '';
-    lyricsTranslationError.value = '';
-    await Hive.box(appPrefsBoxName).put('lyricsTranslationLanguage', language);
-    if (lyricsDisplayMode.value == 'translated') await ensureLyricsTranslated();
-  }
-
-  Future<void> setLyricsDisplayMode(String mode) async {
-    const supportedModes = {'original', 'romanized', 'both', 'translated'};
-    final safeMode = supportedModes.contains(mode) ? mode : 'original';
-    lyricsDisplayMode.value = safeMode;
-    await Hive.box(appPrefsBoxName).put('lyricsDisplayMode', safeMode);
-    if (safeMode == 'translated') await ensureLyricsTranslated();
-  }
-
-  Future<void> ensureLyricsTranslated() async {
-    final song = currentSong.value;
-    if (song == null || isLyricsTranslationLoading.value) return;
-    final synced = lyrics['synced']?.toString() ?? '';
-    final plain = lyrics['plainLyrics']?.toString() ?? '';
-    final source = lyricsMode.value == 0 && synced.trim().isNotEmpty && synced != 'NA' ? synced : plain;
-    if (source.trim().isEmpty) return;
-    if (source == 'NA') {
-      lyricsTranslationError.value = 'No lyrics available to translate.';
-      return;
-    }
-    final requestKey = '${song.id}|${lyricsTranslationLanguage.value}|${source.hashCode}';
-    if (_lyricsTranslationRequestKey != requestKey) translatedLyrics.value = '';
-    _lyricsTranslationRequestKey = requestKey;
-    isLyricsTranslationLoading.value = true;
-    lyricsTranslationError.value = '';
-    try {
-      final result = await LyricsTranslationService.translateLyrics(
-        songId: song.id,
-        lyrics: source,
-        targetLanguage: lyricsTranslationLanguage.value,
-      );
-      if (currentSong.value?.id != song.id) return;
-      if (result == null || result.trim().isEmpty) {
-        translatedLyrics.value = '';
-        lyricsTranslationError.value = 'Translation unavailable. Showing original lyrics.';
-      } else {
-        translatedLyrics.value = result;
-      }
-    } finally {
-      isLyricsTranslationLoading.value = false;
-    }
   }
 
   void changeLyricsMode(int? val) {
