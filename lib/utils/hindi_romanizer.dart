@@ -76,7 +76,9 @@ class HindiRomanizer {
     }
     var result = output.toString();
     // Omit the final inherent schwa in the common Hindi word-final case.
-    if (result.endsWith('a')) result = result.substring(0, result.length - 1);
+    if (runes.isNotEmpty && _consonants.containsKey(runes.last) && result.endsWith('a')) {
+      result = result.substring(0, result.length - 1);
+    }
     return result;
   }
 }
