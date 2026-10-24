@@ -28,14 +28,16 @@ class LyricsHomeWidgetProvider : AppWidgetProvider() {
         private const val KEY_CURRENT = "current_line"
         private const val KEY_NEXT = "next_line"
         private const val KEY_PAGE = "visible_page"
+        private const val KEY_ACTIVE_INDEX = "active_lyric_index"
 
-        fun updateLines(context: Context, previous: String, current: String, next: String) {
+        fun updateLines(context: Context, previous: String, current: String, next: String, activeIndex: Int) {
             val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             // Flutter may publish the same visible window more than once (e.g. seek
             // and playback callbacks). Do not restart a roll unless content changed.
             if (preferences.getString(KEY_PREVIOUS, "").orEmpty() == previous &&
                 preferences.getString(KEY_CURRENT, "").orEmpty() == current &&
-                preferences.getString(KEY_NEXT, "").orEmpty() == next
+                preferences.getString(KEY_NEXT, "").orEmpty() == next &&
+                preferences.getInt(KEY_ACTIVE_INDEX, -2) == activeIndex
             ) return
 
             val targetPage = 1 - preferences.getInt(KEY_PAGE, 0).coerceIn(0, 1)
@@ -43,6 +45,7 @@ class LyricsHomeWidgetProvider : AppWidgetProvider() {
                 .putString(KEY_PREVIOUS, previous)
                 .putString(KEY_CURRENT, current)
                 .putString(KEY_NEXT, next)
+                .putInt(KEY_ACTIVE_INDEX, activeIndex)
                 .putInt(KEY_PAGE, targetPage)
                 .apply()
 
