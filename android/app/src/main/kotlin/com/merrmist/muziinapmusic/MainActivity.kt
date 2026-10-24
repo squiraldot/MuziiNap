@@ -78,10 +78,12 @@ class MainActivity : AudioServiceActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/home_lyrics_widget")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "updateLine" -> {
-                        LyricsHomeWidgetProvider.updateLine(
+                    "updateLines" -> {
+                        LyricsHomeWidgetProvider.updateLines(
                             this,
-                            call.argument<String>("line").orEmpty()
+                            call.argument<String>("previous").orEmpty(),
+                            call.argument<String>("current").orEmpty(),
+                            call.argument<String>("next").orEmpty()
                         )
                         result.success(null)
                     }
