@@ -3,7 +3,7 @@
     android:label="@string/lyrics_widget_name"
     android:description="@string/lyrics_widget_description"
     android:initialLayout="@layout/lyrics_home_widget"
-    android:minHeight="48dp"
+    android:minHeight="96dp"
     android:minWidth="180dp"
     android:previewLayout="@layout/lyrics_home_widget"
     android:resizeMode="horizontal|vertical"
