@@ -78,6 +78,23 @@ class SyncedLyricsService {
         return await _cacheAndClose(lyricsBox, song.id, youtube);
       }
 
+      // Never downgrade a previously cached timed transcript to plain-only
+      // results just because a provider temporarily returned a weaker match.
+      if (cached != null && _hasSynced(cached["synced"])) {
+        final refreshedPlain = _clean(plainCandidate?["plainLyrics"]).isNotEmpty
+            ? _clean(plainCandidate?["plainLyrics"])
+            : _clean(netEase?["plainLyrics"]).isNotEmpty
+                ? _clean(netEase?["plainLyrics"])
+                : _clean(youtube?["plainLyrics"]);
+        final preserved = <String, dynamic>{
+          "synced": cached["synced"],
+          "plainLyrics": refreshedPlain.isNotEmpty
+              ? refreshedPlain
+              : cached["plainLyrics"],
+        };
+        return await _cacheAndClose(lyricsBox, song.id, preserved);
+      }
+
       if (plainCandidate != null) {
         return await _cacheAndClose(lyricsBox, song.id, plainCandidate);
       }
