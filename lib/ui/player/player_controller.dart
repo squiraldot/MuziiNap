@@ -1124,12 +1124,19 @@ class PlayerController extends GetxController
   }
 
   Future<void> reloadLyrics() async {
+    final song = currentSong.value;
+    if (song == null) return;
+
+    // Keep the currently displayed lyrics visible while a refresh is running.
+    final previousLyrics = Map<String, dynamic>.from(lyrics);
     isLyricsLoading.value = true;
     try {
       final Map<String, dynamic>? lyricsR =
           await SyncedLyricsService.getSyncedLyrics(
-              currentSong.value!, progressBarStatus.value.total.inSeconds, forceReload: true);
-      if (lyricsR != null) {
+              song, progressBarStatus.value.total.inSeconds, forceReload: true);
+      if (lyricsR != null &&
+          ((lyricsR["synced"]?.toString().trim().isNotEmpty ?? false) ||
+              (lyricsR["plainLyrics"]?.toString().trim().isNotEmpty ?? false))) {
         lyrics.value = lyricsR;
         isLyricsLoading.value = false;
         return;
@@ -1148,12 +1155,13 @@ class PlayerController extends GetxController
       }
       */
       
-      // If not found in lrclib, just set to NA
-      lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      // A failed refresh should not erase lyrics that were already available.
+      lyrics.value = previousLyrics;
     } catch (e) {
-      lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      lyrics.value = previousLyrics;
+    } finally {
+      isLyricsLoading.value = false;
     }
-    isLyricsLoading.value = false;
   }
 
   Future<void> translateLyrics() async {
