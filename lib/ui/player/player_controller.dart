@@ -1184,30 +1184,6 @@ class PlayerController extends GetxController
     }
   }
 
-  Future<void> _loadLyricsForSong(MediaItem song) async {
-    isLyricsLoading.value = true;
-    try {
-      final lyricsResult = await SyncedLyricsService.getSyncedLyrics(
-        song,
-        progressBarStatus.value.total.inSeconds,
-      );
-      // A slow lookup for an older track must never overwrite the current one.
-      if (currentSong.value?.id == song.id && lyricsResult != null) {
-        lyrics.value = lyricsResult;
-      } else if (currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
-      }
-    } catch (_) {
-      if (currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
-      }
-    } finally {
-      if (currentSong.value?.id == song.id) {
-        isLyricsLoading.value = false;
-      }
-    }
-  }
-
   Future<void> showLyrics() async {
     showLyricsflag.value = !showLyricsflag.value;
     if ((lyrics["synced"].isEmpty && lyrics['plainLyrics'].isEmpty) &&
