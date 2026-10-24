@@ -80,6 +80,7 @@ class PlayerController extends GetxController
   final translatedLyrics = ''.obs;
   final isLyricsTranslationLoading = false.obs;
   final lyricsTranslationError = ''.obs;
+  String _lyricsTranslationRequestKey = '';
   static const lyricsTranslationLanguages = <String, String>{
     'hi': 'Hindi', 'en': 'English', 'es': 'Spanish', 'fr': 'French',
     'de': 'German', 'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian',
@@ -1226,11 +1227,14 @@ class PlayerController extends GetxController
     if (song == null || isLyricsTranslationLoading.value) return;
     final synced = lyrics['synced']?.toString() ?? '';
     final plain = lyrics['plainLyrics']?.toString() ?? '';
-    final source = synced.trim().isNotEmpty && synced != 'NA' ? synced : plain;
+    final source = lyricsMode.value == 0 && synced.trim().isNotEmpty && synced != 'NA' ? synced : plain;
     if (source.trim().isEmpty || source == 'NA') {
       lyricsTranslationError.value = 'No lyrics available to translate.';
       return;
     }
+    final requestKey = '${song.id}|${lyricsTranslationLanguage.value}|${source.hashCode}';
+    if (_lyricsTranslationRequestKey != requestKey) translatedLyrics.value = '';
+    _lyricsTranslationRequestKey = requestKey;
     isLyricsTranslationLoading.value = true;
     lyricsTranslationError.value = '';
     try {
