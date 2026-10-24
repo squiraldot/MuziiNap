@@ -1228,7 +1228,8 @@ class PlayerController extends GetxController
     final synced = lyrics['synced']?.toString() ?? '';
     final plain = lyrics['plainLyrics']?.toString() ?? '';
     final source = lyricsMode.value == 0 && synced.trim().isNotEmpty && synced != 'NA' ? synced : plain;
-    if (source.trim().isEmpty || source == 'NA') {
+    if (source.trim().isEmpty) return;
+    if (source == 'NA') {
       lyricsTranslationError.value = 'No lyrics available to translate.';
       return;
     }
