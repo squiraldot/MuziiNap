@@ -23,7 +23,6 @@ import '../../services/lyrics_translation_service.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
-import '../../utils/hindi_romanizer.dart';
 import '../../utils/home_history.dart';
 import '../../models/media_Item_builder.dart';
 import '../screens/Home/home_screen_controller.dart';
