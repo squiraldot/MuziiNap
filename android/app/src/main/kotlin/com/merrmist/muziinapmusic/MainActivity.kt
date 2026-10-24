@@ -75,6 +75,19 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/home_lyrics_widget")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "updateLine" -> {
+                        LyricsHomeWidgetProvider.updateLine(
+                            this,
+                            call.argument<String>("line").orEmpty()
+                        )
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         handlePresetIntent(intent)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, downloadNotificationChannel)
