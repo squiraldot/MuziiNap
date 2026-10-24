@@ -5,6 +5,8 @@
 class HindiRomanizer {
   HindiRomanizer._();
 
+  static final Map<String, String> _cache = <String, String>{};
+
   static const _independentVowels = <int, String>{
     0x0905: 'a', 0x0906: 'aa', 0x0907: 'i', 0x0908: 'ee',
     0x0909: 'u', 0x090A: 'oo', 0x090B: 'ri', 0x090F: 'e',
@@ -30,11 +32,17 @@ class HindiRomanizer {
   };
 
   static String transliterate(String input) {
-    return input.splitMapJoin(
+    final cached = _cache[input];
+    if (cached != null) return cached;
+    final result = input.splitMapJoin(
       RegExp(r'[\u0900-\u097F]+'),
       onMatch: (match) => _transliterateDevanagari(match[0]!),
       onNonMatch: (text) => text,
     );
+    // Keep the cache bounded for long sessions with many different songs.
+    if (_cache.length >= 200) _cache.clear();
+    _cache[input] = result;
+    return result;
   }
 
   static String _transliterateDevanagari(String input) {
