@@ -771,6 +771,13 @@ class PlayerController extends GetxController
     await _audioHandler
         .customAction("setSourceNPlay", {'mediaItem': mediaItem});
 
+    // The first tap after a cold app launch can start playback before the
+    // mediaItem stream has emitted/updated currentSong. Fetch from the explicit
+    // play request too, so widget lyrics do not rely solely on that stream.
+    if (mediaItem != null) {
+      unawaited(_loadLyricsForSong(mediaItem));
+    }
+
     // disable queue loop mode when radio is started
     if (radio &&
         isQueueLoopModeEnabled.isTrue &&
@@ -1178,17 +1185,18 @@ class PlayerController extends GetxController
         progressBarStatus.value.total.inSeconds,
       );
       // A slow lookup for an older track must never overwrite the current one.
-      if (currentSong.value?.id == song.id && lyricsResult != null) {
+      if ((currentSong.value == null || currentSong.value?.id == song.id) &&
+          lyricsResult != null) {
         lyrics.value = lyricsResult;
-      } else if (currentSong.value?.id == song.id) {
+      } else if (currentSong.value == null || currentSong.value?.id == song.id) {
         lyrics.value = {"synced": "", "plainLyrics": "NA"};
       }
     } catch (_) {
-      if (currentSong.value?.id == song.id) {
+      if (currentSong.value == null || currentSong.value?.id == song.id) {
         lyrics.value = {"synced": "", "plainLyrics": "NA"};
       }
     } finally {
-      if (currentSong.value?.id == song.id) {
+      if (currentSong.value == null || currentSong.value?.id == song.id) {
         isLyricsLoading.value = false;
       }
     }
