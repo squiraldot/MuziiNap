@@ -94,6 +94,7 @@ class PlayerController extends GetxController
       MethodChannel('muziinap/home_lyrics_widget');
   List<TimedLyricLine> _homeWidgetTimeline = const <TimedLyricLine>[];
   String? _lastHomeWidgetPayload;
+  int _lastHomeWidgetLyricIndex = -2;
   Worker? _homeWidgetLyricsWorker;
   Worker? _homeWidgetSongWorker;
 
@@ -115,8 +116,9 @@ class PlayerController extends GetxController
     // Only redraw when the visible three-line window changes, not on every
     // audio-position tick. The native widget handles the visual cross-fade.
     final payloadKey = jsonEncode(<String>[previous, current, next]);
-    if (payloadKey == _lastHomeWidgetPayload) return;
+    if (payloadKey == _lastHomeWidgetPayload && activeIndex == _lastHomeWidgetLyricIndex) return;
     _lastHomeWidgetPayload = payloadKey;
+    _lastHomeWidgetLyricIndex = activeIndex;
     unawaited(
       _homeLyricsWidgetChannel.invokeMethod<void>(
         'updateLines',
@@ -124,6 +126,7 @@ class PlayerController extends GetxController
           'previous': previous,
           'current': current,
           'next': next,
+          'activeIndex': activeIndex,
         },
       ).catchError((Object error) {
         printINFO('Home-screen lyrics widget update failed: $error');
@@ -171,6 +174,7 @@ class PlayerController extends GetxController
         lyrics['synced']?.toString() ?? '',
       );
       _lastHomeWidgetPayload = null;
+      _lastHomeWidgetLyricIndex = -2;
       _publishCurrentLyricToHomeWidget();
     });
     _homeWidgetSongWorker = ever(currentSong, (_) {
