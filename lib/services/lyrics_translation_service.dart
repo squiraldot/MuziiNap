@@ -80,9 +80,7 @@ class LyricsTranslationService {
         // Identical output can be a valid translation for names/short words.
         return translated.isEmpty ? null : translated;
       }
-      return const HtmlEscape().convert(translated) == translated
-          ? translated
-          : _decodeBasicEntities(translated);
+      return _decodeBasicEntities(translated);
     } on DioException {
       return null;
     } catch (_) {
