@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'lyrics_quote_card.dart';
+import '../../../services/lyrics_quote_export_service.dart';
 
 import '../../widgets/loader.dart';
 import '../player_controller.dart';
@@ -78,6 +80,84 @@ class LyricsWidget extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> _showLyricsQuotePreview(BuildContext context, PlayerController controller, String lyric) async {
+  final song = controller.currentSong.value;
+  if (song == null || lyric.trim().isEmpty) return;
+  final boundaryKey = GlobalKey();
+  int themeIndex = 0;
+  TextAlign alignment = TextAlign.center;
+  double quoteSize = controller.activeLyricSize.value.clamp(16, 36);
+  final fontFamily = controller.lyricFontFamily.value;
+  final bold = controller.boldActiveLyric.value;
+  await showModalBottomSheet<void>(
+    context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (sheetContext, setSheetState) => Padding(
+        padding: EdgeInsets.fromLTRB(18, 4, 18, 18 + MediaQuery.of(sheetContext).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Lyric quote card', style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: 14),
+              Center(child: RepaintBoundary(
+                key: boundaryKey,
+                child: SizedBox(width: 320, child: LyricsQuoteCard(
+                  lyric: lyric, songTitle: song.title, artist: song.artist ?? 'Unknown artist',
+                  artworkUri: song.artUri, fontFamily: fontFamily, fontSize: quoteSize,
+                  bold: bold, themeIndex: themeIndex, textAlignment: alignment,
+                )),
+              )),
+              const SizedBox(height: 16),
+              Text('Background theme', style: Theme.of(sheetContext).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(spacing: 10, children: List.generate(LyricsQuoteCard.palettes.length, (index) {
+                final selected = index == themeIndex;
+                return InkWell(
+                  onTap: () => setSheetState(() => themeIndex = index),
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(width: 42, height: 42, decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: LyricsQuoteCard.palettes[index]),
+                    border: Border.all(color: selected ? Theme.of(sheetContext).colorScheme.primary : Colors.white30, width: selected ? 3 : 1),
+                  ), child: selected ? const Icon(Icons.check, color: Colors.white) : null),
+                );
+              })),
+              const SizedBox(height: 12),
+              Row(children: [Expanded(child: Text('Text size', style: Theme.of(sheetContext).textTheme.titleSmall)), Text('${quoteSize.round()} px')]),
+              Slider(min: 16, max: 36, divisions: 20, value: quoteSize, label: '${quoteSize.round()} px',
+                onChanged: (value) => setSheetState(() => quoteSize = value)),
+              SegmentedButton<TextAlign>(
+                segments: const [
+                  ButtonSegment(value: TextAlign.left, icon: Icon(Icons.format_align_left), label: Text('Left')),
+                  ButtonSegment(value: TextAlign.center, icon: Icon(Icons.format_align_center), label: Text('Center')),
+                  ButtonSegment(value: TextAlign.right, icon: Icon(Icons.format_align_right), label: Text('Right')),
+                ],
+                selected: {alignment},
+                onSelectionChanged: (values) => setSheetState(() => alignment = values.first),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(width: double.infinity, child: FilledButton.icon(
+                icon: const Icon(Icons.share), label: const Text('Share image'),
+                onPressed: () async {
+                  final success = await const LyricsQuoteExportService().sharePng(
+                    boundaryKey, filename: 'muziinap-${song.id}-lyric.png',
+                  );
+                  if (sheetContext.mounted && !success) {
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      const SnackBar(content: Text('Could not share quote card. Please try again.')),
+                    );
+                  }
+                },
+              )),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 TextStyle _lyricsTextStyle(BuildContext context, PlayerController controller) {
@@ -216,6 +296,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => _seekToLine(_lines[index]),
+                      onLongPress: () => _showLyricsQuotePreview(context, widget.controller, _lines[index].text),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
