@@ -109,10 +109,7 @@ class PlayerController extends GetxController
         : '';
     final current = activeIndex >= 0 && activeIndex < _homeWidgetTimeline.length
         ? _homeWidgetTimeline[activeIndex].text
-        : (_homeWidgetTimeline.isEmpty &&
-                lyrics['plainLyrics']?.toString() == 'Synced lyrics not available'
-            ? 'Synced lyrics not available'
-            : '');
+        : '';
     final next = activeIndex >= 0 && activeIndex + 1 < _homeWidgetTimeline.length
         ? _homeWidgetTimeline[activeIndex + 1].text
         : '';
@@ -1210,11 +1207,11 @@ class PlayerController extends GetxController
             RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced);
         lyrics.value = hasSynced
             ? lyricsResult!
-            : {"synced": "", "plainLyrics": "Synced lyrics not available"};
+            : {"synced": "", "plainLyrics": ""};
       }
     } catch (_) {
       if (currentSong.value == null || currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": "Synced lyrics not available"};
+        lyrics.value = {"synced": "", "plainLyrics": ""};
       }
     } finally {
       if (currentSong.value == null || currentSong.value?.id == song.id) {
