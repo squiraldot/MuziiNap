@@ -21,7 +21,12 @@
         android:outAnimation="@anim/lyrics_slide_out_up">
         <TextView
             android:id="@+id/lyrics_home_widget_previous_a"
-            style="@style/HomeLyricsSecondary"
+            android:ellipsize="end"
+            android:fontFamily="sans"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="#99FFFFFF"
+            android:textSize="13sp"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
         <TextView
@@ -41,7 +46,19 @@
         android:outAnimation="@anim/lyrics_slide_out_up">
         <TextView
             android:id="@+id/lyrics_home_widget_current_a"
-            style="@style/HomeLyricsCurrent"
+            android:ellipsize="end"
+            android:fontFamily="sans"
+            android:gravity="center"
+            android:maxLines="2"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:shadowColor="#CC000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:textColor="#FFFFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
         <TextView
