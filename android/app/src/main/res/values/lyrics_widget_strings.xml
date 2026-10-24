@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lyrics_widget_description">Shows the current synced lyric line. Tap to open MuziiNap.</string>
+</resources>
