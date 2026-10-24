@@ -88,6 +88,32 @@ class LyricsWidget extends StatelessWidget {
             );
           }),
         ),
+        if (controller.lyricsDisplayMode.value == 'translated' &&
+            controller.lyricsTranslationError.value.isNotEmpty &&
+            !controller.isLyricsTranslationLoading.value)
+          Positioned(
+            top: 8,
+            left: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.68),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    child: Text(
+                      'Translation unavailable • showing original lyrics',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
