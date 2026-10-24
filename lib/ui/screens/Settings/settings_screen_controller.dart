@@ -417,6 +417,8 @@ class SettingsScreenController extends GetxController {
       'lyricsFontFamily': 'Poppins',
       'activeLyricSize': 22.0,
       'boldActiveLyric': true,
+      'lyricsTranslationLanguage': 'hi',
+      'lyricsDisplayMode': 'original',
       'isBottomNavBarEnabled': true,
       'themePrimaryColor': 4278199603,
       'newVersionVisibility': updateCheckFlag,
