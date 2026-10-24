@@ -92,7 +92,7 @@ class PlayerController extends GetxController
   static const MethodChannel _homeLyricsWidgetChannel =
       MethodChannel('muziinap/home_lyrics_widget');
   List<TimedLyricLine> _homeWidgetTimeline = const <TimedLyricLine>[];
-  String? _lastHomeWidgetLine;
+  String? _lastHomeWidgetPayload;
   Worker? _homeWidgetLyricsWorker;
   Worker? _homeWidgetSongWorker;
 
@@ -102,13 +102,28 @@ class PlayerController extends GetxController
       _homeWidgetTimeline,
       effectiveLyricsPositionMs,
     );
-    final line = activeIndex >= 0 ? _homeWidgetTimeline[activeIndex].text : '';
-    if (line == _lastHomeWidgetLine) return;
-    _lastHomeWidgetLine = line;
+    final previous = activeIndex > 0
+        ? _homeWidgetTimeline[activeIndex - 1].text
+        : '';
+    final current = activeIndex >= 0 && activeIndex < _homeWidgetTimeline.length
+        ? _homeWidgetTimeline[activeIndex].text
+        : '';
+    final next = activeIndex >= 0 && activeIndex + 1 < _homeWidgetTimeline.length
+        ? _homeWidgetTimeline[activeIndex + 1].text
+        : '';
+    // Only redraw when the visible three-line window changes, not on every
+    // audio-position tick. The native widget handles the visual cross-fade.
+    final payloadKey = '$previous\\u0000$current\\u0000$next';
+    if (payloadKey == _lastHomeWidgetPayload) return;
+    _lastHomeWidgetPayload = payloadKey;
     unawaited(
       _homeLyricsWidgetChannel.invokeMethod<void>(
-        'updateLine',
-        <String, String>{'line': line},
+        'updateLines',
+        <String, String>{
+          'previous': previous,
+          'current': current,
+          'next': next,
+        },
       ).catchError((Object error) {
         printINFO('Home-screen lyrics widget update failed: $error');
       }),
@@ -154,12 +169,12 @@ class PlayerController extends GetxController
       _homeWidgetTimeline = LyricsTimeline.parse(
         lyrics['synced']?.toString() ?? '',
       );
-      _lastHomeWidgetLine = null;
+      _lastHomeWidgetPayload = null;
       _publishCurrentLyricToHomeWidget();
     });
     _homeWidgetSongWorker = ever(currentSong, (_) {
       _homeWidgetTimeline = const <TimedLyricLine>[];
-      _lastHomeWidgetLine = null;
+      _lastHomeWidgetPayload = null;
       _publishCurrentLyricToHomeWidget();
     });
     _listenForChangesInBufferedPosition();
