@@ -102,14 +102,29 @@ Future<void> _showLyricsQuotePreview(BuildContext context, PlayerController cont
             children: [
               Text('Lyric quote card', style: Theme.of(sheetContext).textTheme.titleLarge),
               const SizedBox(height: 14),
-              Center(child: RepaintBoundary(
-                key: boundaryKey,
-                child: SizedBox(width: 320, child: LyricsQuoteCard(
-                  lyric: lyric, songTitle: song.title, artist: song.artist ?? 'Unknown artist',
-                  artworkUri: song.artUri, fontFamily: fontFamily, fontSize: quoteSize,
-                  bold: bold, themeIndex: themeIndex, textAlignment: alignment,
-                )),
-              )),
+              Center(
+                child: RepaintBoundary(
+                  key: boundaryKey,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox(
+                      width: 320,
+                      child: LyricsQuoteCard(
+                        lyric: lyric,
+                        songTitle: song.title,
+                        artist: song.artist ?? 'Unknown artist',
+                        artworkUri: song.artUri,
+                        fontFamily: fontFamily,
+                        fontSize: quoteSize,
+                        bold: bold,
+                        themeIndex: themeIndex,
+                        textAlignment: alignment,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               Text('Background theme', style: Theme.of(sheetContext).textTheme.titleSmall),
               const SizedBox(height: 8),
