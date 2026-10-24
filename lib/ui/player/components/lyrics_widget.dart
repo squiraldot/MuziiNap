@@ -334,13 +334,6 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                               ),
                             ),
                           ),
-                          IconButton(
-                            tooltip: 'Create lyric quote card',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => _showLyricsQuotePreview(context, widget.controller, _lines[index].text),
-                            icon: const Icon(Icons.ios_share_rounded, size: 19),
-                            color: active ? Colors.white : Colors.white70,
-                          ),
                         ],
                       ),
                     ),
