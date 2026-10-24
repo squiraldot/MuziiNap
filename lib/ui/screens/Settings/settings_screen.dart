@@ -344,6 +344,47 @@ class SettingsScreen extends StatelessWidget {
                       hasBottomNavigation: isBottomNavActive,
                     ),
                   ),
+                  Obx(() {
+                    final player = Get.find<PlayerController>();
+                    return ListTile(
+                      contentPadding: const EdgeInsets.only(left: 5, right: 10),
+                      leading: const Icon(Icons.translate),
+                      title: const Text('Lyrics translation language'),
+                      subtitle: const Text('Choose the language for translated lyrics'),
+                      trailing: DropdownButton<String>(
+                        value: player.lyricsTranslationLanguage.value,
+                        underline: const SizedBox.shrink(),
+                        items: PlayerController.lyricsTranslationLanguages.entries
+                            .map((entry) => DropdownMenuItem<String>(
+                                  value: entry.key,
+                                  child: Text(entry.value),
+                                )).toList(),
+                        onChanged: (value) {
+                          if (value != null) player.setLyricsTranslationLanguage(value);
+                        },
+                      ),
+                    );
+                  }),
+                  Obx(() {
+                    final player = Get.find<PlayerController>();
+                    return ListTile(
+                      contentPadding: const EdgeInsets.only(left: 5, right: 10),
+                      leading: const Icon(Icons.lyrics),
+                      title: const Text('Lyrics display'),
+                      subtitle: const Text('Show original lyrics or their translation'),
+                      trailing: DropdownButton<String>(
+                        value: player.lyricsDisplayMode.value,
+                        underline: const SizedBox.shrink(),
+                        items: const [
+                          DropdownMenuItem(value: 'original', child: Text('Original')),
+                          DropdownMenuItem(value: 'translated', child: Text('Translated')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) player.setLyricsDisplayMode(value);
+                        },
+                      ),
+                    );
+                  }),
                 ],
               ),
               CustomExpansionTile(
