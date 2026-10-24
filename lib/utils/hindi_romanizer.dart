@@ -31,7 +31,7 @@ class HindiRomanizer {
 
   static String transliterate(String input) {
     return input.splitMapJoin(
-      RegExp(r'[\\u0900-\\u097F]+'),
+      RegExp(r'[\u0900-\u097F]+'),
       onMatch: (match) => _transliterateDevanagari(match[0]!),
       onNonMatch: (text) => text,
     );
