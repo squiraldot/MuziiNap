@@ -83,7 +83,8 @@ class MainActivity : AudioServiceActivity() {
                             this,
                             call.argument<String>("previous").orEmpty(),
                             call.argument<String>("current").orEmpty(),
-                            call.argument<String>("next").orEmpty()
+                            call.argument<String>("next").orEmpty(),
+                            call.argument<Int>("activeIndex") ?: -1
                         )
                         result.success(null)
                     }
