@@ -189,6 +189,13 @@ class PlayerController extends GetxController
         unawaited(_loadLyricsForSong(song));
       }
     });
+    // GetX's ever() only reacts to future changes; it does not emit the
+    // current value. If playback/session restoration selected a track before
+    // this worker was registered, explicitly fetch its lyrics on startup.
+    final initialSong = currentSong.value;
+    if (initialSong != null) {
+      unawaited(_loadLyricsForSong(initialSong));
+    }
     _listenForChangesInBufferedPosition();
     _listenForChangesInDuration();
     _listenForPlaylistChange();
