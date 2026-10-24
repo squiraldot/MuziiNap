@@ -111,9 +111,12 @@ class SyncedLyricsService {
     } catch (error) {
       printINFO("Lyrics lookup failed: " + error.toString());
       return null;
-    } finally {
-      if (lyricsBox.isOpen) await lyricsBox.close();
     }
+    // Do not close this Hive box here. Hive.openBox returns the shared box
+    // instance; simultaneous lookups for the first track can be running from
+    // both the mediaItem stream and the play request. One lookup closing the
+    // box would invalidate the other lookup and can make first-play lyrics
+    // intermittently disappear. Keep the cache box open for app-wide reuse.
   }
 
   static Future<Map<String, dynamic>> _cacheAndClose(
