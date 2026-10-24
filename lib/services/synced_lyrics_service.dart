@@ -7,9 +7,9 @@ import '../utils/helper.dart';
 
 class SyncedLyricsService {
   static final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 6),
-    sendTimeout: const Duration(seconds: 6),
-    receiveTimeout: const Duration(seconds: 8),
+    connectTimeout: const Duration(seconds: 12),
+    sendTimeout: const Duration(seconds: 12),
+    receiveTimeout: const Duration(seconds: 20),
     headers: const {
       'Accept': 'application/json',
       'User-Agent': 'MuziiNap (https://github.com/squiraldot/MuziiNap)',
@@ -166,55 +166,72 @@ class SyncedLyricsService {
     required String album,
     required int duration,
   }) async {
-    try {
-      final response = await _dio.get(
-        "https://lrclib.net/api/search",
-        queryParameters: {
-          // Use LRCLIB's structured metadata filters instead of one broad q
-          // query. q searches across fields and can crowd the 20-result limit
-          // with unrelated records before the correct track is considered.
-          "track_name": title,
-          if (artist.isNotEmpty) "artist_name": artist,
-          if (album.isNotEmpty) "album_name": album,
-        },
-      );
-      if (response.statusCode != 200 || response.data is! List) return null;
-      final candidates = (response.data as List)
-          .whereType<Map>()
-          .map((record) => Map<String, dynamic>.from(record))
-          .where((record) => _normalizeLrclibRecord(record) != null)
-          .toList();
-      if (candidates.isEmpty) return null;
+    // Do not require exact artist/album filters for discovery: metadata from
+    // media providers often differs from LRCLIB even for the same recording.
+    // Search progressively broader queries and rank all results locally.
+    final queries = <Map<String, String>>[
+      {"track_name": title},
+      if (artist.isNotEmpty) {"q": "$title $artist"},
+      {"q": title},
+    ];
+    final seen = <String>{};
+    final candidates = <Map<String, dynamic>>[];
 
-      candidates.sort((a, b) => _lrclibScore(
-        b, title: title, artist: artist, album: album, duration: duration,
-      ).compareTo(_lrclibScore(
-        a, title: title, artist: artist, album: album, duration: duration,
-      )));
-
-      // Do not return a high-ranked plain-only result before checking
-      // the remaining candidates: LRCLIB can return multiple editions of the
-      // same track, and a later record may contain synced lyrics.
-      Map<String, dynamic>? plainCandidate;
-      for (final candidate in candidates) {
-        if (_lrclibScore(
-          candidate, title: title, artist: artist, album: album, duration: duration,
-        ) < 80) continue;
-        final normalized = _normalizeLrclibRecord(candidate);
-        if (normalized == null) continue;
-        if (_hasSynced(normalized["synced"])) {
-          printINFO("Synced lyrics found (LRCLIB search)");
-          return normalized;
+    for (final query in queries) {
+      try {
+        final response = await _dio.get(
+          "https://lrclib.net/api/search",
+          queryParameters: query,
+        );
+        if (response.statusCode != 200 || response.data is! List) continue;
+        for (final record in (response.data as List).whereType<Map>()) {
+          final candidate = Map<String, dynamic>.from(record);
+          final id = candidate["id"]?.toString();
+          final key = id ?? [
+            candidate["trackName"], candidate["artistName"],
+            candidate["albumName"], candidate["duration"],
+          ].join("|");
+          if (seen.add(key) && _normalizeLrclibRecord(candidate) != null) {
+            candidates.add(candidate);
+          }
         }
-        plainCandidate ??= normalized;
+      } on DioException catch (error) {
+        printINFO("LRCLIB search failed for $query: $error");
+      } catch (error) {
+        printINFO("LRCLIB search response failed: $error");
       }
-      if (plainCandidate != null) {
-        printINFO("Plain lyrics found (LRCLIB search; no synced candidate matched)");
-        return plainCandidate;
+      // If this query already returned a strong synced match, avoid further
+      // requests and respect LRCLIB's sequential-request guidance.
+      final strongSynced = candidates.any((candidate) =>
+          _hasSynced(candidate["syncedLyrics"]) &&
+          _lrclibScore(candidate, title: title, artist: artist,
+              album: album, duration: duration) >= 80);
+      if (strongSynced) break;
+    }
+
+    candidates.sort((a, b) => _lrclibScore(
+      b, title: title, artist: artist, album: album, duration: duration,
+    ).compareTo(_lrclibScore(
+      a, title: title, artist: artist, album: album, duration: duration,
+    )));
+
+    Map<String, dynamic>? plainCandidate;
+    for (final candidate in candidates) {
+      if (_lrclibScore(
+        candidate, title: title, artist: artist, album: album, duration: duration,
+      ) < 80) continue;
+      final normalized = _normalizeLrclibRecord(candidate);
+      if (normalized == null) continue;
+      if (_hasSynced(normalized["synced"])) {
+        printINFO("Synced lyrics found (LRCLIB search)");
+        return normalized;
       }
-    } on DioException catch (error) {
-      printINFO("LRCLIB search failed: " + error.toString());
-    } catch (_) {}
+      plainCandidate ??= normalized;
+    }
+    if (plainCandidate != null) {
+      printINFO("Plain lyrics found (LRCLIB search; no synced candidate matched)");
+      return plainCandidate;
+    }
     return null;
   }
 
