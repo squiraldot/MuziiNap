@@ -23,6 +23,10 @@ class LyricsWidget extends StatelessWidget {
         Positioned.fill(
           child: Obx(() {
             controller.lyricsStyleRevision.value;
+            final translatedMode = controller.lyricsDisplayMode.value == 'translated';
+            if (translatedMode && controller.translatedLyrics.value.isEmpty && !controller.isLyricsTranslationLoading.value) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => controller.ensureLyricsTranslated());
+            }
             if (controller.isLyricsLoading.isTrue) {
               return const Center(child: LoadingIndicator());
             }
@@ -36,9 +40,11 @@ class LyricsWidget extends StatelessWidget {
                     () => TextSelectionTheme(
                       data: Theme.of(context).textSelectionTheme,
                       child: SelectableText(
-                        controller.lyrics["plainLyrics"] == "NA"
-                            ? "lyricsNotAvailable".tr
-                            : controller.lyrics["plainLyrics"],
+                        translatedMode && controller.translatedLyrics.value.isNotEmpty
+                            ? controller.translatedLyrics.value
+                            : (controller.lyrics["plainLyrics"] == "NA"
+                                ? "lyricsNotAvailable".tr
+                                : controller.lyrics["plainLyrics"]),
                         textAlign: TextAlign.center,
                         style: _lyricsTextStyle(context, controller).copyWith(
                           height: 1.38,
@@ -53,8 +59,13 @@ class LyricsWidget extends StatelessWidget {
               );
             }
 
-            final synced = controller.lyrics['synced']?.toString() ?? '';
+            final originalSynced = controller.lyrics['synced']?.toString() ?? '';
+            final translatedSynced = translatedMode ? controller.translatedLyrics.value : '';
+            final synced = translatedSynced.isNotEmpty && translatedSynced.contains(RegExp(r'\\[\\d{1,3}:\\d{2}')) ? translatedSynced : originalSynced;
             final songId = controller.currentSong.value?.id ?? '';
+            if (translatedMode && controller.isLyricsTranslationLoading.value) {
+              return const Center(child: LoadingIndicator());
+            }
             if (synced.trim().isEmpty || synced == 'NA') {
               return Center(
                 child: Text(
