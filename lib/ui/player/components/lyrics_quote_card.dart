@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -89,15 +87,24 @@ class LyricsQuoteCard extends StatelessWidget {
                         Text('MUZIINAP', style: TextStyle(color: Colors.white70, letterSpacing: 2, fontWeight: FontWeight.w700, fontSize: 12)),
                       ],
                     ),
-                    const Spacer(),
-                    Text(
-                      '“${lyric.trim()}”',
-                      textAlign: textAlignment,
-                      maxLines: 10,
-                      overflow: TextOverflow.visible,
-                      style: _lyricStyle().copyWith(color: Colors.white, shadows: const [
-                        Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
-                      ]),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 250),
+                            child: Text(
+                              '“${lyric.trim()}”',
+                              textAlign: textAlignment,
+                              style: _lyricStyle().copyWith(color: Colors.white, shadows: const [
+                                Shadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2)),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 22),
                     Container(height: 2, width: 44, color: Colors.white70),
