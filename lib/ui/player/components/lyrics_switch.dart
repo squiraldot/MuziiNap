@@ -247,6 +247,17 @@ class LyricsSwitch extends StatelessWidget {
                     color: Colors.white,
                     tooltip: "Lyrics sync adjustment",
                   ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Lyrics display mode',
+                    icon: const Icon(Icons.translate, color: Colors.white),
+                    onSelected: playerController.setLyricsDisplayMode,
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'original', child: Text('Original lyrics')),
+                      PopupMenuItem(value: 'romanized', child: Text('Romanized Hindi')),
+                      PopupMenuItem(value: 'both', child: Text('Original + Romanized')),
+                      PopupMenuItem(value: 'translated', child: Text('Translated lyrics')),
+                    ],
+                  ),
                 ],
               ),
             )
