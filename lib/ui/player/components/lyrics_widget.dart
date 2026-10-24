@@ -39,6 +39,7 @@ class LyricsWidget extends StatelessWidget {
                             : controller.lyrics["plainLyrics"],
                         textAlign: TextAlign.center,
                         style: _lyricsTextStyle(context, controller).copyWith(
+                          height: 1.38,
                           color: controller.isLyricsDialogOpen
                               ? Theme.of(context).textTheme.titleMedium!.color
                               : Colors.white,
@@ -124,7 +125,7 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
     super.dispose();
   }
 
-  static const double _lineExtent = 88;
+  static const double _lineExtent = 68;
 
   void _scrollToActiveLine(int index, {bool animate = true}) {
     if (!_followPlayback ||
