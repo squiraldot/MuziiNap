@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart';
@@ -200,13 +201,12 @@ class SyncedLyricsService {
       } catch (error) {
         printINFO("LRCLIB search response failed: $error");
       }
-      // If this query already returned a strong synced match, avoid further
-      // requests and respect LRCLIB's sequential-request guidance.
-      final strongSynced = candidates.any((candidate) =>
-          _hasSynced(candidate["syncedLyrics"]) &&
-          _lrclibScore(candidate, title: title, artist: artist,
-              album: album, duration: duration) >= 80);
-      if (strongSynced) break;
+      // LRCLIB recommends sequential requests with a short pause between
+      // them. Gather broad candidates before ranking so an early result with
+      // the right title but wrong artist/edition cannot hide a better match.
+      if (query != queries.last) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
     }
 
     candidates.sort((a, b) => _lrclibScore(
