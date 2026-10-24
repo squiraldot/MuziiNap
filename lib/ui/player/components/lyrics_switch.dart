@@ -215,7 +215,14 @@ class LyricsSwitch extends StatelessWidget {
                     totalSwitches: 2,
                     labels: ['synced'.tr, 'plain'.tr],
                     radiusStyle: true,
-                    onToggle: playerController.changeLyricsMode,
+                    onToggle: (value) {
+                      if (value == null) return;
+                      if (value == playerController.lyricsMode.value) {
+                        playerController.showLyricsflag.value = false;
+                      } else {
+                        playerController.changeLyricsMode(value);
+                      }
+                    },
                   ),
                   const SizedBox(width: 10),
                   IconButton(
