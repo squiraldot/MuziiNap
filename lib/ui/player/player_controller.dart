@@ -23,6 +23,7 @@ import '../../services/lyrics_translation_service.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
+import '../../utils/hindi_romanizer.dart';
 import '../../utils/home_history.dart';
 import '../../models/media_Item_builder.dart';
 import '../screens/Home/home_screen_controller.dart';
@@ -138,7 +139,10 @@ class PlayerController extends GetxController
     _setInitLyricsMode();
     final appPrefs = Hive.box(appPrefsBoxName);
     lyricsTranslationLanguage.value = lyricsTranslationLanguages.containsKey(appPrefs.get('lyricsTranslationLanguage')) ? appPrefs.get('lyricsTranslationLanguage') as String : 'hi';
-    lyricsDisplayMode.value = appPrefs.get('lyricsDisplayMode') == 'translated' ? 'translated' : 'original';
+    final savedLyricsDisplayMode = appPrefs.get('lyricsDisplayMode');
+    lyricsDisplayMode.value = const {'original', 'romanized', 'both', 'translated'}.contains(savedLyricsDisplayMode)
+        ? savedLyricsDisplayMode as String
+        : 'original';
     final savedFont = appPrefs.get('lyricsFontFamily');
     lyricFontFamily.value = lyricFontFamilies.contains(savedFont) ? savedFont as String : 'Poppins';
     final savedSize = appPrefs.get('activeLyricSize');
@@ -1216,7 +1220,8 @@ class PlayerController extends GetxController
   }
 
   Future<void> setLyricsDisplayMode(String mode) async {
-    final safeMode = mode == 'translated' ? 'translated' : 'original';
+    const supportedModes = {'original', 'romanized', 'both', 'translated'};
+    final safeMode = supportedModes.contains(mode) ? mode : 'original';
     lyricsDisplayMode.value = safeMode;
     await Hive.box(appPrefsBoxName).put('lyricsDisplayMode', safeMode);
     if (safeMode == 'translated') await ensureLyricsTranslated();
