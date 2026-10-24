@@ -122,7 +122,7 @@ class PlayerController extends GetxController
     unawaited(
       _homeLyricsWidgetChannel.invokeMethod<void>(
         'updateLines',
-        <String, String>{
+        <String, Object>{
           'previous': previous,
           'current': current,
           'next': next,
@@ -180,6 +180,7 @@ class PlayerController extends GetxController
     _homeWidgetSongWorker = ever(currentSong, (_) {
       _homeWidgetTimeline = const <TimedLyricLine>[];
       _lastHomeWidgetPayload = null;
+      _lastHomeWidgetLyricIndex = -2;
       _publishCurrentLyricToHomeWidget();
     });
     _listenForChangesInBufferedPosition();
