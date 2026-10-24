@@ -27,9 +27,15 @@ class SyncedLyricsService {
       if (lyricsBox.containsKey(song.id)) {
         final value = lyricsBox.get(song.id);
         if (value is Map) {
+          final cachedSynced = _clean(value["synced"]);
+          final cachedPlain = _clean(value["plainLyrics"]);
           cached = {
-            "synced": _clean(value["synced"]),
-            "plainLyrics": _clean(value["plainLyrics"]),
+            "synced": cachedSynced,
+            // Older cache entries may have synced lyrics but no separate
+            // plainLyrics field. Derive plain text so Plain mode still works.
+            "plainLyrics": cachedPlain.isNotEmpty
+                ? cachedPlain
+                : _stripTimestamps(cachedSynced),
           };
         }
       }
