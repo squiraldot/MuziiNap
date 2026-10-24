@@ -10,6 +10,7 @@ import '../../../services/lyrics_quote_export_service.dart';
 import '../../widgets/loader.dart';
 import '../player_controller.dart';
 import '../../../utils/lyrics_timeline.dart';
+import '../../../utils/hindi_romanizer.dart';
 
 class LyricsWidget extends StatelessWidget {
   final EdgeInsetsGeometry padding;
@@ -24,6 +25,8 @@ class LyricsWidget extends StatelessWidget {
           child: Obx(() {
             controller.lyricsStyleRevision.value;
             final translatedMode = controller.lyricsDisplayMode.value == 'translated';
+            final romanizedMode = controller.lyricsDisplayMode.value == 'romanized';
+            final bothMode = controller.lyricsDisplayMode.value == 'both';
             if (translatedMode && controller.translatedLyrics.value.isEmpty && controller.lyricsTranslationError.value.isEmpty && !controller.isLyricsTranslationLoading.value) {
               WidgetsBinding.instance.addPostFrameCallback((_) => controller.ensureLyricsTranslated());
             }
@@ -42,9 +45,13 @@ class LyricsWidget extends StatelessWidget {
                       child: SelectableText(
                         translatedMode && controller.translatedLyrics.value.isNotEmpty
                             ? controller.translatedLyrics.value
-                            : (controller.lyrics["plainLyrics"] == "NA"
-                                ? "lyricsNotAvailable".tr
-                                : controller.lyrics["plainLyrics"]),
+                            : _formatLyricsForDisplay(
+                                controller.lyrics["plainLyrics"] == "NA"
+                                    ? "lyricsNotAvailable".tr
+                                    : (controller.lyrics["plainLyrics"]?.toString() ?? ''),
+                                romanized: romanizedMode,
+                                both: bothMode,
+                              ),
                         textAlign: TextAlign.center,
                         style: _lyricsTextStyle(context, controller).copyWith(
                           height: 1.38,
@@ -212,6 +219,13 @@ Future<void> _showLyricsQuotePreview(BuildContext context, PlayerController cont
   );
 }
 
+String _formatLyricsForDisplay(String text, {required bool romanized, required bool both}) {
+  if (!romanized && !both) return text;
+  final converted = HindiRomanizer.transliterate(text);
+  if (romanized) return converted;
+  return '$text\n$converted';
+}
+
 TextStyle _lyricsTextStyle(BuildContext context, PlayerController controller) {
   final base = Theme.of(context).textTheme.titleMedium!;
   final style = controller.lyricFontFamily.value == 'Poppins'
@@ -356,7 +370,11 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                               child: Center(
                                 child: Text(
-                                  _lines[index].text,
+                                  _formatLyricsForDisplay(
+                                    _lines[index].text,
+                                    romanized: widget.controller.lyricsDisplayMode.value == 'romanized',
+                                    both: widget.controller.lyricsDisplayMode.value == 'both',
+                                  ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
