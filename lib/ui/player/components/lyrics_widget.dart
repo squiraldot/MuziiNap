@@ -297,42 +297,36 @@ class _SyncedLyricsViewState extends State<_SyncedLyricsView> {
                       borderRadius: BorderRadius.circular(12),
                       onTap: () => _seekToLine(_lines[index]),
                       onLongPress: () => _showLyricsQuotePreview(context, widget.controller, _lines[index].text),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        child: Center(
-                          child: Text(
-                          _lines[index].text,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: _lyricsTextStyle(context, widget.controller)
-                              .copyWith(
-                            fontSize: widget.controller.activeLyricSize.value *
-                                (active ? 1 : 0.88),
-                            fontWeight: active &&
-                                    widget.controller.boldActiveLyric.value
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: widget.controller.isLyricsDialogOpen
-                                ? (active
-                                    ? Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.color
-                                    : Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.color
-                                        ?.withValues(alpha: 0.55))
-                                : (active
-                                    ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.58)),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                              child: Center(
+                                child: Text(
+                                  _lines[index].text,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: _lyricsTextStyle(context, widget.controller).copyWith(
+                                    fontSize: widget.controller.activeLyricSize.value * (active ? 1 : 0.88),
+                                    fontWeight: active && widget.controller.boldActiveLyric.value ? FontWeight.bold : FontWeight.normal,
+                                    color: widget.controller.isLyricsDialogOpen
+                                      ? (active ? Theme.of(context).textTheme.titleMedium?.color : Theme.of(context).textTheme.titleMedium?.color?.withValues(alpha: 0.55))
+                                      : (active ? Colors.white : Colors.white.withValues(alpha: 0.58)),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
+                          IconButton(
+                            tooltip: 'Create lyric quote card',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _showLyricsQuotePreview(context, widget.controller, _lines[index].text),
+                            icon: const Icon(Icons.ios_share_rounded, size: 19),
+                            color: active ? Colors.white : Colors.white70,
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
