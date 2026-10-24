@@ -1,117 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/lyrics_home_widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
     android:clickable="true"
     android:focusable="true"
+    android:orientation="vertical"
+    android:gravity="center"
     android:padding="4dp">
 
+    <!-- Each lyric role rolls independently; never animate the whole stack. -->
     <ViewFlipper
-        android:id="@+id/lyrics_home_widget_flipper"
+        android:id="@+id/lyrics_home_widget_previous_flipper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:background="@android:color/transparent"
         android:inAnimation="@anim/lyrics_slide_in_up"
         android:outAnimation="@anim/lyrics_slide_out_up">
-
-        <LinearLayout
-            android:id="@+id/lyrics_home_widget_page_a"
+        <TextView
+            android:id="@+id/lyrics_home_widget_previous_a"
+            style="@style/HomeLyricsSecondary"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@android:color/transparent"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_previous_a"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#99FFFFFF"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_current_a"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="2"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:shadowColor="#CC000000"
-                android:shadowDx="0"
-                android:shadowDy="1"
-                android:shadowRadius="3"
-                android:textColor="#FFFFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_next_a"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#99FFFFFF"
-                android:textSize="13sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/lyrics_home_widget_page_b"
+            android:layout_height="match_parent" />
+        <TextView
+            android:id="@+id/lyrics_home_widget_previous_b"
+            style="@style/HomeLyricsSecondary"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@android:color/transparent"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_previous_b"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#99FFFFFF"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_current_b"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="2"
-                android:paddingTop="3dp"
-                android:paddingBottom="3dp"
-                android:shadowColor="#CC000000"
-                android:shadowDx="0"
-                android:shadowDy="1"
-                android:shadowRadius="3"
-                android:textColor="#FFFFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/lyrics_home_widget_next_b"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans"
-                android:gravity="center"
-                android:maxLines="1"
-                android:textColor="#99FFFFFF"
-                android:textSize="13sp" />
-        </LinearLayout>
+            android:layout_height="match_parent" />
     </ViewFlipper>
-</FrameLayout>
+
+    <ViewFlipper
+        android:id="@+id/lyrics_home_widget_current_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2"
+        android:background="@android:color/transparent"
+        android:inAnimation="@anim/lyrics_slide_in_up"
+        android:outAnimation="@anim/lyrics_slide_out_up">
+        <TextView
+            android:id="@+id/lyrics_home_widget_current_a"
+            style="@style/HomeLyricsCurrent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+        <TextView
+            android:id="@+id/lyrics_home_widget_current_b"
+            style="@style/HomeLyricsCurrent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </ViewFlipper>
+
+    <ViewFlipper
+        android:id="@+id/lyrics_home_widget_next_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/transparent"
+        android:inAnimation="@anim/lyrics_slide_in_up"
+        android:outAnimation="@anim/lyrics_slide_out_up">
+        <TextView
+            android:id="@+id/lyrics_home_widget_next_a"
+            style="@style/HomeLyricsSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+        <TextView
+            android:id="@+id/lyrics_home_widget_next_b"
+            style="@style/HomeLyricsSecondary"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </ViewFlipper>
+</LinearLayout>
