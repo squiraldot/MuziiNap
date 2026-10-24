@@ -14,8 +14,7 @@
     <ViewFlipper
         android:id="@+id/lyrics_home_widget_previous_flipper"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="28dp"
         android:background="@android:color/transparent"
         android:inAnimation="@anim/lyrics_slide_in_up"
         android:outAnimation="@anim/lyrics_slide_out_up">
@@ -44,8 +43,7 @@
     <ViewFlipper
         android:id="@+id/lyrics_home_widget_current_flipper"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="2"
+        android:layout_height="48dp"
         android:background="@android:color/transparent"
         android:inAnimation="@anim/lyrics_slide_in_up"
         android:outAnimation="@anim/lyrics_slide_out_up">
@@ -88,8 +86,7 @@
     <ViewFlipper
         android:id="@+id/lyrics_home_widget_next_flipper"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="28dp"
         android:background="@android:color/transparent"
         android:inAnimation="@anim/lyrics_slide_in_up"
         android:outAnimation="@anim/lyrics_slide_out_up">
