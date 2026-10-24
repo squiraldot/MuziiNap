@@ -38,7 +38,7 @@ class LyricsWidget extends StatelessWidget {
                       child: SelectableText(
                         controller.lyrics["plainLyrics"] == "NA"
                             ? "lyricsNotAvailable".tr
-                            : (controller.lyrics["plainLyrics"]?.toString() ?? ''),
+                            : controller.lyrics["plainLyrics"],
                         textAlign: TextAlign.center,
                         style: _lyricsTextStyle(context, controller).copyWith(
                           height: 1.38,
@@ -53,7 +53,6 @@ class LyricsWidget extends StatelessWidget {
               );
             }
 
-            final originalSynced = controller.lyrics['synced']?.toString() ?? '';
             final synced = controller.lyrics['synced']?.toString() ?? '';
             final songId = controller.currentSong.value?.id ?? '';
             if (synced.trim().isEmpty || synced == 'NA') {
