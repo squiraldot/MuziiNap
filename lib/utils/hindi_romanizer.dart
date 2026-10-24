@@ -30,17 +30,19 @@ class HindiRomanizer {
   };
 
   static String transliterate(String input) {
+    return input.splitMapJoin(
+      RegExp(r'[\\u0900-\\u097F]+'),
+      onMatch: (match) => _transliterateDevanagari(match[0]!),
+      onNonMatch: (text) => text,
+    );
+  }
+
+  static String _transliterateDevanagari(String input) {
     final output = StringBuffer();
     final runes = input.runes.toList();
     var i = 0;
     while (i < runes.length) {
       final rune = runes[i];
-      if (rune == 0x0A || rune == 0x0D) {
-        output.writeCharCode(rune);
-        i++;
-        continue;
-      }
-
       final consonant = _consonants[rune];
       if (consonant != null) {
         output.write(consonant);
@@ -58,7 +60,6 @@ class HindiRomanizer {
         i++;
         continue;
       }
-
       final vowel = _independentVowels[rune];
       if (vowel != null) {
         output.write(vowel);
@@ -67,23 +68,15 @@ class HindiRomanizer {
       } else if (rune == 0x0903) {
         output.write('h');
       } else if (rune == 0x093C || rune == 0x094D) {
-        // Nukta is handled by the consonant mapping; virama is consumed above.
+        // Nukta and virama are handled with their preceding consonant.
       } else {
         output.writeCharCode(rune);
       }
       i++;
     }
-
-    // Hindi words conventionally omit the final inherent schwa.
-    // Apply this only to output words that contained Devanagari, leaving
-    // Latin-only words and punctuation untouched.
-    return output.toString().splitMapJoin(
-      RegExp(r'[^\\s]+'),
-      onMatch: (match) {
-        final word = match[0]!;
-        if (!RegExp(r'[\\u0900-\\u097F]').hasMatch(word)) return word;
-        return word;
-      },
-    );
+    var result = output.toString();
+    // Omit the final inherent schwa in the common Hindi word-final case.
+    if (result.endsWith('a')) result = result.substring(0, result.length - 1);
+    return result;
   }
 }
