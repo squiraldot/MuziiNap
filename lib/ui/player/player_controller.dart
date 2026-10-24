@@ -177,11 +177,17 @@ class PlayerController extends GetxController
       _lastHomeWidgetLyricIndex = -2;
       _publishCurrentLyricToHomeWidget();
     });
-    _homeWidgetSongWorker = ever(currentSong, (_) {
+    _homeWidgetSongWorker = ever(currentSong, (song) {
       _homeWidgetTimeline = const <TimedLyricLine>[];
       _lastHomeWidgetPayload = null;
       _lastHomeWidgetLyricIndex = -2;
+      // Never leave the previous song's lyrics in the widget while the next
+      // track is resolving. Lyrics lookup must not depend on opening Player UI.
+      lyrics.value = {"synced": "", "plainLyrics": ""};
       _publishCurrentLyricToHomeWidget();
+      if (song != null) {
+        unawaited(_loadLyricsForSong(song));
+      }
     });
     _listenForChangesInBufferedPosition();
     _listenForChangesInDuration();
@@ -1154,40 +1160,60 @@ class PlayerController extends GetxController
     recentItem = mediaItem;
   }
 
+  Future<void> _loadLyricsForSong(MediaItem song) async {
+    isLyricsLoading.value = true;
+    try {
+      final lyricsResult = await SyncedLyricsService.getSyncedLyrics(
+        song,
+        progressBarStatus.value.total.inSeconds,
+      );
+      // A slow lookup for an older track must never overwrite the current one.
+      if (currentSong.value?.id == song.id && lyricsResult != null) {
+        lyrics.value = lyricsResult;
+      } else if (currentSong.value?.id == song.id) {
+        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      }
+    } catch (_) {
+      if (currentSong.value?.id == song.id) {
+        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      }
+    } finally {
+      if (currentSong.value?.id == song.id) {
+        isLyricsLoading.value = false;
+      }
+    }
+  }
+
+  Future<void> _loadLyricsForSong(MediaItem song) async {
+    isLyricsLoading.value = true;
+    try {
+      final lyricsResult = await SyncedLyricsService.getSyncedLyrics(
+        song,
+        progressBarStatus.value.total.inSeconds,
+      );
+      // A slow lookup for an older track must never overwrite the current one.
+      if (currentSong.value?.id == song.id && lyricsResult != null) {
+        lyrics.value = lyricsResult;
+      } else if (currentSong.value?.id == song.id) {
+        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      }
+    } catch (_) {
+      if (currentSong.value?.id == song.id) {
+        lyrics.value = {"synced": "", "plainLyrics": "NA"};
+      }
+    } finally {
+      if (currentSong.value?.id == song.id) {
+        isLyricsLoading.value = false;
+      }
+    }
+  }
+
   Future<void> showLyrics() async {
     showLyricsflag.value = !showLyricsflag.value;
     if ((lyrics["synced"].isEmpty && lyrics['plainLyrics'].isEmpty) &&
         showLyricsflag.value) {
-      isLyricsLoading.value = true;
-      try {
-        final Map<String, dynamic>? lyricsR =
-            await SyncedLyricsService.getSyncedLyrics(
-                currentSong.value!, progressBarStatus.value.total.inSeconds);
-        if (lyricsR != null) {
-          lyrics.value = lyricsR;
-          isLyricsLoading.value = false;
-          return;
-        }
-        
-        // --- YouTube Fallback Commented Out ---
-        /*
-        final related = await _musicServices.getWatchPlaylist(
-            videoId: currentSong.value!.id, onlyRelated: true);
-        final relatedLyricsId = related['lyrics'];
-        if (relatedLyricsId != null) {
-          final lyrics_ = await _musicServices.getLyrics(relatedLyricsId);
-          lyrics.value = {"synced": "", "plainLyrics": lyrics_};
-        } else {
-          lyrics.value = {"synced": "", "plainLyrics": "NA"};
-        }
-        */
-        
-        // If not found in lrclib, just set to NA
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
-      } catch (e) {
-        lyrics.value = {"synced": "", "plainLyrics": "NA"};
-      }
-      isLyricsLoading.value = false;
+      final song = currentSong.value;
+      if (song != null) await _loadLyricsForSong(song);
     }
   }
 
