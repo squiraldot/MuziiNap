@@ -10,7 +10,8 @@ import android.widget.RemoteViews
 
 /**
  * Transparent home-screen lyrics widget. Flutter supplies timestamp-synced
- * previous/current/next lines; Android only renders and animates those values.
+ * previous/current/next lines. Each fixed visual slot has its own RemoteViews
+ * ViewFlipper so a lyric rolls between roles instead of moving as one block.
  */
 class LyricsHomeWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(
@@ -30,6 +31,13 @@ class LyricsHomeWidgetProvider : AppWidgetProvider() {
 
         fun updateLines(context: Context, previous: String, current: String, next: String) {
             val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            // Flutter may publish the same visible window more than once (e.g. seek
+            // and playback callbacks). Do not restart a roll unless content changed.
+            if (preferences.getString(KEY_PREVIOUS, "").orEmpty() == previous &&
+                preferences.getString(KEY_CURRENT, "").orEmpty() == current &&
+                preferences.getString(KEY_NEXT, "").orEmpty() == next
+            ) return
+
             val targetPage = 1 - preferences.getInt(KEY_PAGE, 0).coerceIn(0, 1)
             preferences.edit()
                 .putString(KEY_PREVIOUS, previous)
@@ -59,16 +67,16 @@ class LyricsHomeWidgetProvider : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.lyrics_home_widget)
 
             if (initialize) {
-                // On first placement both pages need content so the first line
-                // change can cross-fade from a populated page.
-                setPageText(views, 0, previous, current, next)
-                setPageText(views, 1, previous, current, next)
+                // Populate both pages to avoid empty frames on first placement.
+                for (slotPage in 0..1) setPageText(views, slotPage, previous, current, next)
             } else {
-                // Update the hidden page, then flip to it. The ViewFlipper's
-                // fade animations keep the outgoing lyric visible during the change.
+                // Update only each slot's hidden child; all three slot flippers
+                // then transition independently through the same fixed positions.
                 setPageText(views, page, previous, current, next)
             }
-            views.setDisplayedChild(R.id.lyrics_home_widget_flipper, page)
+            views.setDisplayedChild(R.id.lyrics_home_widget_previous_flipper, page)
+            views.setDisplayedChild(R.id.lyrics_home_widget_current_flipper, page)
+            views.setDisplayedChild(R.id.lyrics_home_widget_next_flipper, page)
 
             val launchIntent = context.packageManager
                 .getLaunchIntentForPackage(context.packageName)
