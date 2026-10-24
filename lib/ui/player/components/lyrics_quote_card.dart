@@ -52,6 +52,7 @@ class LyricsQuoteCard extends StatelessWidget {
     return AspectRatio(
       aspectRatio: 4 / 5,
       child: ClipRRect(
+        clipBehavior: Clip.antiAlias,
         borderRadius: BorderRadius.circular(24),
         child: DecoratedBox(
           decoration: BoxDecoration(
