@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:hive/hive.dart';
 
@@ -53,8 +54,8 @@ class LyricsTranslationService {
   }
 
   static Future<String?> _translateLine(String text, String source, String target) async {
-    // MyMemory accepts a maximum of 500 characters per query.
-    if (text.length > 480) {
+    // MyMemory accepts a maximum of 500 UTF-8 bytes per query; keep a margin.
+    if (utf8.encode(text).length > 450) {
       final pieces = _splitLongLine(text, 450);
       final output = <String>[];
       for (final piece in pieces) {
@@ -93,7 +94,7 @@ class LyricsTranslationService {
     final chunks = <String>[];
     var current = '';
     for (final word in words) {
-      if (current.isNotEmpty && current.length + word.length + 1 > maxLength) {
+      if (current.isNotEmpty && utf8.encode('$current $word').length > maxLength) {
         chunks.add(current);
         current = word;
       } else {
