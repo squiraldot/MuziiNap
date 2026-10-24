@@ -649,6 +649,10 @@ class PlayerController extends GetxController
         printINFO(mediaItem.title);
         _newSongFlag = true;
         isCurrentSongBuffered.value = false;
+        // Clear the old track's lyrics BEFORE publishing currentSong. The
+        // currentSong worker starts an async lookup immediately; clearing at
+        // the end of this listener can otherwise erase that first result.
+        lyrics.value = {"synced": "", "plainLyrics": ""};
         currentSong.value = mediaItem;
         await loadLyricsSyncOffsetForCurrentSong();
         currentSongIndex.value = currentQueue
@@ -664,7 +668,6 @@ class PlayerController extends GetxController
         if (isRadioModeOn && (currentSong.value!.id == currentQueue.last.id)) {
           await _addRadioContinuation(radioInitiatorItem!);
         }
-        lyrics.value = {"synced": "", "plainLyrics": ""};
         showLyricsflag.value = false;
         if (isLyricsDialogOpen) {
           Navigator.pop(Get.context!);
