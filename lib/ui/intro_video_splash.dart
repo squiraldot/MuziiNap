@@ -83,8 +83,10 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      _wasPlayingBeforePause = controller.value.isPlaying;
-      if (_wasPlayingBeforePause) unawaited(controller.pause());
+      if (controller.value.isPlaying) {
+        _wasPlayingBeforePause = true;
+        unawaited(controller.pause());
+      }
     } else if (state == AppLifecycleState.resumed &&
         _wasPlayingBeforePause &&
         !controller.value.isCompleted) {
