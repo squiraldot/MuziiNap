@@ -31,7 +31,7 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     if (!mounted || _hasNavigated) return;
     final controller = VideoPlayerController.asset(
-      'assets/videos/muziinap_intro.mp4',
+      'assets/videos/muziinap_intro.MP4',
     );
     _controller = controller;
     controller.addListener(_handlePlaybackUpdate);
