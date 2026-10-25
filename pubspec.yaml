@@ -51,6 +51,7 @@ dependencies:
       ref: b53567a42b4ba3793a3cf00d478bdba0ecce33d7
   toggle_switch: ^2.1.0
   url_launcher: ^6.2.1
+  video_player: ^2.9.2
   widget_marquee: ^0.0.8
   youtube_explode_dart:
     git:
@@ -76,6 +77,7 @@ flutter:
   assets:
     - assets/icons/
     - assets/fonts/
+    - assets/videos/muziinap_intro.mp4
   fonts:
     - family: 'Bold'
       fonts:
