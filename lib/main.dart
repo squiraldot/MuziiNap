@@ -16,7 +16,6 @@ import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
 import './services/music_service.dart';
-import './ui/home.dart';
 import './ui/intro_video_splash.dart';
 import './ui/player/player_controller.dart';
 import 'ui/screens/Settings/settings_screen_controller.dart';
@@ -80,7 +79,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.put(AppLinksController());
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     return GetMaterialApp(
         title: 'MuziiNap',
         home: const IntroVideoSplash(),
