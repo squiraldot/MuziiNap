@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../services/update_checker.dart';
+import '../../utils/update_check_flag_file.dart';
+
 import './screens/Home/home_screen_controller.dart';
 import './screens/Settings/settings_screen_controller.dart';
 import '../utils/helper.dart';
@@ -23,6 +26,13 @@ class Home extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     printINFO("Home");
+    if (updateCheckFlag) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          UpdateChecker.checkAndShowStartupDialog(context);
+        }
+      });
+    }
     final PlayerController playerController = Get.find<PlayerController>();
     final settingsScreenController = Get.find<SettingsScreenController>();
     final homeScreenController = Get.find<HomeScreenController>();
