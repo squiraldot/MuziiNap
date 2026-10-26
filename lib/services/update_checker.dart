@@ -108,6 +108,26 @@ class UpdateChecker {
   }
 
   static bool _dialogVisible = false;
+  static bool _startupCheckStarted = false;
+
+  /// Runs once per app process, after the Home screen has been mounted.
+  static void checkAndShowStartupDialog(BuildContext context) {
+    if (_startupCheckStarted || !context.mounted) return;
+    _startupCheckStarted = true;
+    check().then((result) {
+      if (!context.mounted) return;
+      final release = result.update;
+      if (release != null) {
+        return showUpdateDialog(
+          context,
+          installedVersion: result.installedVersion,
+          release: release,
+        );
+      }
+    }).catchError((Object error) {
+      debugPrint('Startup version check failed: $error');
+    });
+  }
 
   static Future<void> showUpdateDialog(
     BuildContext context, {
@@ -119,8 +139,10 @@ class UpdateChecker {
     try {
       await showDialog<void>(
         context: context,
-        barrierDismissible: true,
-        builder: (dialogContext) => AlertDialog(
+        barrierDismissible: false,
+        builder: (dialogContext) => PopScope(
+          canPop: false,
+          child: AlertDialog(
           title: const Text('Update Available'),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440, maxHeight: 360),
@@ -144,10 +166,6 @@ class UpdateChecker {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
             FilledButton(
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
@@ -172,6 +190,7 @@ class UpdateChecker {
               child: const Text('Download'),
             ),
           ],
+        ),
         ),
       );
     } finally {
