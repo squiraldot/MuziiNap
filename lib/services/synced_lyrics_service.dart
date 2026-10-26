@@ -13,7 +13,7 @@ class SyncedLyricsService {
     receiveTimeout: const Duration(seconds: 20),
     headers: const {
       'Accept': 'application/json',
-      'User-Agent': 'MuziiNap (https://github.com/squiraldot/MuziiNap)',
+      'User-Agent': 'MuziiNap (Music App)',
     },
   ));
 
