@@ -1,6 +1,5 @@
 import 'dart:ui' as ui;
 import 'services/constant.dart';
-import 'services/update_checker.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +21,6 @@ import 'ui/screens/Settings/settings_screen_controller.dart';
 import './ui/utils/theme_controller.dart';
 import 'ui/screens/Home/home_screen_controller.dart';
 import 'ui/screens/Library/library_controller.dart';
-import 'utils/update_check_flag_file.dart';
 import 'utils/song_info_diagnostics.dart';
 import 'services/local_proxy.dart';
 
@@ -49,27 +47,7 @@ Future<void> main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   TerminateRestart.instance.initialize();
   runApp(const MyApp());
-  if (updateCheckFlag) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = Get.context;
-      if (context == null) return;
-      UpdateChecker.check().then((result) {
-        final release = result.update;
-        final currentContext = Get.context;
-        if (release != null &&
-            currentContext != null &&
-            currentContext.mounted) {
-          UpdateChecker.showUpdateDialog(
-            currentContext,
-            installedVersion: result.installedVersion,
-            release: release,
-          );
-        }
-      }).catchError((Object error) {
-        debugPrint('Startup version check failed: $error');
-      });
-    });
-  }
+
 }
 
 class MyApp extends StatelessWidget {
