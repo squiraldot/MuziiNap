@@ -167,7 +167,7 @@ class AboutScreen extends StatelessWidget {
               icon: Icons.language_rounded,
               title: 'Official Website',
               subtitle: 'Visit our website.',
-              onTap: () => _openLink(context, 'https://instaprimeofficial.com'),
+              onTap: () => _openLink(context, 'https://muziinap-site.vercel.app'),
             ),
             const SizedBox(height: 18),
             const Divider(color: _divider),
