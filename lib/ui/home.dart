@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../services/update_checker.dart';
-import '../../utils/update_check_flag_file.dart';
+import '../services/update_checker.dart';
+import '../utils/update_check_flag_file.dart';
 
 import './screens/Home/home_screen_controller.dart';
 import './screens/Settings/settings_screen_controller.dart';
