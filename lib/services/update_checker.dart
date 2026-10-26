@@ -118,7 +118,7 @@ class UpdateChecker {
       if (!context.mounted) return;
       final release = result.update;
       if (release != null) {
-        return showUpdateDialog(
+        showUpdateDialog(
           context,
           installedVersion: result.installedVersion,
           release: release,
