@@ -6,8 +6,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const _releasesApi =
-    'https://api.github.com/repos/squiraldot/MuziiNap-Releases/releases';
-const _downloadUrl = 'https://t.me/muziinapofficial';
+    'https://api.github.com/repos/squiraldot/MuziiNap-Official/releases';
+const _downloadUrl = 'https://telegram.me/muziinap/3';
 
 class AppRelease {
   const AppRelease({
