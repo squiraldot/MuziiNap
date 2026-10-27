@@ -476,7 +476,7 @@ class SettingsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 20.0),
             child: Text(
-              "${settingsController.currentVersion} ${"by".tr} Merrmist\n(Forked from squiraldot)",
+              "${settingsController.currentVersion} ${"by".tr} Merrmist\n(Developer: SquiralDot)",
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
