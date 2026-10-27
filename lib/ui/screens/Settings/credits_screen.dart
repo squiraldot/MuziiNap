@@ -153,7 +153,11 @@ class _CreditsHero extends StatelessWidget {
             errorBuilder: (_, __, ___) => const SizedBox(
               width: 132,
               height: 132,
-              child: Icon(Icons.broken_image_outlined, color: _muted, size: 36),
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: Color(0xFF9B9B9B),
+                size: 36,
+              ),
             ),
           ),
         ),
@@ -170,7 +174,9 @@ class _CreditsHero extends StatelessWidget {
         Text(
           'The people behind the MuziiNap',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: const Color(0xFF9B9B9B),
+          ),
         ),
       ],
     );
