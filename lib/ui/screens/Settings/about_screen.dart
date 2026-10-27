@@ -81,15 +81,19 @@ class AboutScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
           children: [
             Center(
-              child: Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF242424),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: const Color(0xFF383838)),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Image.asset(
+                  'assets/icons/icon.png',
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: Icon(Icons.broken_image_outlined, color: _muted),
+                  ),
                 ),
-                child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 42),
               ),
             ),
             const SizedBox(height: 16),
