@@ -76,7 +76,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
-    - assets/images/
+    - assets/images/playlist_placeholder.png
     - assets/fonts/
     - assets/videos/muziinap_intro.MP4
   fonts:
