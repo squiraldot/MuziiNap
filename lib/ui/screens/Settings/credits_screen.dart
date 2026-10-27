@@ -69,7 +69,7 @@ class CreditsScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
           children: [
-            const _VinylHero(),
+            const _CreditsHero(),
             const SizedBox(height: 30),
             for (final category in _categories) ...[
               _CategoryHeading(category: category),
@@ -135,69 +135,42 @@ class _CreditCategory {
   final List<_Credit> credits;
 }
 
-class _VinylHero extends StatelessWidget {
-  const _VinylHero();
+class _CreditsHero extends StatelessWidget {
+  const _CreditsHero();
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
-        SizedBox(
-          width: 154,
-          height: 154,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              for (var i = 0; i < 6; i++)
-                Container(
-                  width: 150 - i * 18.0,
-                  height: 150 - i * 18.0,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i.isEven
-                        ? const Color(0xFF171717)
-                        : const Color(0xFF202020),
-                    border: Border.all(
-                      color: const Color(0xFF303030),
-                      width: 1,
-                    ),
-                  ),
-                ),
-              Container(
-                width: 58,
-                height: 58,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFF6FAE),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              Container(
-                width: 9,
-                height: 9,
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Image.asset(
+            'assets/icons/icon.png',
+            width: 132,
+            height: 132,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox(
+              width: 132,
+              height: 132,
+              child: Icon(Icons.broken_image_outlined, color: _muted, size: 36),
+            ),
           ),
         ),
         const SizedBox(height: 18),
         Text(
           'MuziiNap',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 5),
         Text(
           'The people behind the MuziiNap',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF9B9B9B),
-              ),
+          style: theme.textTheme.bodyMedium?.copyWith(color: _muted),
         ),
       ],
     );
