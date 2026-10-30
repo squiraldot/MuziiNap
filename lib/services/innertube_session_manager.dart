@@ -22,7 +22,7 @@ class InnerTubeSessionManager {
   static const String _userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '
-      'Chrome/131.0.0.0 Safari/537.36';
+      'Chrome/140.0.0.0 Safari/537.36';
   static const Set<String> _allowedHosts = {
     'music.youtube.com',
     'youtube.com',
@@ -155,16 +155,16 @@ class InnerTubeSessionManager {
     }
 
     return {
-      'Content-Type': 'application/json',
-      'User-Agent': _userAgent,
-      'Origin': origin,
-      'X-Origin': origin,
-      'X-YouTube-Client-Name': '67',
-      'X-YouTube-Client-Version': _clientVersion,
-      'Accept': '*/*',
-      'Accept-Encoding': 'gzip, deflate',
-      'Cookie': cookies,
-      'Authorization': authorizationParts.join(' '),
+      'content-type': 'application/json',
+      'user-agent': _userAgent,
+      'origin': origin,
+      'x-origin': origin,
+      'x-youtube-client-name': '67',
+      'x-youtube-client-version': _clientVersion,
+      'accept': '*/*',
+      'accept-encoding': 'gzip, deflate',
+      'cookie': cookies,
+      'authorization': authorizationParts.join(' '),
     };
   }
 
