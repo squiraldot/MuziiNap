@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:muziinap/services/device_adaptive_stream_selector.dart';
 import 'package:muziinap/services/stream_service.dart';
 
 void main() {
@@ -27,6 +28,135 @@ void main() {
 
       expect(formats, hasLength(1));
       expect(formats.single.url, 'https://media.example.com/audio');
+    });
+  });
+
+  group('Device adaptive stream policy', () {
+    test('prefers Opus 251 on API 29+ Wi-Fi devices with adequate RAM', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      expect(profile.preferredItag, 251);
+      expect(profile.isLegacyAndroid, isFalse);
+    });
+
+    test('prefers AAC 140 on low-RAM devices even on Wi-Fi', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: true,
+        networkType: DeviceNetworkType.wifi,
+      );
+      expect(profile.preferredItag, 140);
+    });
+
+    test('prefers AAC 140 on cellular networks', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.mobile,
+      );
+      expect(profile.preferredItag, 140);
+    });
+
+    test('forces AAC on Android versions below API 29', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 28,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      expect(profile.preferredItag, 140);
+      expect(profile.isLegacyAndroid, isTrue);
+      expect(profile.allowsOpus, isFalse);
+    });
+
+    test('serializes profile for safe transfer into resolver isolate', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 33,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      expect(DeviceStreamProfile.fromJson(profile.toJson()), profile);
+    });
+  });
+
+  group('InnerTube adaptive format filtering', () {
+    final formats = [
+      {
+        'itag': 251,
+        'mimeType': 'audio/webm; codecs="opus"',
+        'url': 'https://media.example.com/opus',
+        'bitrate': 160000,
+      },
+      {
+        'itag': 140,
+        'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+        'url': 'https://media.example.com/aac',
+        'bitrate': 128000,
+      },
+      {
+        'itag': 999,
+        'mimeType': 'video/webm; codecs="vp9,opus"',
+        'url': 'https://media.example.com/video',
+        'bitrate': 200000,
+      },
+      {
+        'itag': 998,
+        'mimeType': 'audio/webm; codecs="opus"',
+        'url': 'https://media.example.com/spatial',
+        'bitrate': 160000,
+        'spatialAudioType': 'SPATIAL_AUDIO',
+      },
+    ];
+
+    test('selects Opus 251 for a high-end Wi-Fi device', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        formats,
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 35,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected.map((format) => format.itag), [251]);
+    });
+
+    test('selects AAC 140 for a low-RAM or cellular device', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        formats,
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 35,
+          isLowRamDevice: true,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected.map((format) => format.itag), [140]);
+    });
+
+    test('legacy Android excludes Opus and keeps standard AAC', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        formats,
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 28,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected.map((format) => format.itag), [140]);
+    });
+
+    test('drops spatial and video-wrapped tracks', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        formats,
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 35,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected.map((format) => format.itag), isNot(contains(998)));
+      expect(selected.map((format) => format.itag), isNot(contains(999)));
     });
   });
 
