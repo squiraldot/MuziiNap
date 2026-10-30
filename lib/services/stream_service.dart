@@ -50,7 +50,7 @@ class StreamProvider {
 
   // Bump when URL playability semantics change so previously cached,
   // syntactically valid but unusable InnerTube URLs are re-resolved.
-  static const int streamResolverVersion = 2;
+  static const int streamResolverVersion = 3;
   static const Duration _urlCacheMaxAge = Duration(minutes: 10);
   static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
   static const List<String> _defaultPipedInstances = [
@@ -177,6 +177,7 @@ class StreamProvider {
     String? preferredClient,
     Map<String, String>? authenticatedHeaders,
     DeviceStreamProfile? deviceProfile,
+    Future<String?> Function()? refreshVisitorId,
   }) async {
     // Retain the legacy argument for source compatibility. Client selection
     // is deterministic; the caller may promote a different context on retry.
@@ -203,6 +204,22 @@ class StreamProvider {
       }
 
       pipedInstances = _getPipedInstances(prefs);
+      // VISIONOS needs a visitorData value. If startup could not obtain one,
+      // make one bounded refresh attempt before asking the player endpoint.
+      if (visitorId.isEmpty && refreshVisitorId != null) {
+        try {
+          final refreshed = await refreshVisitorId();
+          if (refreshed != null && refreshed.trim().isNotEmpty) {
+            visitorId = refreshed.trim();
+            await prefs.put('visitorId', {
+              'id': visitorId,
+              'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2592000,
+            });
+          }
+        } catch (error) {
+          printINFO('Unable to refresh YouTube visitor data: $error');
+        }
+      }
     } catch (error) {
       // Hive may not be available in isolated tests or early startup. The
       // anonymous InnerTube request can still be attempted.
@@ -219,6 +236,42 @@ class StreamProvider {
     );
     if (innerTube.playable) return innerTube;
     if (innerTube.statusMSG.isNotEmpty) lastFailure = innerTube.statusMSG;
+
+    // YouTube can silently stop accepting a previously persisted visitorData.
+    // Refresh it only for bot/visitor/403-style refusals, then retry InnerTube
+    // once before falling back to another extractor.
+    final normalizedFailure = innerTube.statusMSG.toLowerCase();
+    final visitorRejected = normalizedFailure.contains('not a bot') ||
+        normalizedFailure.contains('visitor') ||
+        normalizedFailure.contains('http 403');
+    if (visitorRejected && refreshVisitorId != null) {
+      try {
+        final refreshed = await refreshVisitorId();
+        if (refreshed != null && refreshed.trim().isNotEmpty) {
+          visitorId = refreshed.trim();
+          try {
+            final prefs = Hive.box(appPrefsBoxName);
+            await prefs.put('visitorId', {
+              'id': visitorId,
+              'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2592000,
+            });
+          } catch (_) {
+            // A refreshed id can still be used for this request if storage is unavailable.
+          }
+          final retried = await _fetchInnerTubeClients(
+            cleanId,
+            visitorId,
+            preferredClient: preferredClient,
+            authenticatedHeaders: authenticatedHeaders,
+            deviceProfile: deviceProfile,
+          );
+          if (retried.playable) return retried;
+          if (retried.statusMSG.isNotEmpty) lastFailure = retried.statusMSG;
+        }
+      } catch (error) {
+        printINFO('YouTube visitor-data recovery failed: $error');
+      }
+    }
 
     // 2. Secondary: YouTubeExplode is invoked only after all primary clients
     // fail to provide at least one validated direct audio URL.
