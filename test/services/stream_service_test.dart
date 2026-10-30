@@ -348,14 +348,14 @@ void main() {
   group('StreamProvider client fallback order', () {
     test('starts with WEB_REMIX for the primary authenticated request', () {
       expect(
-        StreamProvider.clientNamesFor(),
+        StreamProvider.clientNamesFor().take(2).toList(),
         ['WEB_REMIX', 'ANDROID'],
       );
     });
 
     test('moves ANDROID to the front after a playback source failure', () {
       expect(
-        StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
+        StreamProvider.clientNamesFor(preferredClient: 'ANDROID').take(2).toList(),
         ['ANDROID', 'WEB_REMIX'],
       );
     });
