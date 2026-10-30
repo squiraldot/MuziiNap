@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/services/device_adaptive_stream_selector.dart';
 import 'package:muziinap/services/stream_service.dart';
