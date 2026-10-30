@@ -527,7 +527,7 @@ void main() {
     test('prioritizes WEB_REMIX for the initial authenticated request', () {
       expect(
         StreamProvider.clientNamesFor().take(2).toList(),
-        ['WEB_REMIX', 'ANDROID'],
+        ['WEB_REMIX', 'WEB_EMBEDDED'],
       );
     });
 
