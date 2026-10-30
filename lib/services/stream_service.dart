@@ -381,6 +381,12 @@ class StreamProvider {
     ),
   ];
 
+  /// Stagger non-primary client requests so a fast VISIONOS response can
+  /// cancel the remaining attempts before they consume network connections.
+  static Duration clientStartDelayFor(int clientIndex) => Duration(
+        milliseconds: clientIndex <= 0 ? 0 : clientIndex * 200,
+      );
+
   /// Exposes deterministic client ordering for diagnostics and unit tests.
   static List<String> clientNamesFor({String? preferredClient}) =>
       _orderedClients(preferredClient)
@@ -493,6 +499,17 @@ class StreamProvider {
 
       attempts.add(() async {
         try {
+          final startDelay = clientStartDelayFor(index);
+          if (startDelay > Duration.zero) {
+            await Future<void>.delayed(startDelay);
+          }
+          // A quicker client may already have won while this request waited.
+          if (cancelToken.isCancelled) {
+            return StreamProvider(
+              playable: false,
+              statusMSG: '${client.name}: cancelled before request',
+            );
+          }
           return await _fetchInnerTube(
             videoId: videoId,
             clientName: client.name,
