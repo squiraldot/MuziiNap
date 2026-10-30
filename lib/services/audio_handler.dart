@@ -22,6 +22,7 @@ import './equalizer.dart';
 import './stream_service.dart';
 import './music_service.dart';
 import './innertube_session_manager.dart';
+import './audio_cache_manager.dart';
 import '../models/hm_streaming_data.dart';
 import '../models/equalizer.dart';
 import '../ui/player/player_controller.dart';
@@ -50,7 +51,8 @@ Future<AudioHandler> initAudioService() async {
 
 class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // ignore: prefer_typing_uninitialized_variables
-  late final _cacheDir;
+  late final String _cacheDir;
+  late final Future<void> _cacheDirReady;
   late AudioPlayer _player;
   late MediaLibrary _mediaLibrary;
   // ignore: prefer_typing_uninitialized_variables
@@ -65,6 +67,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // Serialize audio-setting mutations so startup restoration and rapid user
   // toggles cannot complete out of order and overwrite each other.
   Future<void> _audioSettingsQueue = Future<void>.value();
+  Future<void> _audioCacheTrimQueue = Future<void>.value();
+  bool _backgroundResourcesReleased = false;
+  Duration? _backgroundReleasedPosition;
   bool isSongLoading = true;
   int _playSessionId = 0;
   String? _playbackRecoverySongId;
@@ -85,12 +90,15 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       useProxyForRequestHeaders: false,
       audioLoadConfiguration: const AudioLoadConfiguration(
             androidLoadControl: AndroidLoadControl(
-      minBufferDuration: Duration(seconds: 10),
-      maxBufferDuration: Duration(seconds: 30),
+      minBufferDuration: Duration(seconds: 8),
+      // A shorter ExoPlayer buffer reduces queued compressed/decoded audio
+      // while preserving enough headroom for ordinary network jitter. This
+      // is a buffer target, not a hard cap on total process RAM.
+      maxBufferDuration: Duration(seconds: 20),
       bufferForPlaybackDuration: Duration(milliseconds: 250),
       bufferForPlaybackAfterRebufferDuration: Duration(seconds: 1),
     )));
-    _createCacheDir();
+    _cacheDirReady = _createCacheDir();
     _notifyAudioHandlerAboutPlaybackEvents();
     _listenToPlaybackForNextSong();
     _listenForSequenceStateChanges();
@@ -143,9 +151,54 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<void> _createCacheDir() async {
     _cacheDir = (await getTemporaryDirectory()).path;
-    if (!Directory("$_cacheDir/cachedSongs/").existsSync()) {
-      Directory("$_cacheDir/cachedSongs/").createSync(recursive: true);
+    await Directory('$_cacheDir/cachedSongs').create(recursive: true);
+  }
+
+  /// Run cache cleanup serially so rapid skips cannot race file deletion.
+  /// Files for every item still in the playback queue are protected because
+  /// LockCachingAudioSource may still be downloading their .part files.
+  void _scheduleAudioCacheTrim() {
+    _audioCacheTrimQueue = _audioCacheTrimQueue.then((_) async {
+      await _cacheDirReady;
+      final protectedIds = queue.value.map((item) => item.id).toSet();
+      final result = await AudioCacheManager.trimDirectory(
+        Directory('$_cacheDir/cachedSongs'),
+        protectedSongIds: protectedIds,
+      );
+      if (!result.withinLimit) {
+        printINFO(
+          'Audio cache remains above 100 MB because protected playback-queue files use ${result.totalBytes} bytes.',
+        );
+      }
+    }).catchError((Object error, StackTrace stackTrace) {
+      printERROR('Audio cache cleanup failed: $error');
+    });
+  }
+
+  /// Unload the paused source when the app leaves the foreground. just_audio
+  /// has no public decoder-buffer-pool flush API; stop() is the supported way
+  /// to unload the source and release native playback resources. Playback is
+  /// restored from the saved position when the user presses Play again.
+  Future<void> releasePausedPlaybackResources() async {
+    if (_backgroundResourcesReleased ||
+        _player.playing ||
+        _player.processingState != ProcessingState.ready ||
+        currentIndex is! int ||
+        currentIndex < 0 ||
+        currentIndex >= queue.value.length) {
+      return;
     }
+
+    _backgroundReleasedPosition = _player.position;
+    _backgroundResourcesReleased = true;
+    await _player.stop();
+
+    final sessionId = _activeEqualizerSessionId;
+    if (sessionId != null) {
+      EqualizerService.endAudioEffect(sessionId);
+      _activeEqualizerSessionId = null;
+    }
+    _scheduleAudioCacheTrim();
   }
 
   void _listenSessionIdStream() {
@@ -359,6 +412,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final newQueue = this.queue.value
       ..replaceRange(0, this.queue.value.length, queue);
     this.queue.add(newQueue);
+    _scheduleAudioCacheTrim();
   }
 
   @override
@@ -373,6 +427,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
+    await _cacheDirReady;
     final originalUrl = mediaItem.extras!['url'] as String;
     final streamHeaders =
         (mediaItem.extras!['streamHeaders'] as Map?)?.cast<String, String>();
@@ -430,10 +485,24 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     currentQueue.remove(mediaItem_);
     queue.add(currentQueue);
     mediaItem.add(currentSong);
+    _scheduleAudioCacheTrim();
   }
 
   @override
   Future<void> play() async {
+    if (_backgroundResourcesReleased) {
+      final resumePosition = _backgroundReleasedPosition;
+      _backgroundResourcesReleased = false;
+      _backgroundReleasedPosition = null;
+      // just_audio.stop() retains the source but releases native decoders.
+      // Restore the exact position and reactivate that source without
+      // re-resolving the YouTube URL or downloading it a second time.
+      if (resumePosition != null) {
+        await _player.seek(resumePosition);
+      }
+      await _player.play();
+      return;
+    }
     if (currentSongUrl == null) {
       await customAction("playByIndex", {'index': currentIndex});
       return;
@@ -626,6 +695,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         try {
           await _player.setAudioSource(await _createAudioSource(currentSong));
           if (currentSession != _playSessionId) return;
+          _backgroundResourcesReleased = false;
+          _backgroundReleasedPosition = null;
+          _scheduleAudioCacheTrim();
         } catch (sourceError) {
           // setAudioSource can throw before playbackEventStream emits an
           // error. Refresh the URL once here as well so the first tap is not
@@ -758,6 +830,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
         await _player.setAudioSource(await _createAudioSource(currMed));
         if (currentSession != _playSessionId) return;
+        _backgroundResourcesReleased = false;
+        _backgroundReleasedPosition = null;
+        _scheduleAudioCacheTrim();
         isSongLoading = false;
 
         // Normalize audio
@@ -914,6 +989,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         await saveSessionData();
         break;
 
+      case 'releasePausedResources':
+        await releasePausedPlaybackResources();
+        break;
+
       case 'setVolume':
         final rawValue = extras!['value'];
         final value = (rawValue as num).toDouble().clamp(0.0, 100.0);
@@ -1039,9 +1118,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     await _player.stop();
     mediaItem.add(null);
     queue.add(<MediaItem>[]);
-    _backgroundResourcesReleased = false;
-    _backgroundReleasedPosition = null;
-    _scheduleAudioCacheTrim();
     playbackState.add(playbackState.value.copyWith(
       controls: const [],
       playing: false,
@@ -1056,6 +1132,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 // Work around used [useNewInstanceOfExplode = false] to Fix Connection closed before full header was received issue
   Future<HMStreamingData> checkNGetUrl(String songId,
       {bool generateNewUrl = false, bool offlineReplacementUrl = false}) async {
+    await _cacheDirReady;
     printINFO("Requested id : $songId");
     final songDownloadsBox = Hive.box("SongDownloads");
     if (!offlineReplacementUrl &&

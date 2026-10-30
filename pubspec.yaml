@@ -39,7 +39,6 @@ dependencies:
   terminate_restart:
     git:
       url: https://github.com/anandnet/terminate_restart.git
-      branch: main
       ref: eb505e07e11d0fe1f5c03993e707c6678428c353
   permission_handler: ^11.0.1
   share_plus: ^10.1.4
@@ -49,7 +48,6 @@ dependencies:
   sidebar_with_animation:
     git:
       url: https://github.com/anandnet/animated_side_bar.git
-      branch: main
       ref: b53567a42b4ba3793a3cf00d478bdba0ecce33d7
   toggle_switch: ^2.1.0
   url_launcher: ^6.2.1
