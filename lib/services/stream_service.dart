@@ -263,7 +263,9 @@ class StreamProvider {
     DeviceStreamProfile? deviceProfile,
   }) async {
     var lastFailure = 'All InnerTube clients failed';
-    final clients = _orderedClients(preferredClient);
+    final clients = _orderedClients(
+      deviceProfile?.isLegacyAndroid == true ? 'WEB_REMIX' : preferredClient,
+    );
     for (var index = 0; index < clients.length; index++) {
       final client = clients[index];
       final requestTimeout = requestTimeoutForClient(
