@@ -1,11 +1,15 @@
-import 'constant.dart';
-import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import '../utils/helper.dart';
-import 'package:hive/hive.dart';
+import 'dart:io';
 
+import 'package:hive/hive.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+import '../utils/helper.dart';
+import 'constant.dart';
+
+/// Resolves audio-only streams. InnerTube is the primary extractor; external
+/// extractors are deliberately sequential fallbacks, never competing races.
 class StreamProvider {
   final bool playable;
   final List<Audio>? audioFormats;
@@ -15,177 +19,300 @@ class StreamProvider {
   StreamProvider({
     required this.playable,
     this.audioFormats,
-    this.statusMSG = "",
+    this.statusMSG = '',
     this.streamHeaders,
   });
+
+  static const Duration _requestTimeout = Duration(seconds: 7);
+  static const String _innerTubeApiKey =
+      'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+
+  /// A stream URL must be an absolute HTTPS URL without embedded credentials.
+  /// We intentionally don't restrict the hostname because configured Piped
+  /// instances may serve media from their own HTTPS domains.
+  static bool isValidAudioFormatUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return false;
+    final uri = Uri.tryParse(rawUrl.trim());
+    return uri != null &&
+        uri.scheme == 'https' &&
+        uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty;
+  }
+
+  static bool isAudioMimeType(String? mimeType) {
+    if (mimeType == null) return false;
+    return mimeType.trim().toLowerCase().startsWith('audio/');
+  }
 
   static Future<StreamProvider> fetch(
     String videoId, {
     bool preferYoutubeExplode = false,
   }) async {
-    // 1. Strip MPED prefix if present
-    String cleanId = videoId;
-    if (cleanId.startsWith("MPED")) {
-      cleanId = cleanId.substring(4);
-    }
-    
-    String lastStatusMsg = "Unknown error occurred";
-    final appPrefsBox = Hive.box(appPrefsBoxName);
-    final visitorData = appPrefsBox.get("visitorId");
-    final visitorId = visitorData != null ? visitorData['id'] : '';
-
-    // Keep the known public instances and the user's configured instance.
-    final pipedInstances = [
-      "https://pipedapi.kavin.rocks",
-      "https://pipedapi.adminforge.de",
-      "https://pipedapi.moomoo.me",
-      "https://piped-api.lunar.icu",
-    ];
-
-    final piped = appPrefsBox.get('piped');
-    if (piped != null &&
-        piped['instApiUrl'] != null &&
-        piped['instApiUrl'].toString().isNotEmpty) {
-      pipedInstances.insert(0, piped['instApiUrl'].toString());
-    }
-
-    // Resolve the two primary extractors concurrently. Previously Piped was
-    // awaited for up to 5 seconds before YouTubeExplode even started; dead
-    // instances therefore delayed every first tap on affected networks.
-    final fastResult = await _fetchFastStream(
-      cleanId,
-      pipedInstances,
-      preferYoutubeExplode: preferYoutubeExplode,
-    );
-    if (fastResult != null) return fastResult;
-
-    // Race every InnerTube client together. The first *playable* result wins;
-    // failed/empty responses never prevent a slower client from succeeding.
-    final innerTubeResult = await _fetchInnerTubeFallbacks(
-      cleanId,
-      visitorId,
-    );
-    if (innerTubeResult != null && innerTubeResult.playable) {
-      return innerTubeResult;
-    }
-    if (innerTubeResult != null && innerTubeResult.statusMSG.isNotEmpty) {
-      lastStatusMsg = innerTubeResult.statusMSG;
-    }
-
-    return StreamProvider(playable: false, statusMSG: lastStatusMsg);
-  }
-
-  static Future<StreamProvider?> _fetchInnerTubeFallbacks(
-    String videoId,
-    String visitorId,
-  ) async {
-    final clients = <({String name, String version, String userAgent, String id})>[
-      (
-        name: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-        version: '2.0',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36',
-        id: '85',
-      ),
-      (
-        name: 'WEB_EMBEDDED',
-        version: '1.20240104.01.00',
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        id: '56',
-      ),
-      (
-        name: 'ANDROID',
-        version: '20.10.38',
-        userAgent: 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
-        id: '3',
-      ),
-    ];
-
-    final completer = Completer<StreamProvider?>();
-    var pending = clients.length;
-    var lastFailure = 'All InnerTube clients failed';
-
-    void finish(StreamProvider? result, String clientName) {
-      if (result != null && result.playable) {
-        if (!completer.isCompleted) completer.complete(result);
-        return;
-      }
-      if (result != null && result.statusMSG.isNotEmpty) {
-        lastFailure = '$clientName: ${result.statusMSG}';
-      }
-      pending--;
-      if (pending == 0 && !completer.isCompleted) {
-        completer.complete(
-          StreamProvider(playable: false, statusMSG: lastFailure),
-        );
-      }
-    }
-
-    for (final client in clients) {
-      _fetchInnerTube(
-        videoId: videoId,
-        clientName: client.name,
-        clientVersion: client.version,
-        userAgent: client.userAgent,
-        clientId: client.id,
-        visitorId: visitorId,
-      ).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => StreamProvider(
-          playable: false,
-          statusMSG: 'InnerTube request timed out',
-        ),
-      ).then(
-        (result) => finish(result, client.name),
-        onError: (Object error) {
-          printINFO('InnerTube ${client.name} race error: $error');
-          finish(
-            StreamProvider(playable: false, statusMSG: 'Connection error'),
-            client.name,
-          );
-        },
+    // Retain the legacy argument for source compatibility. Extractor order is
+    // now deterministic by design: InnerTube -> YouTubeExplode -> Piped.
+    final cleanId =
+        videoId.startsWith('MPED') ? videoId.substring(4) : videoId;
+    if (cleanId.isEmpty) {
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'Invalid video ID',
       );
     }
 
-    // Requests are independently bounded. Return immediately when the first
-    // usable stream arrives; late results are ignored by the completed completer.
-    return completer.future;
+    String lastFailure = 'No supported audio stream was returned';
+    String visitorId = '';
+    List<String> pipedInstances = [];
+
+    try {
+      final prefs = Hive.box(appPrefsBoxName);
+      final visitorData = prefs.get('visitorId');
+      if (visitorData is Map) {
+        visitorId = (visitorData['id'] ?? '').toString();
+      } else if (visitorData is String) {
+        visitorId = visitorData;
+      }
+
+      pipedInstances = _getPipedInstances(prefs);
+    } catch (error) {
+      // Hive may not be available in isolated tests or early startup. The
+      // anonymous InnerTube request can still be attempted.
+      printINFO('Unable to read stream preferences: $error');
+    }
+
+    // 1. Primary: try supported InnerTube player clients in a fixed order.
+    final innerTube = await _fetchInnerTubeClients(cleanId, visitorId);
+    if (innerTube.playable) return innerTube;
+    if (innerTube.statusMSG.isNotEmpty) lastFailure = innerTube.statusMSG;
+
+    // 2. Secondary: YouTubeExplode is invoked only after all primary clients
+    // fail to provide at least one validated direct audio URL.
+    final youtubeExplode = await _fetchYoutubeExplode(cleanId);
+    if (youtubeExplode != null && youtubeExplode.playable) {
+      return youtubeExplode;
+    }
+
+    // 3. Optional last resort: configured/public Piped instances.
+    final piped = await _fetchPipedStreams(cleanId, pipedInstances);
+    if (piped != null && piped.playable) return piped;
+
+    return StreamProvider(playable: false, statusMSG: lastFailure);
   }
 
-  static Future<StreamProvider?> _fetchFastStream(
+  static List<String> _getPipedInstances(Box prefs) {
+    const defaults = <String>[
+      'https://pipedapi.kavin.rocks',
+      'https://pipedapi.adminforge.de',
+      'https://pipedapi.moomoo.me',
+      'https://piped-api.lunar.icu',
+    ];
+    final result = <String>[];
+    final configured = prefs.get('piped');
+    if (configured is Map) {
+      final configuredUrl = configured['instApiUrl']?.toString().trim();
+      if (configuredUrl != null && configuredUrl.isNotEmpty) {
+        final uri = Uri.tryParse(configuredUrl);
+        if (uri != null &&
+            uri.scheme == 'https' &&
+            uri.host.isNotEmpty &&
+            !result.contains(configuredUrl)) {
+          result.add(configuredUrl);
+        }
+      }
+    }
+    for (final instance in defaults) {
+      if (!result.contains(instance)) result.add(instance);
+    }
+    return result;
+  }
+
+  static const List<
+      ({
+        String name,
+        String version,
+        String userAgent,
+        String id,
+      })> _innerTubeClients = [
+    (
+      name: 'ANDROID',
+      version: '20.10.38',
+      userAgent:
+          'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
+      id: '3',
+    ),
+    (
+      name: 'ANDROID_VR',
+      version: '1.43.32',
+      userAgent:
+          'com.google.android.apps.youtube.vr.oculus/1.43.32 (Linux; U; Android 10) gzip',
+      id: '28',
+    ),
+    (
+      name: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+      version: '2.0',
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 Chrome/113.0.0.0 Safari/537.36',
+      id: '85',
+    ),
+  ];
+
+  static Future<StreamProvider> _fetchInnerTubeClients(
     String videoId,
-    List<String> instances, {
-    required bool preferYoutubeExplode,
+    String visitorId,
+  ) async {
+    var lastFailure = 'All InnerTube clients failed';
+    for (final client in _innerTubeClients) {
+      try {
+        final result = await _fetchInnerTube(
+          videoId: videoId,
+          clientName: client.name,
+          clientVersion: client.version,
+          userAgent: client.userAgent,
+          clientId: client.id,
+          visitorId: visitorId,
+        ).timeout(_requestTimeout);
+
+        if (result.playable) return result;
+        if (result.statusMSG.isNotEmpty) {
+          lastFailure = '${client.name}: ${result.statusMSG}';
+        }
+      } on TimeoutException {
+        lastFailure = '${client.name}: request timed out';
+      } catch (error) {
+        lastFailure = '${client.name}: request failed';
+        printINFO('InnerTube ${client.name} failed: $error');
+      }
+    }
+    return StreamProvider(playable: false, statusMSG: lastFailure);
+  }
+
+  static Future<StreamProvider> _fetchInnerTube({
+    required String videoId,
+    required String clientName,
+    required String clientVersion,
+    required String userAgent,
+    required String clientId,
+    required String visitorId,
   }) async {
-    final completer = Completer<StreamProvider?>();
-    var pending = 2;
-
-    void finish(StreamProvider? result) {
-      if (result != null && result.playable) {
-        if (!completer.isCompleted) completer.complete(result);
-        return;
+    final httpClient = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final uri = Uri.parse(
+        'https://music.youtube.com/youtubei/v1/player?key=$_innerTubeApiKey',
+      );
+      final request = await httpClient.postUrl(uri);
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set('X-YouTube-Client-Name', clientId);
+      request.headers.set('X-YouTube-Client-Version', clientVersion);
+      request.headers.set(HttpHeaders.userAgentHeader, userAgent);
+      if (visitorId.isNotEmpty) {
+        request.headers.set('X-Goog-Visitor-Id', visitorId);
       }
-      pending--;
-      if (pending == 0 && !completer.isCompleted) {
-        completer.complete(null);
+
+      final clientContext = <String, dynamic>{
+        'clientName': clientName,
+        'clientVersion': clientVersion,
+        'userAgent': userAgent,
+        'hl': 'en',
+        'gl': 'US',
+      };
+      if (visitorId.isNotEmpty) clientContext['visitorData'] = visitorId;
+
+      request.write(jsonEncode({
+        'context': {'client': clientContext, 'user': <String, dynamic>{}},
+        'videoId': videoId,
+        'contentCheckOk': true,
+        'racyCheckOk': true,
+      }));
+
+      final response = await request.close().timeout(_requestTimeout);
+      if (response.statusCode != HttpStatus.ok) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'HTTP ${response.statusCode}',
+        );
       }
-    }
 
-    // Both pipelines race; the first usable result wins. Keep the other
-    // request bounded so a broken public endpoint cannot stall playback.
-    final pipedFuture = _fetchPipedStreams(videoId, instances);
-    final youtubeFuture = _fetchYoutubeExplode(videoId);
-    if (preferYoutubeExplode) {
-      youtubeFuture.then(finish, onError: (Object _) => finish(null));
-      pipedFuture.then(finish, onError: (Object _) => finish(null));
-    } else {
-      pipedFuture.then(finish, onError: (Object _) => finish(null));
-      youtubeFuture.then(finish, onError: (Object _) => finish(null));
-    }
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(_requestTimeout);
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'Invalid InnerTube response',
+        );
+      }
 
-    return completer.future.timeout(
-      const Duration(seconds: 8),
-      onTimeout: () => null,
-    );
+      final playability = decoded['playabilityStatus'];
+      final streamingData = decoded['streamingData'];
+      if (streamingData is! Map) {
+        final reason = playability is Map
+            ? (playability['reason'] ?? playability['status'])
+            : null;
+        return StreamProvider(
+          playable: false,
+          statusMSG: reason?.toString() ?? 'No streaming data',
+        );
+      }
+
+      final formats = streamingData['adaptiveFormats'];
+      if (formats is! List) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'No adaptive audio formats',
+        );
+      }
+
+      final audioFormats = _parseInnerTubeFormats(formats);
+      if (audioFormats.isEmpty) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'No validated direct audio formats',
+        );
+      }
+
+      printINFO(
+        'InnerTube $clientName returned ${audioFormats.length} validated audio formats',
+      );
+      return StreamProvider(
+        playable: true,
+        statusMSG: 'OK',
+        audioFormats: audioFormats,
+        streamHeaders: {'User-Agent': userAgent},
+      );
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  static List<Audio> _parseInnerTubeFormats(List<dynamic> formats) {
+    final parsed = <Audio>[];
+    for (final item in formats) {
+      if (item is! Map) continue;
+      final mimeType = item['mimeType']?.toString();
+      final rawUrl = item['url']?.toString();
+      if (!isAudioMimeType(mimeType) ||
+          !isValidAudioFormatUrl(rawUrl)) {
+        // signatureCipher/cipher-only formats are intentionally not selected:
+        // this extractor does not currently implement player-JS deciphering.
+        continue;
+      }
+
+      final codec = _codecFromMimeType(mimeType!);
+      if (codec == null) continue;
+
+      parsed.add(Audio(
+        itag: _asInt(item['itag']),
+        audioCodec: codec,
+        bitrate: _asInt(item['bitrate'] ?? item['averageBitrate']),
+        duration: _asInt(item['approxDurationMs']),
+        loudnessDb: (item['loudnessDb'] as num?)?.toDouble() ?? 0.0,
+        url: rawUrl!.trim(),
+        size: _asInt(item['contentLength']),
+      ));
+    }
+    return _sortFormats(parsed);
   }
 
   static Future<StreamProvider?> _fetchYoutubeExplode(String videoId) async {
@@ -194,34 +321,35 @@ class StreamProvider {
       final manifest = await yt.videos.streamsClient
           .getManifest(videoId)
           .timeout(const Duration(seconds: 8));
-      final audio = manifest.audioOnly
-          .where((stream) => stream.url.toString().trim().isNotEmpty)
-          .toList();
-      if (audio.isEmpty) return null;
+      final audio = manifest.audioOnly.where((stream) {
+        return isValidAudioFormatUrl(stream.url.toString()) &&
+            _codecFromName(stream.audioCodec) != null;
+      }).toList();
 
-      printINFO("Successfully fetched stream from youtube_explode_dart");
+      if (audio.isEmpty) return null;
+      final formats = audio.map((stream) => Audio(
+        itag: stream.tag,
+        audioCodec: _codecFromName(stream.audioCodec)!,
+        bitrate: stream.bitrate.bitsPerSecond,
+        duration: 0,
+        loudnessDb: 0.0,
+        url: stream.url.toString(),
+        size: stream.size.totalBytes,
+      )).toList();
+
+      printINFO('YouTubeExplode fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
-        statusMSG: "OK",
-        audioFormats: audio
-            .map((stream) => Audio(
-                  itag: stream.tag,
-                  audioCodec:
-                      stream.audioCodec.contains('mp') ? Codec.mp4a : Codec.opus,
-                  bitrate: stream.bitrate.bitsPerSecond,
-                  duration: 0,
-                  loudnessDb: 0.0,
-                  url: stream.url.toString(),
-                  size: stream.size.totalBytes,
-                ))
-            .toList(),
+        statusMSG: 'OK',
+        audioFormats: _sortFormats(formats),
         streamHeaders: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
+          'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
           'Referer': 'https://www.youtube.com/',
         },
       );
     } catch (error) {
-      printINFO("YoutubeExplode Error: $error");
+      printINFO('YouTubeExplode fallback failed: $error');
       return null;
     } finally {
       yt.close();
@@ -232,221 +360,143 @@ class StreamProvider {
     String videoId,
     List<String> instances,
   ) async {
-    if (instances.isEmpty) return null;
-
-    final completer = Completer<StreamProvider?>();
-    var pending = instances.length;
-
     for (final instance in instances) {
-      _fetchPipedInstance(instance, videoId).then((result) {
-        if (result != null && result.playable) {
-          if (!completer.isCompleted) completer.complete(result);
-          return;
-        }
-        pending--;
-        if (pending == 0 && !completer.isCompleted) {
-          completer.complete(null);
-        }
-      }, onError: (Object _) {
-        pending--;
-        if (pending == 0 && !completer.isCompleted) {
-          completer.complete(null);
-        }
-      });
+      final result = await _fetchPipedInstance(instance, videoId);
+      if (result != null && result.playable) return result;
     }
-
-    // Bound the entire fallback phase. Individual requests also have bounded
-    // connection, header, and body-read times below.
-    return completer.future.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => null,
-    );
+    return null;
   }
 
   static Future<StreamProvider?> _fetchPipedInstance(
     String baseUrl,
     String videoId,
   ) async {
+    final base = Uri.tryParse(baseUrl);
+    if (base == null || base.scheme != 'https' || base.host.isEmpty) {
+      return null;
+    }
+
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 3);
     try {
       final request = await client
-          .getUrl(Uri.parse('$baseUrl/streams/$videoId'))
+          .getUrl(base.replace(
+            path: '${base.path.replaceFirst(RegExp(r'/$'), '')}/streams/$videoId',
+          ))
           .timeout(const Duration(seconds: 4));
-      final response =
-          await request.close().timeout(const Duration(seconds: 4));
-      if (response.statusCode != HttpStatus.ok) {
-        printINFO("Piped HTTP Error ($baseUrl): ${response.statusCode}");
-        return null;
-      }
+      final response = await request.close().timeout(const Duration(seconds: 4));
+      if (response.statusCode != HttpStatus.ok) return null;
 
-      final bodyString = await response
+      final body = await response
           .transform(utf8.decoder)
           .join()
           .timeout(const Duration(seconds: 4));
-      final decoded = jsonDecode(bodyString);
+      final decoded = jsonDecode(body);
       if (decoded is! Map || decoded['audioStreams'] is! List) return null;
 
-      final audioStreams = (decoded['audioStreams'] as List)
-          .whereType<Map>()
-          .where((stream) =>
-              stream['url'] is String &&
-              (stream['url'] as String).trim().isNotEmpty)
-          .toList();
-      if (audioStreams.isEmpty) return null;
+      final formats = <Audio>[];
+      for (final item in decoded['audioStreams'] as List) {
+        if (item is! Map) continue;
+        final rawUrl = item['url']?.toString();
+        final mimeType = item['mimeType']?.toString();
+        final codecName =
+            (item['codec'] ?? mimeType ?? '').toString();
+        if (!isValidAudioFormatUrl(rawUrl)) continue;
+        final codec = _codecFromName(codecName) ?? _codecFromMimeType(mimeType);
+        if (codec == null) continue;
+        if (mimeType != null &&
+            mimeType.contains('/') &&
+            !isAudioMimeType(mimeType)) {
+          continue;
+        }
+        formats.add(Audio(
+          itag: _asInt(item['itag']),
+          audioCodec: codec,
+          bitrate: _asInt(item['bitrate']),
+          duration: 0,
+          loudnessDb: 0.0,
+          url: rawUrl!.trim(),
+          size: _asInt(item['contentLength']),
+        ));
+      }
 
-      printINFO("Successfully fetched stream from $baseUrl");
+      if (formats.isEmpty) return null;
+      printINFO('Piped last-resort fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
-        statusMSG: "OK",
-        audioFormats: audioStreams.map((stream) {
-          final codec =
-              (stream['codec'] ?? stream['mimeType'] ?? '').toString();
-          return Audio(
-            itag: int.tryParse(stream['itag']?.toString() ?? '') ?? 0,
-            audioCodec: codec.contains('mp') ? Codec.mp4a : Codec.opus,
-            bitrate: int.tryParse(stream['bitrate']?.toString() ?? '') ?? 0,
-            duration: 0,
-            loudnessDb: 0.0,
-            url: (stream['url'] as String).trim(),
-            size: int.tryParse(stream['contentLength']?.toString() ?? '') ?? 0,
-          );
-        }).toList(),
-        streamHeaders: null,
+        statusMSG: 'OK',
+        audioFormats: _sortFormats(formats),
       );
-    } catch (e) {
-      printINFO("Piped API Error ($baseUrl): $e");
+    } catch (error) {
+      printINFO('Piped fallback failed: $error');
       return null;
     } finally {
       client.close(force: true);
     }
   }
 
-  static Future<StreamProvider?> _fetchInnerTube({
-    required String videoId,
-    required String clientName,
-    required String clientVersion,
-    required String userAgent,
-    required String clientId,
-    required String visitorId,
-  }) async {
-    final httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 3);
-    try {
-      final request = await httpClient.postUrl(
-          Uri.parse('https://music.youtube.com/youtubei/v1/player?key=AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30'))
-          .timeout(const Duration(seconds: 4));
-      
-      request.headers.set('content-type', 'application/json');
-      request.headers.set('X-YouTube-Client-Name', clientId);
-      request.headers.set('X-YouTube-Client-Version', clientVersion);
-      request.headers.set('User-Agent', userAgent);
-      if (visitorId.isNotEmpty) {
-        request.headers.set('X-Goog-Visitor-Id', visitorId);
-      }
-
-      final payload = {
-        'context': {
-          'client': {
-            'clientName': clientName,
-            'clientVersion': clientVersion,
-            'userAgent': userAgent,
-            'hl': 'en',
-            'gl': 'US',
-          },
-          'user': {}
-        },
-        'videoId': videoId,
-        'contentCheckOk': true,
-        'racyCheckOk': true,
-      };
-
-      request.write(jsonEncode(payload));
-      final response = await request.close().timeout(const Duration(seconds: 4));
-
-      if (response.statusCode == 200) {
-        final bodyString = await response.transform(utf8.decoder).join().timeout(const Duration(seconds: 4));
-        final data = jsonDecode(bodyString);
-
-        final streamingData = data['streamingData'];
-        if (streamingData != null) {
-          final adaptiveFormats = streamingData['adaptiveFormats'] as List?;
-          if (adaptiveFormats != null && adaptiveFormats.isNotEmpty) {
-            final audioFormats = adaptiveFormats
-                .where((f) => f['mimeType'].toString().contains('audio') && f['url'] != null && f['url'].toString().isNotEmpty)
-                .map((e) {
-              return Audio(
-                itag: e['itag'] ?? 0,
-                audioCodec: e['mimeType'].toString().contains('mp4a')
-                    ? Codec.mp4a
-                    : Codec.opus,
-                bitrate: e['bitrate'] ?? e['averageBitrate'] ?? 0,
-                duration: int.tryParse(e['approxDurationMs']?.toString() ?? '0') ?? 0,
-                loudnessDb: (e['loudnessDb'] as num?)?.toDouble() ?? 0.0,
-                url: e['url'] ?? '',
-                size: int.tryParse(e['contentLength']?.toString() ?? '0') ?? 0,
-              );
-            }).toList();
-
-            if (audioFormats.isNotEmpty) {
-              printINFO('InnerTube fetched ${audioFormats.length} streams successfully via $clientName');
-              return StreamProvider(
-                playable: true,
-                statusMSG: "OK",
-                audioFormats: audioFormats,
-                streamHeaders: {
-                  'User-Agent': userAgent,
-                },
-              );
-            } else {
-              printINFO('InnerTube $clientName returned streamingData but no formats with direct URLs.');
-              return StreamProvider(playable: false, statusMSG: "No direct streams available");
-            }
-          }
-        } else {
-          final playability = data['playabilityStatus'];
-          final reason = playability?['reason'] ?? playability?['status'] ?? "Unknown error";
-          printINFO('InnerTube $clientName returned no streamingData. Playability: $reason');
-          return StreamProvider(playable: false, statusMSG: reason.toString());
-        }
-      } else {
-        printINFO('InnerTube $clientName HTTP Error: ${response.statusCode}');
-        return StreamProvider(playable: false, statusMSG: "HTTP ${response.statusCode}");
-      }
-    } catch (e) {
-      printINFO('InnerTube $clientName Exception: $e');
-      return StreamProvider(playable: false, statusMSG: "Connection error");
-    } finally {
-      httpClient.close(force: true);
+  static Codec? _codecFromMimeType(String mimeType) {
+    final normalized = mimeType.toLowerCase();
+    if (normalized.contains('mp4a') || normalized.contains('aac')) {
+      return Codec.mp4a;
     }
+    if (normalized.contains('opus')) return Codec.opus;
     return null;
   }
 
+  static Codec? _codecFromName(String codecName) {
+    final normalized = codecName.toLowerCase();
+    if (normalized.contains('mp4a') ||
+        normalized.contains('aac') ||
+        normalized.contains('m4a')) {
+      return Codec.mp4a;
+    }
+    if (normalized.contains('opus')) return Codec.opus;
+    return null;
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static List<Audio> _sortFormats(List<Audio> formats) {
+    formats.sort((a, b) => a.bitrate.compareTo(b.bitrate));
+    return formats;
+  }
+
   Audio? get highestQualityAudio =>
-      audioFormats?.lastWhere((item) => item.itag == 251 || item.itag == 140,
-          orElse: () => audioFormats!.first);
+      audioFormats == null || audioFormats!.isEmpty
+          ? null
+          : audioFormats!.last;
 
-  Audio? get highestBitrateMp4aAudio =>
-      audioFormats?.lastWhere((item) => item.itag == 140 || item.itag == 139,
-          orElse: () => audioFormats!.first);
+  Audio? get highestBitrateMp4aAudio {
+    final matches =
+        audioFormats?.where((item) => item.audioCodec == Codec.mp4a).toList();
+    if (matches == null || matches.isEmpty) return highestQualityAudio;
+    return _sortFormats(matches).last;
+  }
 
-  Audio? get highestBitrateOpusAudio =>
-      audioFormats?.lastWhere((item) => item.itag == 251 || item.itag == 250,
-          orElse: () => audioFormats!.first);
+  Audio? get highestBitrateOpusAudio {
+    final matches =
+        audioFormats?.where((item) => item.audioCodec == Codec.opus).toList();
+    if (matches == null || matches.isEmpty) return highestQualityAudio;
+    return _sortFormats(matches).last;
+  }
 
   Audio? get lowQualityAudio =>
-      audioFormats?.lastWhere((item) => item.itag == 249 || item.itag == 139,
-          orElse: () => audioFormats!.first);
+      audioFormats == null || audioFormats!.isEmpty
+          ? null
+          : audioFormats!.first;
 
-  Map<String, dynamic> get hmStreamingData {
-    return {
-      "playable": playable,
-      "statusMSG": statusMSG,
-      "lowQualityAudio": lowQualityAudio?.toJson(),
-      "highQualityAudio": highestQualityAudio?.toJson(),
-      if (streamHeaders != null) "streamHeaders": streamHeaders,
-    };
-  }
+  Map<String, dynamic> get hmStreamingData => {
+        'playable': playable,
+        'statusMSG': statusMSG,
+        'lowQualityAudio': lowQualityAudio?.toJson(),
+        'highQualityAudio': highestQualityAudio?.toJson(),
+        if (streamHeaders != null) 'streamHeaders': streamHeaders,
+      };
 }
 
 class Audio {
@@ -457,6 +507,7 @@ class Audio {
   final int size;
   final double loudnessDb;
   final String url;
+
   Audio({
     required this.itag,
     required this.audioCodec,
@@ -468,25 +519,32 @@ class Audio {
   });
 
   Map<String, dynamic> toJson() => {
-        "itag": itag,
-        "audioCodec": audioCodec.toString(),
-        "bitrate": bitrate,
-        "loudnessDb": loudnessDb,
-        "url": url,
-        "approxDurationMs": duration,
-        "size": size
+        'itag': itag,
+        'audioCodec': audioCodec.toString(),
+        'bitrate': bitrate,
+        'loudnessDb': loudnessDb,
+        'url': url,
+        'approxDurationMs': duration,
+        'size': size,
       };
 
-  factory Audio.fromJson(json) => Audio(
-      audioCodec: (json["audioCodec"] as String).contains("mp4a")
-          ? Codec.mp4a
-          : Codec.opus,
-      itag: json['itag'],
-      duration: json["approxDurationMs"] ?? 0,
-      bitrate: json["bitrate"] ?? 0,
-      loudnessDb: (json['loudnessDb'])?.toDouble() ?? 0.0,
-      url: json['url'],
-      size: json["size"] ?? 0);
+  factory Audio.fromJson(dynamic json) => Audio(
+        audioCodec: (json['audioCodec'] as String).contains('mp4a')
+            ? Codec.mp4a
+            : Codec.opus,
+        itag: _asInt(json['itag']),
+        duration: _asInt(json['approxDurationMs']),
+        bitrate: _asInt(json['bitrate']),
+        loudnessDb: (json['loudnessDb'] as num?)?.toDouble() ?? 0.0,
+        url: json['url']?.toString() ?? '',
+        size: _asInt(json['size']),
+      );
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
 }
 
 enum Codec { mp4a, opus }
