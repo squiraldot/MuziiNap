@@ -277,14 +277,14 @@ class MusicServices extends getx.GetxService {
 
   /// Invalidates only the currently active account whose cookie was rejected.
   /// Saved secondary accounts are retained so the user can switch back to them.
-  Future<void> _handleExpiredYouTubeSession(String? failedCookie) async {
-    if (failedCookie == null || failedCookie.isEmpty) return;
+  Future<bool> _handleExpiredYouTubeSession(String? failedCookie) async {
+    if (failedCookie == null || failedCookie.isEmpty) return false;
 
     final box = Hive.box(appPrefsBoxName);
     final currentCookies = box.get('yt_cookies')?.toString();
     // Ignore late failures from requests sent before the user switched account
     // or completed a newer login.
-    if (currentCookies != failedCookie) return;
+    if (currentCookies != failedCookie) return false;
 
     final activeKey = box.get('yt_active_account_key')?.toString();
     final storedAccounts = box.get('yt_accounts');
@@ -322,6 +322,7 @@ class MusicServices extends getx.GetxService {
     }
     await box.put('yt_logged_in', false);
     _resetInMemoryAuthHeaders();
+    return true;
   }
 
   set hlCode(String code) {

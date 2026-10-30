@@ -42,7 +42,7 @@ void main() {
       InnerTubeAuthInterceptor(
         sessionManager: sessionManager,
         headersProvider: () => {'x-youtube-client-name': '67'},
-        onSessionExpired: (_) async {},
+        onSessionExpired: (_) async => true,
       ),
     );
 
@@ -75,6 +75,7 @@ void main() {
         onSessionExpired: (_) async {
           callbackCount++;
           await Future<void>.delayed(const Duration(milliseconds: 10));
+          return true;
         },
       ),
     );
@@ -105,6 +106,7 @@ void main() {
         headersProvider: () => const {},
         onSessionExpired: (_) async {
           callbackCount++;
+          return true;
         },
       ),
     );

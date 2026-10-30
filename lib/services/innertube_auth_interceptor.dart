@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 
 import 'innertube_session_manager.dart';
 
-typedef InnerTubeSessionExpiredCallback = Future<void> Function(
+typedef InnerTubeSessionExpiredCallback = Future<bool> Function(
   String? failedCookie,
 );
 
@@ -145,15 +145,22 @@ class InnerTubeAuthInterceptor extends Interceptor {
 
     _sessionInvalidated = true;
     final handling = () async {
+      var invalidated = false;
       try {
-        await _onSessionExpired(failedCookie);
+        invalidated = await _onSessionExpired(failedCookie);
       } catch (_) {
         // The original Dio failure remains available to its caller. A storage
         // cleanup error must not become an unhandled background exception.
       } finally {
-        _sessionExpiredController.add(
-          InnerTubeSessionExpiredEvent(DateTime.now()),
-        );
+        if (invalidated) {
+          _sessionExpiredController.add(
+            InnerTubeSessionExpiredEvent(DateTime.now()),
+          );
+        } else {
+          // A late response from a previous account must not log out the
+          // currently active account. Permit a later, current-session retry.
+          _sessionInvalidated = false;
+        }
       }
     }();
     _expiryHandling = handling;
