@@ -575,7 +575,11 @@ class StreamProvider {
     final completer = Completer<StreamProvider?>();
     var pending = instances.length;
     for (final instance in instances) {
-      _fetchPipedInstance(instance, videoId)
+      _fetchPipedInstance(
+        instance,
+        videoId,
+        deviceProfile: deviceProfile,
+      )
           .timeout(const Duration(seconds: 5), onTimeout: () => null)
           .then((result) {
         if (result != null && result.playable) {
@@ -601,8 +605,9 @@ class StreamProvider {
 
   static Future<StreamProvider?> _fetchPipedInstance(
     String baseUrl,
-    String videoId,
-  ) async {
+    String videoId, {
+    DeviceStreamProfile? deviceProfile,
+  }) async {
     final base = Uri.tryParse(baseUrl);
     if (base == null || base.scheme != 'https' || base.host.isEmpty) {
       return null;
@@ -628,7 +633,7 @@ class StreamProvider {
 
       final formats = <Audio>[];
       for (final item in decoded['audioStreams'] as List) {
-        if (item is! Map) continue;
+        if (item is! Map || _isSpatialOrWrappedAudio(item)) continue;
         final rawUrl = item['url']?.toString();
         final mimeType = item['mimeType']?.toString();
         final codecName =
