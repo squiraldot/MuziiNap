@@ -46,7 +46,7 @@ class StreamProvider {
 
   static const Duration _requestTimeout = Duration(seconds: 5);
   static const Duration _initialHandshakeTimeout =
-      Duration(milliseconds: 800);
+      Duration(milliseconds: 1500);
 
   // Bump when URL playability semantics change so previously cached,
   // syntactically valid but unusable InnerTube URLs are re-resolved.
@@ -160,12 +160,13 @@ class StreamProvider {
         'Accept': '*/*',
       };
 
-  /// A slow initial WEB_REMIX handshake is cancelled before trying ANDROID.
+  /// Bound the first-choice VISIONOS handshake; other clients remain available
+  /// as staggered fallbacks if the primary endpoint is slow or unavailable.
   static Duration requestTimeoutForClient(
     String clientName, {
     bool isInitialAttempt = true,
   }) {
-    if (clientName == 'WEB_REMIX' && isInitialAttempt) {
+    if (clientName == 'VISIONOS' && isInitialAttempt) {
       return _initialHandshakeTimeout;
     }
     return _requestTimeout;
