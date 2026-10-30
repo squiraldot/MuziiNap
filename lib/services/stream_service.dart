@@ -51,8 +51,8 @@ class StreamProvider {
     String? preferredClient,
     Map<String, String>? authenticatedHeaders,
   }) async {
-    // Retain the legacy argument for source compatibility. Extractor order is
-    // now deterministic by design: InnerTube -> YouTubeExplode -> Piped.
+    // Retain the legacy argument for source compatibility. Client selection
+    // is deterministic; the caller may promote a different context on retry.
     final cleanId =
         videoId.startsWith('MPED') ? videoId.substring(4) : videoId;
     if (cleanId.isEmpty) {
@@ -82,7 +82,7 @@ class StreamProvider {
       printINFO('Unable to read stream preferences: $error');
     }
 
-    // 1. Primary: try supported InnerTube player clients in a fixed order.
+    // 1. Primary: try supported InnerTube player clients in the selected order.
     final innerTube = await _fetchInnerTubeClients(
       cleanId,
       visitorId,
@@ -235,6 +235,7 @@ class StreamProvider {
     required String userAgent,
     required String clientId,
     required String visitorId,
+    Map<String, String>? authenticatedHeaders,
   }) async {
     final dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 4),
