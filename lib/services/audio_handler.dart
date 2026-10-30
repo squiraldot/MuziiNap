@@ -1424,11 +1424,21 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       final songsUrlCacheBox = Hive.box("SongsUrlCache");
       final qualityIndex = Hive.box(appPrefsBoxName).get('streamingQuality') ?? 1;
       HMStreamingData? streamInfo;
+      // Re-check connectivity for every online resolution, but keep all plugin
+      // calls on this root isolate. Cached URLs are profile-specific because
+      // a previous network/device profile may have selected a different codec.
+      final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
+      final deviceProfileJson = deviceProfile.toJson();
       if (songsUrlCacheBox.containsKey(songId) && !generateNewUrl) {
         final streamInfoJson = songsUrlCacheBox.get(songId);
         if (streamInfoJson.runtimeType.toString().contains("Map") &&
             streamInfoJson.containsKey('streamHeaders') &&
-            !isExpired(url: (streamInfoJson['lowQualityAudio']['url']))) {
+            !isExpired(url: (streamInfoJson['lowQualityAudio']['url'])) &&
+            streamInfoJson['deviceProfile'] is Map &&
+            DeviceStreamProfile.fromJson(
+                  Map<String, Object?>.from(streamInfoJson['deviceProfile']),
+                ) ==
+                deviceProfile) {
           printINFO("Got cached Url ($songId)");
           streamInfo = HMStreamingData.fromJson(streamInfoJson);
         }
@@ -1446,11 +1456,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // A first attempt uses WEB_REMIX. On URL/source refresh, promote
         // ANDROID so the retry changes client context instead of replaying
         // the same failed direct URL.
-        final preferredClient = generateNewUrl ? 'ANDROID' : 'WEB_REMIX';
-        // Platform plugins must run on the root isolate. Only the primitive
-        // profile snapshot is passed into getStreamInfo's resolver isolate.
-        final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
-        final deviceProfileJson = deviceProfile.toJson();
+        final preferredClient = deviceProfile.isLegacyAndroid
+            ? 'WEB_REMIX'
+            : (generateNewUrl ? 'ANDROID' : 'WEB_REMIX');
         Map<String, dynamic>? streamInfoJson;
         try {
           streamInfoJson = await Isolate.run(
