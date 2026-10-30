@@ -23,12 +23,15 @@ class DeviceStreamProfile {
   /// Opus is reserved for API 29+ devices that are not marked low-RAM and
   /// currently use Wi-Fi. Cellular networks intentionally prefer AAC.
   bool get prefersOpus =>
-      !isLegacyAndroid &&
-      androidApiLevel != null &&
+      allowsOpus &&
       !isLowRamDevice &&
       networkType == DeviceNetworkType.wifi;
 
-  bool get allowsOpus => !isLegacyAndroid;
+  // Unknown API level is treated conservatively like a legacy device.
+  bool get allowsOpus =>
+      androidApiLevel != null && androidApiLevel! >= 29;
+
+  bool get requiresWebClient => !allowsOpus;
 
   int get preferredItag => prefersOpus ? 251 : 140;
 
