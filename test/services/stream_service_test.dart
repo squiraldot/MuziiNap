@@ -30,6 +30,49 @@ void main() {
     });
   });
 
+  group('InnerTube request and media transport policy', () {
+    test('uses a bounded 800 ms first-client handshake budget', () {
+      expect(
+        StreamProvider.requestTimeoutForClient('WEB_REMIX'),
+        const Duration(milliseconds: 800),
+      );
+    });
+
+    test('uses the normal timeout for fallback clients', () {
+      expect(
+        StreamProvider.requestTimeoutForClient('ANDROID'),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('preserves server-issued stream query parameters verbatim', () {
+      const signedUrl =
+          'https://media.example.com/audio?expire=123&sig=abc%2Fdef&cpn=serverNonce';
+      expect(StreamProvider.prepareStreamUrl(signedUrl), signedUrl);
+    });
+
+    test('rejects insecure or malformed media URLs', () {
+      expect(
+        () => StreamProvider.prepareStreamUrl('http://media.example.com/audio'),
+        throwsFormatException,
+      );
+      expect(
+        () => StreamProvider.prepareStreamUrl('not a URL'),
+        throwsFormatException,
+      );
+    });
+
+    test('builds native media headers without forwarding account cookies', () {
+      expect(
+        StreamProvider.buildMediaRequestHeaders('MuziiNap/1.0'),
+        {
+          'User-Agent': 'MuziiNap/1.0',
+          'Accept': '*/*',
+        },
+      );
+    });
+  });
+
   group('StreamProvider client fallback order', () {
     test('starts with WEB_REMIX for the primary authenticated request', () {
       expect(
