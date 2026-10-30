@@ -1,5 +1,7 @@
 import 'dart:core';
 import 'package:flutter/services.dart';
+
+import 'device_adaptive_stream_selector.dart';
 import './stream_service.dart';
 
 //Not in use for now
