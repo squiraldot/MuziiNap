@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -42,11 +43,13 @@ class Home extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Ask after the first frame so the app's home screen is visible before
       // presenting the optional system battery-exemption explanation.
-      Future<void>.delayed(const Duration(milliseconds: 900), () {
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
         if (context.mounted) {
-          Get.find<BatteryOptimizationService>().checkAndPrompt(context);
+          unawaited(
+            Get.find<BatteryOptimizationService>().checkAndPrompt(context),
+          );
         }
-      });
+      }));
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!playerController.initFlagForPlayer &&
