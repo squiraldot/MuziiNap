@@ -503,21 +503,20 @@ class StreamProvider {
     final cancelTokens = <CancelToken>[];
     final attempts = <Future<StreamProvider>>[];
 
-    // Start every InnerTube client in the same event-loop turn. Client order
-    // only controls the preferred context and timeout budget; it does not
-    // serialize requests or make later clients wait for WEB_REMIX.
+    // Give VISIONOS a short head start. Later clients are staggered and are
+    // cancelled before opening a connection when the primary already wins.
     for (var index = 0; index < clients.length; index++) {
       final client = clients[index];
       final requestTimeout = requestTimeoutForClient(
         client.name,
         isInitialAttempt: index == 0,
       );
+      final startDelay = clientStartDelayFor(index);
       final cancelToken = CancelToken();
       cancelTokens.add(cancelToken);
 
       attempts.add(() async {
         try {
-          final startDelay = clientStartDelayFor(index);
           if (startDelay > Duration.zero) {
             await Future<void>.delayed(startDelay);
           }
