@@ -62,6 +62,7 @@ Future<AudioHandler> initAudioService() async {
 
 class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   final DeviceStreamProfile _deviceStreamProfile;
+  late DeviceStreamProfile _streamDeviceProfile;
 
   // ignore: prefer_typing_uninitialized_variables
   late final String _cacheDir;
@@ -110,6 +111,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   MyAudioHandler({required DeviceStreamProfile deviceProfile})
       : _deviceStreamProfile = deviceProfile {
+    _streamDeviceProfile = deviceProfile;
     _mediaLibrary = MediaLibrary();
     _player = AudioPlayer(
       // AudioPlaybackService owns the focus policy; disable just_audio's
@@ -121,6 +123,24 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       ),
     );
     final connectivity = Connectivity();
+    // Hardware capabilities are stable for the player lifetime. Only update
+    // the network category on connectivity events instead of querying device
+    // info and platform channels again for every song.
+    _playerSubscriptions.add(
+      connectivity.onConnectivityChanged.listen((results) {
+        final networkType =
+            results.contains(ConnectivityResult.wifi) ||
+                    results.contains(ConnectivityResult.ethernet)
+                ? DeviceNetworkType.wifi
+                : results.contains(ConnectivityResult.mobile)
+                    ? DeviceNetworkType.mobile
+                    : results.contains(ConnectivityResult.none) || results.isEmpty
+                        ? DeviceNetworkType.offline
+                        : DeviceNetworkType.other;
+        _streamDeviceProfile =
+            _streamDeviceProfile.withNetworkType(networkType);
+      }),
+    );
     _playbackCircuitBreaker = PlaybackCircuitBreaker(
       processingStateStream: _player.processingStateStream,
       playingStream: _player.playingStream,
@@ -1529,7 +1549,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       // Re-check connectivity for every online resolution, but keep all plugin
       // calls on this root isolate. Cached URLs are profile-specific because
       // a previous network/device profile may have selected a different codec.
-      final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
+      final deviceProfile = _streamDeviceProfile;
       final deviceProfileJson = deviceProfile.toJson();
       if (songsUrlCacheBox.containsKey(songId) && !generateNewUrl) {
         final cachedStreamInfo = songsUrlCacheBox.get(songId);
