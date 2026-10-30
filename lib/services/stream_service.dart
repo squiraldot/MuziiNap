@@ -41,65 +41,48 @@ class StreamProvider {
   /// selected quality can change while the cached record remains in Hive.
   static bool isCachedStreamUsable(
     dynamic cacheEntry, {
+    int qualityIndex = 1,
     DateTime? now,
     Duration maxAge = _urlCacheMaxAge,
   }) {
     if (cacheEntry is! Map || cacheEntry['playable'] != true) return false;
 
+    final lowQuality = cacheEntry['lowQualityAudio'];
+    final highQuality = cacheEntry['highQualityAudio'];
+    if (lowQuality is! Map ||
+        highQuality is! Map ||
+        !isValidAudioFormatUrl(lowQuality['url']?.toString()) ||
+        !isValidAudioFormatUrl(highQuality['url']?.toString())) {
+      return false;
+    }
+
+    // Only the currently selected quality must be fresh. The other quality
+    // slot still needs a valid URL shape because HMStreamingData deserializes
+    // both slots, but it may be refreshed later if the user changes quality.
+    final selectedAudio = qualityIndex == 0 ? lowQuality : highQuality;
+    final selectedUrl = selectedAudio['url'].toString();
+    final currentTime = now ?? DateTime.now();
+    final uri = Uri.tryParse(selectedUrl);
+    final expiryValue = uri?.queryParameters['expire'] ??
+        uri?.queryParameters['expires'];
+
+    if (expiryValue != null) {
+      final expiry = int.tryParse(expiryValue);
+      return expiry != null &&
+          expiry > currentTime.millisecondsSinceEpoch ~/ 1000 +
+              _urlExpirySafetyWindow.inSeconds;
+    }
+
+    // Providers without an explicit expiry are cached for a short bounded
+    // period. Old records without a timestamp are deliberately re-resolved.
     final resolvedAtValue = cacheEntry['resolvedAt'];
     final resolvedAt = resolvedAtValue is num
         ? resolvedAtValue.toInt()
         : int.tryParse(resolvedAtValue?.toString() ?? '');
-    final currentTime = now ?? DateTime.now();
-
-    for (final key in const ['lowQualityAudio', 'highQualityAudio']) {
-      final audio = cacheEntry[key];
-      if (audio is! Map) return false;
-      final rawUrl = audio['url']?.toString();
-      if (!isValidAudioFormatUrl(rawUrl)) return false;
-
-      final uri = Uri.tryParse(rawUrl!);
-      final expiryValue = uri?.queryParameters['expire'] ??
-          uri?.queryParameters['expires'];
-      if (expiryValue != null) {
-        final expiry = int.tryParse(expiryValue);
-        if (expiry == null ||
-            expiry <= currentTime.millisecondsSinceEpoch ~/ 1000 +
-                _urlExpirySafetyWindow.inSeconds) {
-          return false;
-        }
-        continue;
-      }
-
-      // Providers without an explicit expiry are cached for a short bounded
-      // period. Old records without a timestamp are deliberately re-resolved.
-      if (resolvedAt == null || resolvedAt <= 0) return false;
-      final age = currentTime.millisecondsSinceEpoch - resolvedAt;
-      if (age < 0 || age > maxAge.inMilliseconds) return false;
-    }
-
-    return true;
+    if (resolvedAt == null || resolvedAt <= 0) return false;
+    final age = currentTime.millisecondsSinceEpoch - resolvedAt;
+    return age >= 0 && age <= maxAge.inMilliseconds;
   }
-
-  // Reuse one IO client so repeated player requests share pooled keep-alive
-  // connections instead of paying a fresh TCP/TLS handshake on every track.
-  static final Dio _innerTubeDio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 4),
-    sendTimeout: _requestTimeout,
-    receiveTimeout: _requestTimeout,
-    responseType: ResponseType.json,
-    validateStatus: (status) => status != null,
-  ))..httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        return HttpClient()
-          ..connectionTimeout = const Duration(seconds: 4)
-          ..idleTimeout = const Duration(seconds: 30)
-          ..maxConnectionsPerHost = 6;
-      },
-    );
-
-  static const String _innerTubeApiKey =
-      'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
 
   /// A stream URL must be an absolute HTTPS URL without embedded credentials.
   /// We intentionally don't restrict the hostname because configured Piped
