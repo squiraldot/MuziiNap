@@ -502,16 +502,62 @@ class StreamProvider {
     final clients = _orderedClients(
       deviceProfile?.requiresWebClient == true ? 'WEB_REMIX' : preferredClient,
     );
+    if (clients.isEmpty) {
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'No InnerTube clients were available',
+      );
+    }
+
+    // VISIONOS is the only currently verified full-track client in this
+    // environment. Let it finish its bounded handshake before considering
+    // other InnerTube identities, some of which can return capped streams.
+    final primary = clients.first;
+    StreamProvider primaryResult;
+    try {
+      primaryResult = await _fetchInnerTube(
+        videoId: videoId,
+        clientName: primary.name,
+        clientVersion: primary.version,
+        userAgent: primary.userAgent,
+        clientId: primary.id,
+        visitorId: visitorId,
+        requestTimeout: requestTimeoutForClient(
+          primary.name,
+          isInitialAttempt: true,
+        ),
+        deviceProfile: deviceProfile,
+        language: language,
+        country: country,
+      );
+    } on TimeoutException {
+      primaryResult = StreamProvider(
+        playable: false,
+        statusMSG:
+            '${primary.name}: request timed out after ${requestTimeoutForClient(primary.name).inMilliseconds} ms',
+      );
+    } catch (error) {
+      final message = error is DioException &&
+              error.response?.statusCode != null
+          ? '${primary.name}: HTTP ${error.response!.statusCode}'
+          : '${primary.name}: request failed';
+      printINFO('InnerTube ${primary.name} failed: $error');
+      primaryResult = StreamProvider(playable: false, statusMSG: message);
+    }
+
+    if (primaryResult.playable) return primaryResult;
+
+    // Only after VISIONOS fails do the remaining InnerTube clients race.
+    final fallbackClients = clients.skip(1).toList(growable: false);
+    if (fallbackClients.isEmpty) return primaryResult;
+
     final cancelTokens = <CancelToken>[];
     final attempts = <Future<StreamProvider>>[];
-
-    // Give VISIONOS a short head start. Later clients are staggered and are
-    // cancelled before opening a connection when the primary already wins.
-    for (var index = 0; index < clients.length; index++) {
-      final client = clients[index];
+    for (var index = 0; index < fallbackClients.length; index++) {
+      final client = fallbackClients[index];
       final requestTimeout = requestTimeoutForClient(
         client.name,
-        isInitialAttempt: index == 0,
+        isInitialAttempt: false,
       );
       final startDelay = clientStartDelayFor(index);
       final cancelToken = CancelToken();
@@ -522,7 +568,6 @@ class StreamProvider {
           if (startDelay > Duration.zero) {
             await Future<void>.delayed(startDelay);
           }
-          // A quicker client may already have won while this request waited.
           if (cancelToken.isCancelled) {
             return StreamProvider(
               playable: false,
@@ -536,8 +581,6 @@ class StreamProvider {
             userAgent: client.userAgent,
             clientId: client.id,
             visitorId: visitorId,
-            // SAPISIDHASH/cookies are scoped to the WEB_REMIX session; do not
-            // attach them to Android/TV client identities in the same race.
             authenticatedHeaders:
                 client.name == 'WEB_REMIX' ? authenticatedHeaders : null,
             requestTimeout: requestTimeout,
@@ -565,7 +608,7 @@ class StreamProvider {
       }());
     }
 
-    return firstPlayableResult(
+    final fallback = await firstPlayableResult(
       attempts,
       onWinner: () {
         for (final token in cancelTokens) {
@@ -574,6 +617,15 @@ class StreamProvider {
           }
         }
       },
+    );
+    if (fallback.playable) return fallback;
+
+    return StreamProvider(
+      playable: false,
+      statusMSG: [
+        primaryResult.statusMSG,
+        fallback.statusMSG,
+      ].where((message) => message.isNotEmpty).join('; '),
     );
   }
 
