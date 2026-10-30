@@ -58,6 +58,8 @@ jobs:
 
       - name: Get Dependencies
         run: flutter pub get
+      - name: Generate Isar collection schemas
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build Universal APK
         run: flutter build apk --release
