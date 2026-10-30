@@ -34,6 +34,22 @@ void main() {
       );
     });
 
+    test('keeps map cache while either quality URL is still fresh', () {
+      final now = DateTime.utc(2026, 10, 30, 12);
+      final expiry = now.millisecondsSinceEpoch ~/ 1000 + 7200;
+      final cacheEntry = {
+        'playable': true,
+        'resolvedAt': now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
+        'lowQualityAudio': {'url': 'https://media.example/audio-low?expire=1700000000'},
+        'highQualityAudio': {'url': 'https://media.example/audio-high?expire=$expiry'},
+      };
+
+      expect(
+        shouldRemoveSongUrlCacheEntry(cacheEntry, now: now),
+        isFalse,
+      );
+    });
+
     test('removes stale map-shaped stream cache entries', () {
       final now = DateTime.utc(2026, 10, 30, 12);
       final cacheEntry = {
