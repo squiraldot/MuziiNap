@@ -21,6 +21,7 @@ import '../models/album.dart';
 import '../models/playlist.dart';
 import './equalizer.dart';
 import './stream_service.dart';
+import './device_adaptive_stream_selector.dart';
 import './music_service.dart';
 import './innertube_session_manager.dart';
 import './audio_cache_manager.dart';
@@ -1446,6 +1447,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // ANDROID so the retry changes client context instead of replaying
         // the same failed direct URL.
         final preferredClient = generateNewUrl ? 'ANDROID' : 'WEB_REMIX';
+        // Platform plugins must run on the root isolate. Only the primitive
+        // profile snapshot is passed into getStreamInfo's resolver isolate.
+        final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
+        final deviceProfileJson = deviceProfile.toJson();
         Map<String, dynamic>? streamInfoJson;
         try {
           streamInfoJson = await Isolate.run(
@@ -1455,6 +1460,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
               preferYoutubeExplode: generateNewUrl,
               preferredClient: preferredClient,
               authenticatedHeaders: authenticatedHeaders,
+              deviceProfile: deviceProfileJson,
             ),
           );
         } catch (e) {
@@ -1465,6 +1471,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             preferYoutubeExplode: generateNewUrl,
             preferredClient: preferredClient,
             authenticatedHeaders: authenticatedHeaders,
+            deviceProfile: deviceProfileJson,
           );
         }
         streamInfo = HMStreamingData.fromJson(streamInfoJson);
