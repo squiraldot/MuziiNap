@@ -24,7 +24,16 @@ bool shouldRemoveSongUrlCacheEntry(
   // Current stream records are maps produced by StreamProvider.hmStreamingData.
   // Headers are optional, so Piped/self-contained URLs must remain cacheable.
   if (cacheEntry is Map) {
-    return !StreamProvider.isCachedStreamUsable(cacheEntry, now: now);
+    return !StreamProvider.isCachedStreamUsable(
+          cacheEntry,
+          qualityIndex: 0,
+          now: now,
+        ) &&
+        !StreamProvider.isCachedStreamUsable(
+          cacheEntry,
+          qualityIndex: 1,
+          now: now,
+        );
   }
 
   // Retain cleanup support for older list-shaped cache records.
