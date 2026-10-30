@@ -1371,7 +1371,8 @@ class PlayerController extends GetxController
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    _audioHandler.customAction('dispose');
+    // AudioHandler is app-scoped; a route teardown must never stop playback.
+    // AudioPlaybackService owns final AudioPlayer disposal.
     keyboardSubscription.cancel();
     scrollController.dispose();
     gesturePlayerStateAnimationController?.dispose();
