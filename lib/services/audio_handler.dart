@@ -180,12 +180,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   /// to unload the source and release native playback resources. Playback is
   /// restored from the saved position when the user presses Play again.
   Future<void> releasePausedPlaybackResources() async {
+    final index = currentIndex;
     if (_backgroundResourcesReleased ||
         _player.playing ||
         _player.processingState != ProcessingState.ready ||
-        currentIndex is! int ||
-        currentIndex < 0 ||
-        currentIndex >= queue.value.length) {
+        index is! int ||
+        index < 0 ||
+        index >= queue.value.length) {
       return;
     }
 
@@ -1118,6 +1119,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     await _player.stop();
     mediaItem.add(null);
     queue.add(<MediaItem>[]);
+    _backgroundResourcesReleased = false;
+    _backgroundReleasedPosition = null;
+    _scheduleAudioCacheTrim();
     playbackState.add(playbackState.value.copyWith(
       controls: const [],
       playing: false,
