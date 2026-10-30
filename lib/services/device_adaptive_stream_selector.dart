@@ -36,6 +36,14 @@ class DeviceStreamProfile {
 
   int get preferredItag => prefersOpus ? 251 : 140;
 
+  /// Reuses the hardware snapshot while updating only the network category.
+  DeviceStreamProfile withNetworkType(DeviceNetworkType nextNetworkType) =>
+      DeviceStreamProfile(
+        androidApiLevel: androidApiLevel,
+        isLowRamDevice: isLowRamDevice,
+        networkType: nextNetworkType,
+      );
+
   /// ExoPlayer buffer profile selected once before AudioPlayer construction.
   /// A constrained device gets a smaller ceiling; capable Wi-Fi devices use
   /// the requested 30-second ceiling and 1.5-second startup reserve.
