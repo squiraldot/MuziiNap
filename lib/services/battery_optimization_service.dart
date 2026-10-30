@@ -17,11 +17,12 @@ class BatteryOptimizationService extends GetxService {
       return;
     }
 
+    // Mark before awaiting the platform channel so repeated widget rebuilds
+    // cannot open multiple battery dialogs concurrently.
+    _hasCheckedThisLaunch = true;
     final currentStatus =
         await Permission.ignoreBatteryOptimizations.status;
     if (currentStatus.isGranted || !context.mounted) return;
-
-    _hasCheckedThisLaunch = true;
     final shouldOpenSettings = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
