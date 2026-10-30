@@ -33,6 +33,12 @@ class StreamProvider {
 
   static const Duration _urlCacheMaxAge = Duration(minutes: 10);
   static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
+  static const List<String> _defaultPipedInstances = [
+    'https://pipedapi.kavin.rocks',
+    'https://pipedapi.adminforge.de',
+    'https://pipedapi.moomoo.me',
+    'https://piped-api.lunar.icu',
+  ];
 
   /// Returns whether a persisted stream result can safely be reused.
   ///
@@ -164,7 +170,7 @@ class StreamProvider {
 
     String lastFailure = 'No supported audio stream was returned';
     String visitorId = '';
-    List<String> pipedInstances = [];
+    List<String> pipedInstances = _defaultPipedInstances;
 
     try {
       final prefs = Hive.box(appPrefsBoxName);
@@ -202,6 +208,7 @@ class StreamProvider {
     if (youtubeExplode != null && youtubeExplode.playable) {
       return youtubeExplode;
     }
+    lastFailure = '$lastFailure; YouTubeExplode fallback unavailable';
 
     // 3. Optional last resort: configured/public Piped instances.
     final piped = await _fetchPipedStreams(
@@ -210,17 +217,12 @@ class StreamProvider {
       deviceProfile: deviceProfile,
     );
     if (piped != null && piped.playable) return piped;
+    lastFailure = '$lastFailure; Piped fallback unavailable';
 
     return StreamProvider(playable: false, statusMSG: lastFailure);
   }
 
   static List<String> _getPipedInstances(Box prefs) {
-    const defaults = <String>[
-      'https://pipedapi.kavin.rocks',
-      'https://pipedapi.adminforge.de',
-      'https://pipedapi.moomoo.me',
-      'https://piped-api.lunar.icu',
-    ];
     final result = <String>[];
     final configured = prefs.get('piped');
     if (configured is Map) {
@@ -235,7 +237,7 @@ class StreamProvider {
         }
       }
     }
-    for (final instance in defaults) {
+    for (final instance in _defaultPipedInstances) {
       if (!result.contains(instance)) result.add(instance);
     }
     return result;
