@@ -400,9 +400,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     printINFO('Playback pipe frozen for ${song.id}; recovery ${retryNumber}/2');
     await _player.stop();
     if (session != _playSessionId ||
-        pauseGeneration != _manualPauseGeneration ||
         currentIndex != index ||
         mediaItem.value?.id != song.id) {
+      return;
+    }
+    if (pauseGeneration != _manualPauseGeneration) {
+      isSongLoading = false;
+      playbackState.add(playbackState.value.copyWith(
+        playing: false,
+        processingState: AudioProcessingState.ready,
+        updatePosition: cachedPosition,
+      ));
       return;
     }
     currentSongUrl = null;
@@ -998,6 +1006,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           if (recoveryPauseGeneration is int &&
               recoveryPauseGeneration != _manualPauseGeneration) {
             isSongLoading = false;
+            playbackState.add(playbackState.value.copyWith(
+              playing: false,
+              processingState: AudioProcessingState.ready,
+              updatePosition: _player.position,
+            ));
             return;
           }
           final playFuture = _player.play();
