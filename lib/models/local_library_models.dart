@@ -21,8 +21,8 @@ class DownloadedSong {
 
   late String localFilePath;
 
-  /// Duration in milliseconds, matching just_audio's Duration representation.
-  late int duration;
+  /// Isar stores Duration values at millisecond precision.
+  late Duration duration;
 
   @Index()
   late DateTime timestamp;
