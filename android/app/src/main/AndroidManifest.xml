@@ -105,6 +105,8 @@
                 android:resource="@xml/lyrics_home_widget_info" />
         </receiver>
 
+        <!-- audio_service runs media playback as a foreground service so Android
+             14+ can apply the dedicated mediaPlayback foreground-service type. -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
