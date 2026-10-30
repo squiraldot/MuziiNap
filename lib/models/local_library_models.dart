@@ -30,7 +30,6 @@ class DownloadedSong {
   Duration get duration =>
       Duration(milliseconds: durationInMilliseconds);
 
-  @ignore
   set duration(Duration value) {
     durationInMilliseconds = value.inMilliseconds;
   }
