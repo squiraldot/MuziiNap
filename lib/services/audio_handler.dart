@@ -65,9 +65,6 @@ Future<AudioHandler> initAudioService() async {
 class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   final DeviceStreamProfile _deviceStreamProfile;
 
-  MyAudioHandler({required DeviceStreamProfile deviceProfile})
-      : _deviceStreamProfile = deviceProfile {
-
   // ignore: prefer_typing_uninitialized_variables
   late final String _cacheDir;
   late final Future<void> _cacheDirReady;
@@ -109,8 +106,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // list of shuffled queue songs ids
   List<String> shuffledQueue = [];
 
-
-
+  MyAudioHandler({required DeviceStreamProfile deviceProfile})
+      : _deviceStreamProfile = deviceProfile {
     _mediaLibrary = MediaLibrary();
     _player = AudioPlayer(
       // AudioPlaybackService owns the focus policy; disable just_audio's
