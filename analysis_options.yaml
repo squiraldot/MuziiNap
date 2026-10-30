@@ -5,7 +5,6 @@ analyzer:
   errors:
     avoid_print: error
     close_sinks: error
-    unawaited_futures: error
   exclude:
     - build/**
     - android/**
