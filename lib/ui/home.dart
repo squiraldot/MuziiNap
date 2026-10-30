@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../services/update_checker.dart';
-import '../services/battery_optimization_service.dart';
+import '../services/permission_service.dart';
 import '../utils/update_check_flag_file.dart';
 
 import './screens/Home/home_screen_controller.dart';
@@ -46,7 +46,7 @@ class Home extends StatelessWidget {
       unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
         if (context.mounted) {
           unawaited(
-            Get.find<BatteryOptimizationService>().checkAndPrompt(context),
+            PermissionService.checkBatteryOptimization(context),
           );
         }
       }));
