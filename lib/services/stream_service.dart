@@ -48,6 +48,9 @@ class StreamProvider {
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 800);
 
+  // Bump when URL playability semantics change so previously cached,
+  // syntactically valid but unusable InnerTube URLs are re-resolved.
+  static const int streamResolverVersion = 2;
   static const Duration _urlCacheMaxAge = Duration(minutes: 10);
   static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
   static const List<String> _defaultPipedInstances = [
@@ -70,7 +73,8 @@ class StreamProvider {
   }) {
     if (cacheEntry is! Map ||
         cacheEntry['playable'] != true ||
-        cacheEntry['statusMSG'] is! String) {
+        cacheEntry['statusMSG'] is! String ||
+        cacheEntry['streamResolverVersion'] != streamResolverVersion) {
       return false;
     }
 
@@ -605,9 +609,11 @@ class StreamProvider {
       final rawUrl = item['url']?.toString();
       if (!isAudioMimeType(mimeType) ||
           !isValidAudioFormatUrl(rawUrl) ||
+          !_isDirectlyPlayableInnerTubeUrl(rawUrl) ||
           _isSpatialOrWrappedAudio(item)) {
-        // signatureCipher/cipher-only formats are intentionally not selected:
-        // this extractor does not currently implement player-JS deciphering.
+        // Cipher-only formats and URLs with an undeciphered YouTube "n"
+        // throttling parameter are not playable as-is. Let YouTubeExplode,
+        // the next extractor, perform the required player-JS deciphering.
         continue;
       }
 
@@ -625,6 +631,14 @@ class StreamProvider {
       ));
     }
     return _applyDeviceProfile(parsed, profile);
+  }
+
+  /// Raw InnerTube URLs may contain an undeciphered "n" throttling token.
+  /// Such URLs pass HTTPS validation but are not ready for media playback.
+  static bool _isDirectlyPlayableInnerTubeUrl(String? rawUrl) {
+    if (!isValidAudioFormatUrl(rawUrl)) return false;
+    final uri = Uri.tryParse(rawUrl!.trim());
+    return uri != null && !uri.queryParameters.containsKey('n');
   }
 
   static bool _isSpatialOrWrappedAudio(Map item) {
