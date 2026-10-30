@@ -82,6 +82,21 @@ void main() {
       expect(profile.requiresWebClient, isTrue);
     });
 
+    test('classifies native decoder failures for AAC retry', () {
+      expect(
+        DeviceAdaptiveStreamSelector.isDecoderCompatibilityFailure(
+          Exception('MediaCodecRenderer: DecoderInitializationException'),
+        ),
+        isTrue,
+      );
+      expect(
+        DeviceAdaptiveStreamSelector.isDecoderCompatibilityFailure(
+          Exception('HTTP 403 while fetching media'),
+        ),
+        isFalse,
+      );
+    });
+
     test('serializes profile for safe transfer into resolver isolate', () {
       const profile = DeviceStreamProfile(
         androidApiLevel: 33,
