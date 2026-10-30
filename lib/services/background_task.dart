@@ -8,6 +8,8 @@ Future<Map<String, dynamic>> getStreamInfo(
   String songId,
   dynamic token, {
   bool preferYoutubeExplode = false,
+  String? preferredClient,
+  Map<String, String>? authenticatedHeaders,
 }) async {
   if (songId.startsWith("MPED")) {
     songId = songId.substring(4);
@@ -16,6 +18,8 @@ Future<Map<String, dynamic>> getStreamInfo(
   final playerResponse = await StreamProvider.fetch(
     songId,
     preferYoutubeExplode: preferYoutubeExplode,
+    preferredClient: preferredClient,
+    authenticatedHeaders: authenticatedHeaders,
   );
   return playerResponse.hmStreamingData;
 }
