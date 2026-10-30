@@ -128,7 +128,10 @@ class _YouTubeSessionExpiryListenerState
   }
 
   Future<void> _redirectToYouTubeLogin() async {
-    if (!mounted || _openingLogin) return;
+    if (!mounted || _openingLogin ||
+        Get.currentRoute.toLowerCase().contains('youtubelogin')) {
+      return;
+    }
     _openingLogin = true;
 
     Get.snackbar(

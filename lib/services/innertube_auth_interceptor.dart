@@ -147,6 +147,9 @@ class InnerTubeAuthInterceptor extends Interceptor {
     final handling = () async {
       try {
         await _onSessionExpired(failedCookie);
+      } catch (_) {
+        // The original Dio failure remains available to its caller. A storage
+        // cleanup error must not become an unhandled background exception.
       } finally {
         _sessionExpiredController.add(
           InnerTubeSessionExpiredEvent(DateTime.now()),
