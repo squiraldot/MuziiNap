@@ -272,6 +272,18 @@ class StreamProvider {
         String id,
       })> _innerTubeClients = [
     (
+      // VISIONOS (client 101) is currently the reliable full-track client.
+      // YouTube began requiring a proof-of-origin token from ANDROID_VR and
+      // IOS in August 2026; VISIONOS does not currently require that token or
+      // signature deciphering. Keep it first so the primary InnerTube path
+      // does not depend on the token-gated clients.
+      name: 'VISIONOS',
+      version: '1.02',
+      userAgent:
+          'com.google.ios.youtube/1.02 (RealityDevice17,1; U; visionOS 2_3)',
+      id: '101',
+    ),
+    (
       name: 'WEB_REMIX',
       version: '1.20260707.12.00',
       userAgent:
@@ -386,10 +398,13 @@ class StreamProvider {
         String id,
       })> _orderedClients(String? preferredClient) {
     final clients = List.of(_innerTubeClients);
-    final index = clients.indexWhere((client) => client.name == preferredClient);
-    if (index > 0) {
-      final preferred = clients.removeAt(index);
-      clients.insert(0, preferred);
+    // VISIONOS is the stable first-choice stream identity. A requested
+    // recovery client is promoted immediately behind it, never ahead of it.
+    final preferredIndex =
+        clients.indexWhere((client) => client.name == preferredClient);
+    if (preferredIndex > 0) {
+      final preferred = clients.removeAt(preferredIndex);
+      clients.insert(1, preferred);
     }
     return clients;
   }
@@ -507,6 +522,15 @@ class StreamProvider {
         'gl': 'US',
       };
       if (visitorId.isNotEmpty) clientContext['visitorData'] = visitorId;
+      if (clientName == 'VISIONOS') {
+        // Match the platform identity expected by YouTube's VisionOS player.
+        clientContext.addAll({
+          'osName': 'visionOS',
+          'osVersion': '2.3.21O5565d',
+          'deviceMake': 'Apple',
+          'deviceModel': 'RealityDevice17,1',
+        });
+      }
 
       final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
