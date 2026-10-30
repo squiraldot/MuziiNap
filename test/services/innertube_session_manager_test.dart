@@ -29,7 +29,7 @@ void main() {
 
     final headers =
         manager.getAuthenticatedHeaders('https://music.youtube.com/youtubei/v1/browse');
-    final authorization = headers['Authorization']!;
+    final authorization = headers['authorization']!;
     final match = RegExp(r'^SAPISIDHASH (\d+)_([a-f0-9]{40})$')
         .firstMatch(authorization);
 
@@ -39,9 +39,9 @@ void main() {
       '$timestamp secret-value https://music.youtube.com',
     );
     expect(match.group(2), expected);
-    expect(headers['X-YouTube-Client-Name'], '67');
-    expect(headers['Content-Type'], 'application/json');
-    expect(headers['Cookie'], 'SAPISID=secret-value; SID=session-value');
+    expect(headers['x-youtube-client-name'], '67');
+    expect(headers['content-type'], 'application/json');
+    expect(headers['cookie'], 'SAPISID=secret-value; SID=session-value');
   });
 
   test('rejects non-YouTube origins before exposing session credentials',
