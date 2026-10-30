@@ -264,7 +264,7 @@ class StreamProvider {
   }) async {
     var lastFailure = 'All InnerTube clients failed';
     final clients = _orderedClients(
-      deviceProfile?.isLegacyAndroid == true ? 'WEB_REMIX' : preferredClient,
+      deviceProfile?.requiresWebClient == true ? 'WEB_REMIX' : preferredClient,
     );
     for (var index = 0; index < clients.length; index++) {
       final client = clients[index];
@@ -520,7 +520,7 @@ class StreamProvider {
         .toList();
     if (codecMatches.isNotEmpty) return _sortFormats(codecMatches);
 
-    if (profile.isLegacyAndroid) return <Audio>[];
+    if (!profile.allowsOpus) return <Audio>[];
     return _sortFormats(formats);
   }
 
