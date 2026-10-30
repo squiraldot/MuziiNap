@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:hive/hive.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
@@ -47,6 +48,8 @@ class StreamProvider {
   static Future<StreamProvider> fetch(
     String videoId, {
     bool preferYoutubeExplode = false,
+    String? preferredClient,
+    Map<String, String>? authenticatedHeaders,
   }) async {
     // Retain the legacy argument for source compatibility. Extractor order is
     // now deterministic by design: InnerTube -> YouTubeExplode -> Piped.
@@ -80,7 +83,12 @@ class StreamProvider {
     }
 
     // 1. Primary: try supported InnerTube player clients in a fixed order.
-    final innerTube = await _fetchInnerTubeClients(cleanId, visitorId);
+    final innerTube = await _fetchInnerTubeClients(
+      cleanId,
+      visitorId,
+      preferredClient: preferredClient,
+      authenticatedHeaders: authenticatedHeaders,
+    );
     if (innerTube.playable) return innerTube;
     if (innerTube.statusMSG.isNotEmpty) lastFailure = innerTube.statusMSG;
 
@@ -133,6 +141,15 @@ class StreamProvider {
         String id,
       })> _innerTubeClients = [
     (
+      name: 'WEB_REMIX',
+      version: '1.20260707.12.00',
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) '
+          'Chrome/140.0.0.0 Safari/537.36',
+      id: '67',
+    ),
+    (
       name: 'ANDROID',
       version: '20.10.38',
       userAgent:
@@ -150,17 +167,42 @@ class StreamProvider {
       name: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
       version: '2.0',
       userAgent:
-          'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 Chrome/113.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 '
+          'Chrome/113.0.0.0 Safari/537.36',
       id: '85',
     ),
   ];
 
+  /// Exposes deterministic client ordering for diagnostics and unit tests.
+  static List<String> clientNamesFor({String? preferredClient}) =>
+      _orderedClients(preferredClient)
+          .map((client) => client.name)
+          .toList(growable: false);
+
+  static List<
+      ({
+        String name,
+        String version,
+        String userAgent,
+        String id,
+      })> _orderedClients(String? preferredClient) {
+    final clients = List.of(_innerTubeClients);
+    final index = clients.indexWhere((client) => client.name == preferredClient);
+    if (index > 0) {
+      final preferred = clients.removeAt(index);
+      clients.insert(0, preferred);
+    }
+    return clients;
+  }
+
   static Future<StreamProvider> _fetchInnerTubeClients(
     String videoId,
-    String visitorId,
-  ) async {
+    String visitorId, {
+    String? preferredClient,
+    Map<String, String>? authenticatedHeaders,
+  }) async {
     var lastFailure = 'All InnerTube clients failed';
-    for (final client in _innerTubeClients) {
+    for (final client in _orderedClients(preferredClient)) {
       try {
         final result = await _fetchInnerTube(
           videoId: videoId,
@@ -169,6 +211,7 @@ class StreamProvider {
           userAgent: client.userAgent,
           clientId: client.id,
           visitorId: visitorId,
+          authenticatedHeaders: authenticatedHeaders,
         ).timeout(_requestTimeout);
 
         if (result.playable) return result;
@@ -193,19 +236,26 @@ class StreamProvider {
     required String clientId,
     required String visitorId,
   }) async {
-    final httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 4);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 4),
+      sendTimeout: _requestTimeout,
+      receiveTimeout: _requestTimeout,
+      responseType: ResponseType.json,
+      validateStatus: (status) => status != null,
+    ));
     try {
       final uri = Uri.parse(
         'https://music.youtube.com/youtubei/v1/player?key=$_innerTubeApiKey',
       );
-      final request = await httpClient.postUrl(uri);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.headers.set('X-YouTube-Client-Name', clientId);
-      request.headers.set('X-YouTube-Client-Version', clientVersion);
-      request.headers.set(HttpHeaders.userAgentHeader, userAgent);
+      final headers = <String, String>{
+        ...?authenticatedHeaders,
+        'content-type': 'application/json',
+        'x-youtube-client-name': clientId,
+        'x-youtube-client-version': clientVersion,
+        'user-agent': userAgent,
+      };
       if (visitorId.isNotEmpty) {
-        request.headers.set('X-Goog-Visitor-Id', visitorId);
+        headers['x-goog-visitor-id'] = visitorId;
       }
 
       final clientContext = <String, dynamic>{
@@ -217,14 +267,16 @@ class StreamProvider {
       };
       if (visitorId.isNotEmpty) clientContext['visitorData'] = visitorId;
 
-      request.write(jsonEncode({
-        'context': {'client': clientContext, 'user': <String, dynamic>{}},
-        'videoId': videoId,
-        'contentCheckOk': true,
-        'racyCheckOk': true,
-      }));
-
-      final response = await request.close().timeout(_requestTimeout);
+      final response = await dio.post<dynamic>(
+        uri.toString(),
+        options: Options(headers: headers),
+        data: {
+          'context': {'client': clientContext, 'user': <String, dynamic>{}},
+          'videoId': videoId,
+          'contentCheckOk': true,
+          'racyCheckOk': true,
+        },
+      ).timeout(_requestTimeout);
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(
           playable: false,
@@ -232,11 +284,7 @@ class StreamProvider {
         );
       }
 
-      final body = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(_requestTimeout);
-      final decoded = jsonDecode(body);
+      final decoded = response.data;
       if (decoded is! Map) {
         return StreamProvider(
           playable: false,
@@ -279,10 +327,11 @@ class StreamProvider {
         playable: true,
         statusMSG: 'OK',
         audioFormats: audioFormats,
+        // Never forward account cookies to googlevideo media hosts.
         streamHeaders: {'User-Agent': userAgent},
       );
     } finally {
-      httpClient.close(force: true);
+      dio.close(force: true);
     }
   }
 
