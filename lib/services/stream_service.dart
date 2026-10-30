@@ -841,7 +841,7 @@ class StreamProvider {
     final yt = YoutubeExplode();
     try {
       final manifest = await yt.videos.streamsClient
-          .getManifest(videoId)
+          .getManifest(videoId, requireWatchPage: false)
           .timeout(const Duration(seconds: 8));
       final audio = manifest.audioOnly.where((stream) {
         return isValidAudioFormatUrl(stream.url.toString()) &&
