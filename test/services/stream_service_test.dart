@@ -18,6 +18,19 @@ void main() {
       expect(formats, isEmpty);
     });
 
+    test('rejects InnerTube URLs with an undeciphered n parameter', () {
+      final formats = StreamProvider.parseInnerTubeAudioFormats([
+        {
+          'itag': 140,
+          'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+          'url': 'https://media.example.com/audio?n=undecipheredToken',
+          'bitrate': 128000,
+        },
+      ]);
+
+      expect(formats, isEmpty);
+    });
+
     test('accepts a direct HTTPS audio URL', () {
       final formats = StreamProvider.parseInnerTubeAudioFormats([
         {
@@ -432,11 +445,22 @@ void main() {
     }) => {
       'playable': true,
       'statusMSG': 'OK',
+      'streamResolverVersion': StreamProvider.streamResolverVersion,
       'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': lowUrl},
       'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': highUrl},
       if (resolvedAt != null) 'resolvedAt': resolvedAt,
       if (includeHeaders) 'streamHeaders': <String, String>{},
     };
+
+    test('invalidates cached URLs created by the previous resolver version', () {
+      final entry = cacheEntry(
+        lowUrl: 'https://piped.example/audio-low',
+        highUrl: 'https://piped.example/audio-high',
+        resolvedAt: now.millisecondsSinceEpoch,
+      )..['streamResolverVersion'] = StreamProvider.streamResolverVersion - 1;
+
+      expect(StreamProvider.isCachedStreamUsable(entry, now: now), isFalse);
+    });
 
     test('accepts cached Piped-style URLs without stream headers', () {
       final entry = cacheEntry(
