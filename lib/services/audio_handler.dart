@@ -76,7 +76,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // ignore: prefer_typing_uninitialized_variables
   dynamic currentIndex;
   int currentShuffleIndex = 0;
-  late String? currentSongUrl;
+  String? currentSongUrl;
   bool isPlayingUsingLockCachingSource = false;
   bool loopModeEnabled = false;
   bool queueLoopModeEnabled = false;
@@ -132,7 +132,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       loadingIntentStream: playbackState.map((state) =>
           state.processingState == AudioProcessingState.loading ||
           state.processingState == AudioProcessingState.buffering),
-      isPlaybackRequested: () => _isPlaybackRequested,
+      isPlaybackRequested: _shouldMonitorNetworkPlayback,
       checkOnline: () async => _hasNetworkConnection(await connectivity.checkConnectivity()),
       positionProvider: () => _player.playing ||
               _player.processingState == ProcessingState.buffering
@@ -391,6 +391,16 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       }
       await _recoverFromPlaybackError(e);
     }));
+  }
+
+  bool _shouldMonitorNetworkPlayback() {
+    if (!_isPlaybackRequested || isPlayingUsingLockCachingSource) return false;
+    final index = currentIndex;
+    if (index is int && index >= 0 && index < queue.value.length) {
+      final url = currentSongUrl ?? queue.value[index].extras?['url']?.toString();
+      if (url != null && url.startsWith('file://')) return false;
+    }
+    return true;
   }
 
   static bool _hasNetworkConnection(List<ConnectivityResult> results) =>
@@ -982,6 +992,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           streamInfo.setQualityIndex(0);
         }
         if (!streamInfo.playable) {
+          _isPlaybackRequested = false;
+          _pendingPlaybackPosition = null;
           currentSongUrl = null;
           isSongLoading = false;
           Get.find<PlayerController>().notifyPlayError(streamInfo.statusMSG);
@@ -1037,11 +1049,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           if (resumePosition is int && resumePosition > 0) {
             await _player.seek(Duration(milliseconds: resumePosition));
           }
-          final recoveryPauseGeneration = extras['recoveryPauseGeneration'];
           if (!_isPlaybackRequested ||
-              requestPauseGeneration != _manualPauseGeneration ||
-              (recoveryPauseGeneration is int &&
-                  recoveryPauseGeneration != _manualPauseGeneration)) {
+              requestPauseGeneration != _manualPauseGeneration) {
             isSongLoading = false;
             _pendingPlaybackPosition = null;
             playbackState.add(playbackState.value.copyWith(
@@ -1119,7 +1128,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
-        final requestPauseGeneration = _manualPauseGeneration;
+        final sourcePauseGeneration = _manualPauseGeneration;
         _isPlaybackRequested = true;
         _pendingPlaybackPosition = Duration.zero;
         _playbackCircuitBreaker.setTrack(currMed.id);
@@ -1143,6 +1152,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           return;
         }
         if (!streamInfo.playable) {
+          _isPlaybackRequested = false;
+          _pendingPlaybackPosition = null;
           currentSongUrl = null;
           isSongLoading = false;
           Get.find<PlayerController>().notifyPlayError(streamInfo.statusMSG);
@@ -1166,7 +1177,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         if (currentSession != _playSessionId) return;
 
         if (!_isPlaybackRequested ||
-            requestPauseGeneration != _manualPauseGeneration) {
+            sourcePauseGeneration != _manualPauseGeneration) {
           isSongLoading = false;
           _pendingPlaybackPosition = null;
           playbackState.add(playbackState.value.copyWith(
