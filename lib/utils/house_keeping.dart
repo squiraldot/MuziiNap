@@ -6,6 +6,7 @@ import '../ui/screens/Library/library_controller.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/utils.dart';
+import '../services/stream_service.dart';
 import 'helper.dart';
 
 void startHouseKeeping() {
@@ -17,13 +18,20 @@ void startHouseKeeping() {
 /// A cache record is expected to be a list whose second element contains a
 /// URL map. Treat incomplete records as stale so one corrupt Hive entry does
 /// not abort cleanup for every other entry.
-bool shouldRemoveSongUrlCacheEntry(dynamic cacheEntry) {
-  if (cacheEntry is! List || cacheEntry.length < 2) return true;
-
-  final streamData = cacheEntry[1];
-  if (streamData == null || streamData is String || streamData is! Map) {
-    return true;
+bool shouldRemoveSongUrlCacheEntry(
+  dynamic cacheEntry, {
+  DateTime? now,
+}) {
+  // Current stream records are maps produced by StreamProvider.hmStreamingData.
+  // Headers are optional, so Piped/self-contained URLs must remain cacheable.
+  if (cacheEntry is Map) {
+    return !StreamProvider.isCachedStreamUsable(cacheEntry, now: now);
   }
+
+  // Retain cleanup support for older list-shaped cache records.
+  if (cacheEntry is! List || cacheEntry.length < 2) return true;
+  final streamData = cacheEntry[1];
+  if (streamData == null || streamData is! Map) return true;
 
   final url = streamData['url'];
   if (url is! String || url.isEmpty) return true;
