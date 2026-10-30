@@ -23,9 +23,10 @@ void main() {
       final now = DateTime.utc(2026, 10, 30, 12);
       final cacheEntry = {
         'playable': true,
+        'statusMSG': 'OK',
         'resolvedAt': now.millisecondsSinceEpoch,
-        'lowQualityAudio': {'url': 'https://piped.example/audio-low'},
-        'highQualityAudio': {'url': 'https://piped.example/audio-high'},
+        'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-low'},
+        'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-high'},
       };
 
       expect(
@@ -39,9 +40,10 @@ void main() {
       final expiry = now.millisecondsSinceEpoch ~/ 1000 + 7200;
       final cacheEntry = {
         'playable': true,
+        'statusMSG': 'OK',
         'resolvedAt': now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
-        'lowQualityAudio': {'url': 'https://media.example/audio-low?expire=1700000000'},
-        'highQualityAudio': {'url': 'https://media.example/audio-high?expire=$expiry'},
+        'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://media.example/audio-low?expire=1700000000'},
+        'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://media.example/audio-high?expire=$expiry'},
       };
 
       expect(
@@ -54,9 +56,10 @@ void main() {
       final now = DateTime.utc(2026, 10, 30, 12);
       final cacheEntry = {
         'playable': true,
+        'statusMSG': 'OK',
         'resolvedAt': now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
-        'lowQualityAudio': {'url': 'https://piped.example/audio-low'},
-        'highQualityAudio': {'url': 'https://piped.example/audio-high'},
+        'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-low'},
+        'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-high'},
       };
 
       expect(
