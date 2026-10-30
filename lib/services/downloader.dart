@@ -198,7 +198,13 @@ class DownloadCacheService extends GetxService {
       message: song.title,
       progress: 0,
     );
-    final playerResponse = await StreamProvider.fetch(song.id);
+    final playerResponse = await StreamProvider.fetch(
+      song.id,
+      refreshVisitorId: () async {
+        if (!Get.isRegistered<MusicServices>()) return null;
+        return Get.find<MusicServices>().genrateVisitorId();
+      },
+    );
 
     if (!playerResponse.playable) {
       ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
