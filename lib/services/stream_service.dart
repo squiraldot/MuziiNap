@@ -241,10 +241,9 @@ class StreamProvider {
     // Refresh it only for bot/visitor/403-style refusals, then retry InnerTube
     // once before falling back to another extractor.
     final normalizedFailure = innerTube.statusMSG.toLowerCase();
-    final visitorRejected = normalizedFailure.contains('bot') ||
-        normalizedFailure.contains('visitor') ||
-        normalizedFailure.contains('http 403') ||
-        normalizedFailure.contains('403');
+    // Do not rotate visitor ids for an IP-wide bot block: current field
+    // reports show that doing so does not clear it and only adds latency.
+    final visitorRejected = normalizedFailure.contains('visitor');
     if (visitorRejected && refreshVisitorId != null) {
       try {
         final refreshed = await refreshVisitorId();
