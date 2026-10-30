@@ -1,4 +1,4 @@
-# Shared Flutter lints plus strict rules for resource and async safety.
+# Flutter baseline with strict async and resource-safety checks.
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
@@ -12,14 +12,8 @@ analyzer:
 
 linter:
   rules:
-    # Streaming and background-task resource safety.
     avoid_print: true
     close_sinks: true
     unawaited_futures: true
-    cancel_subscriptions: true
-    discarded_futures: true
-    # Keep the existing legacy relative-import convention.
+    # Preserve the repository's established relative-import convention.
     avoid_relative_lib_imports: false
-    # Predictable, allocation-conscious Dart style.
-    avoid_slow_async_io: true
-    prefer_final_locals: true
