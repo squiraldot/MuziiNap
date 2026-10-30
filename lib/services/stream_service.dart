@@ -299,9 +299,16 @@ class StreamProvider {
         final reason = playability is Map
             ? (playability['reason'] ?? playability['status'])
             : null;
+        final reasonText = reason?.toString() ?? 'No streaming data';
+        final normalizedReason = reasonText.toLowerCase();
+        final diagnostic = normalizedReason.contains('potoken') ||
+                normalizedReason.contains('proof of origin') ||
+                normalizedReason.contains('proof-of-origin')
+            ? 'YouTube requires a PoToken for this client; no proof-token provider is configured.'
+            : reasonText;
         return StreamProvider(
           playable: false,
-          statusMSG: reason?.toString() ?? 'No streaming data',
+          statusMSG: diagnostic,
         );
       }
 
@@ -315,9 +322,16 @@ class StreamProvider {
 
       final audioFormats = parseInnerTubeAudioFormats(formats);
       if (audioFormats.isEmpty) {
+        final hasCipherOnlyAudio = formats.any((item) =>
+            item is Map &&
+            isAudioMimeType(item['mimeType']?.toString()) &&
+            (item['signatureCipher'] != null || item['cipher'] != null) &&
+            item['url'] == null);
         return StreamProvider(
           playable: false,
-          statusMSG: 'No validated direct audio formats',
+          statusMSG: hasCipherOnlyAudio
+              ? 'Only cipher-protected audio formats were returned; the configured extractor could not resolve them.'
+              : 'No validated direct audio formats',
         );
       }
 
