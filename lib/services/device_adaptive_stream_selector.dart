@@ -43,7 +43,8 @@ class DeviceStreamProfile {
     final Duration minBuffer;
     final Duration maxBuffer;
 
-    if (isLowRamDevice || !allowsOpus && networkType != DeviceNetworkType.mobile) {
+    if (isLowRamDevice ||
+        (!allowsOpus && networkType != DeviceNetworkType.mobile)) {
       minBuffer = const Duration(milliseconds: 2500);
       maxBuffer = const Duration(seconds: 12);
     } else if (prefersOpus) {
