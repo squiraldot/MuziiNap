@@ -521,7 +521,10 @@ class StreamProvider {
       // act as a decoder-compatible fallback without another network lookup.
       final opus = formatsForCodec(Codec.opus, 251);
       final aac = formatsForCodec(Codec.mp4a, 140);
-      return _sortFormats([...opus, ...aac]);
+      // The model uses first/last entries for low/high quality. Keep AAC in
+      // the low slot and the preferred Opus stream in the high slot even when
+      // an alternate AAC rendition advertises a larger nominal bitrate.
+      return [..._sortFormats(aac), ..._sortFormats(opus)];
     }
 
     final aac = formatsForCodec(Codec.mp4a, 140);
