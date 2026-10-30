@@ -1539,13 +1539,19 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
               qualityIndex: qualityIndex as int,
             ) &&
             cachedStreamInfo is Map &&
-            cachedStreamInfo['deviceProfile'] is Map &&
-            DeviceStreamProfile.fromJson(
-                  Map<String, Object?>.from(cachedStreamInfo['deviceProfile']),
-                ) ==
-                deviceProfile) {
-          printINFO("Got cached Url ($songId)");
-          streamInfo = HMStreamingData.fromJson(cachedStreamInfo);
+            cachedStreamInfo['deviceProfile'] is Map) {
+          try {
+            final cachedProfile = DeviceStreamProfile.fromJson(
+              Map<String, Object?>.from(cachedStreamInfo['deviceProfile']),
+            );
+            if (cachedProfile == deviceProfile) {
+              printINFO("Got cached Url ($songId)");
+              streamInfo = HMStreamingData.fromJson(cachedStreamInfo);
+            }
+          } catch (cacheError) {
+            // Corrupt or older profile metadata should trigger fresh resolution.
+            printINFO("Ignoring invalid cached stream profile: $cacheError");
+          }
         }
       }
 
