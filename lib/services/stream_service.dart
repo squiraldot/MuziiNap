@@ -277,6 +277,18 @@ class StreamProvider {
       id: '67',
     ),
     (
+      // Keep the older embedded web client in the race. Some Android
+      // networks/accounts no longer receive direct audio formats from the
+      // newer WEB_REMIX identity, while WEB_EMBEDDED still serves them.
+      name: 'WEB_EMBEDDED',
+      version: '1.20240104.01.00',
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) '
+          'Chrome/120.0.0.0 Safari/537.36',
+      id: '56',
+    ),
+    (
       name: 'ANDROID',
       version: '20.10.38',
       userAgent:
