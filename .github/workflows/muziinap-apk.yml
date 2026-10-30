@@ -121,6 +121,8 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
+      - name: Generate Isar collection schemas
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos lib test
