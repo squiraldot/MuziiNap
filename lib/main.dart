@@ -123,7 +123,7 @@ class _YouTubeSessionExpiryListenerState
     super.initState();
     _subscription =
         InnerTubeAuthInterceptor.sessionExpiredEvents.listen((_) {
-      _redirectToYouTubeLogin();
+      unawaited(_redirectToYouTubeLogin());
     });
   }
 
@@ -154,7 +154,7 @@ class _YouTubeSessionExpiryListenerState
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel() ?? Future<void>.value());
     super.dispose();
   }
 
