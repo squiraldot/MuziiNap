@@ -479,7 +479,11 @@ class StreamProvider {
           value.isNotEmpty &&
           value != 'none' &&
           value != 'false' &&
-          value != '0') {
+          value != '0' &&
+          value != 'unknown' &&
+          value != 'unspecified' &&
+          value != 'spatial_audio_type_unspecified' &&
+          value != 'audio_spatial_format_unspecified') {
         return true;
       }
     }
