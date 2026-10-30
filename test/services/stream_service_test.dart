@@ -349,14 +349,14 @@ void main() {
     test('starts with WEB_REMIX for the primary authenticated request', () {
       expect(
         StreamProvider.clientNamesFor(),
-        startsWith(['WEB_REMIX', 'ANDROID']),
+        ['WEB_REMIX', 'ANDROID'],
       );
     });
 
     test('moves ANDROID to the front after a playback source failure', () {
       expect(
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
-        startsWith(['ANDROID', 'WEB_REMIX']),
+        ['ANDROID', 'WEB_REMIX'],
       );
     });
 
