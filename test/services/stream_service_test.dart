@@ -196,7 +196,7 @@ void main() {
           networkType: DeviceNetworkType.wifi,
         ),
       );
-      expect(selected.map((format) => format.itag), [250, 141]);
+      expect(selected.map((format) => format.itag), [141, 250]);
     });
 
     test('legacy devices fail closed when no AAC format exists', () {
