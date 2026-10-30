@@ -63,9 +63,10 @@ Future<AudioHandler> initAudioService() async {
 }
 
 class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
+  final DeviceStreamProfile _deviceStreamProfile;
+
   MyAudioHandler({required DeviceStreamProfile deviceProfile})
       : _deviceStreamProfile = deviceProfile {
-  final DeviceStreamProfile _deviceStreamProfile;
 
   // ignore: prefer_typing_uninitialized_variables
   late final String _cacheDir;
@@ -116,7 +117,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       // built-in auto-duck/resume listeners to avoid double handling.
       handleInterruptions: false,
       useProxyForRequestHeaders: false,
-      audioLoadConfiguration: const AudioLoadConfiguration(
+      audioLoadConfiguration: AudioLoadConfiguration(
         androidLoadControl: _deviceStreamProfile.androidLoadControl,
       ),
     );
