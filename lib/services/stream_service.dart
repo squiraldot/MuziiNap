@@ -510,18 +510,29 @@ class StreamProvider {
   ) {
     if (profile == null || formats.isEmpty) return _sortFormats(formats);
 
-    final preferredItag =
-        formats.where((format) => format.itag == profile.preferredItag).toList();
-    if (preferredItag.isNotEmpty) return _sortFormats(preferredItag);
+    List<Audio> formatsForCodec(Codec codec, int preferredItag) {
+      final exact = formats.where((format) => format.itag == preferredItag).toList();
+      if (exact.isNotEmpty) return exact;
+      return formats.where((format) => format.audioCodec == codec).toList();
+    }
 
-    final preferredCodec = profile.prefersOpus ? Codec.opus : Codec.mp4a;
-    final codecMatches = formats
-        .where((format) => format.audioCodec == preferredCodec)
-        .toList();
-    if (codecMatches.isNotEmpty) return _sortFormats(codecMatches);
+    if (profile.prefersOpus) {
+      // Keep AAC alongside Opus so the existing low-quality stream slot can
+      // act as a decoder-compatible fallback without another network lookup.
+      final opus = formatsForCodec(Codec.opus, 251);
+      final aac = formatsForCodec(Codec.mp4a, 140);
+      return _sortFormats([...opus, ...aac]);
+    }
 
+    final aac = formatsForCodec(Codec.mp4a, 140);
+    if (aac.isNotEmpty) return _sortFormats(aac);
+
+    // On API 29+ devices AAC may be missing for a particular item. Opus is a
+    // last-resort playable fallback; legacy/unknown API devices stay AAC-only.
     if (!profile.allowsOpus) return <Audio>[];
-    return _sortFormats(formats);
+    return _sortFormats(
+      formats.where((format) => format.audioCodec == Codec.opus).toList(),
+    );
   }
 
   static Future<StreamProvider?> _fetchYoutubeExplode(
