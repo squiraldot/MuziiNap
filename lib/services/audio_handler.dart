@@ -91,6 +91,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   MyAudioHandler() {
     _mediaLibrary = MediaLibrary();
     _player = AudioPlayer(
+      // AudioPlaybackService owns the focus policy; disable just_audio's
+      // built-in auto-duck/resume listeners to avoid double handling.
+      handleInterruptions: false,
       useProxyForRequestHeaders: false,
       audioLoadConfiguration: const AudioLoadConfiguration(
             androidLoadControl: AndroidLoadControl(
