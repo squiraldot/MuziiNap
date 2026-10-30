@@ -23,7 +23,7 @@ class StreamProvider {
     this.streamHeaders,
   });
 
-  static const Duration _requestTimeout = Duration(seconds: 7);
+  static const Duration _requestTimeout = Duration(seconds: 5);
   static const String _innerTubeApiKey =
       'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
 
@@ -360,11 +360,35 @@ class StreamProvider {
     String videoId,
     List<String> instances,
   ) async {
+    if (instances.isEmpty) return null;
+
+    // Piped remains the final provider fallback. Its configured instances may
+    // be checked concurrently, but only after InnerTube and YouTubeExplode fail.
+    final completer = Completer<StreamProvider?>();
+    var pending = instances.length;
     for (final instance in instances) {
-      final result = await _fetchPipedInstance(instance, videoId);
-      if (result != null && result.playable) return result;
+      _fetchPipedInstance(instance, videoId)
+          .timeout(const Duration(seconds: 5), onTimeout: () => null)
+          .then((result) {
+        if (result != null && result.playable) {
+          if (!completer.isCompleted) completer.complete(result);
+          return;
+        }
+        pending--;
+        if (pending == 0 && !completer.isCompleted) {
+          completer.complete(null);
+        }
+      }, onError: (Object error) {
+        pending--;
+        if (pending == 0 && !completer.isCompleted) {
+          completer.complete(null);
+        }
+      });
     }
-    return null;
+    return completer.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => null,
+    );
   }
 
   static Future<StreamProvider?> _fetchPipedInstance(
