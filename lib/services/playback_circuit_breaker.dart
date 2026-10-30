@@ -120,6 +120,7 @@ class PlaybackCircuitBreaker {
         _trackId == null ||
         !_isOnline ||
         !(_isPlaying || _isLoadingIntent) ||
+        !isFrozenState(_processingState) ||
         !_shouldMonitorPlayback() ||
         _exhausted) {
       _cancelFrozenTimer();
@@ -136,6 +137,7 @@ class PlaybackCircuitBreaker {
         _trackId == null ||
         !_isOnline ||
         !(_isPlaying || _isLoadingIntent) ||
+        !isFrozenState(_processingState) ||
         !_shouldMonitorPlayback() ||
         _exhausted) {
       _evaluate();
