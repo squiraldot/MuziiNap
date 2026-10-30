@@ -278,9 +278,9 @@ class StreamProvider {
       // signature deciphering. Keep it first so the primary InnerTube path
       // does not depend on the token-gated clients.
       name: 'VISIONOS',
-      version: '1.02',
+      version: '1.04',
       userAgent:
-          'com.google.ios.youtube/1.02 (RealityDevice17,1; U; visionOS 2_3)',
+          'com.google.visionos.youtube/1.04(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X; US)',
       id: '101',
     ),
     (
@@ -461,7 +461,9 @@ class StreamProvider {
           final message = error is DioException &&
                   error.type == DioExceptionType.cancel
               ? '${client.name}: request cancelled or timed out'
-              : '${client.name}: request failed';
+              : error is DioException && error.response?.statusCode != null
+                  ? '${client.name}: HTTP ${error.response!.statusCode}'
+                  : '${client.name}: request failed';
           printINFO('InnerTube ${client.name} failed: $error');
           return StreamProvider(playable: false, statusMSG: message);
         }
@@ -526,7 +528,7 @@ class StreamProvider {
         // Match the platform identity expected by YouTube's VisionOS player.
         clientContext.addAll({
           'osName': 'visionOS',
-          'osVersion': '2.3.21O5565d',
+          'osVersion': '26.6.0.23O770',
           'deviceMake': 'Apple',
           'deviceModel': 'RealityDevice17,1',
         });
