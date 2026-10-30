@@ -914,6 +914,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         break;
 
       case 'dispose':
+        _playSessionId++;
+        _isPlaybackRequested = false;
+        _playbackCircuitBreaker.setTrack(null);
         if (_activeEqualizerSessionId != null) {
           EqualizerService.endAudioEffect(_activeEqualizerSessionId!);
           _activeEqualizerSessionId = null;
