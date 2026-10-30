@@ -15,6 +15,7 @@ import './utils.dart';
 import '../utils/helper.dart';
 import '../utils/youtube_auth.dart';
 import 'innertube_session_manager.dart';
+import 'innertube_auth_interceptor.dart';
 import '../models/home_mood.dart';
 import 'constant.dart';
 import 'continuations.dart';
@@ -76,8 +77,16 @@ class MusicServices extends getx.GetxService {
     'x-youtube-client-version': '20.10.38',
   };
 
+  late final InnerTubeAuthInterceptor _authInterceptor =
+      InnerTubeAuthInterceptor(
+    sessionManager: InnerTubeSessionManager(),
+    headersProvider: () => _headers,
+    onSessionExpired: _handleExpiredYouTubeSession,
+  );
+
   @override
   void onInit() {
+    dio.interceptors.add(_authInterceptor);
     _initFuture = init();
     super.onInit();
   }
@@ -213,6 +222,7 @@ class MusicServices extends getx.GetxService {
       _headers.addAll(
         sessionManager.getAuthenticatedHeaders('https://music.youtube.com'),
       );
+      _authInterceptor.reset();
       return true;
     } on InnerTubeSessionException catch (error) {
       _headers.remove('authorization');
@@ -246,17 +256,72 @@ class MusicServices extends getx.GetxService {
 
   void clearAuthCookies() {
     unawaited(InnerTubeSessionManager().clearCookies());
+    _resetInMemoryAuthHeaders();
+  }
+
+  void _resetInMemoryAuthHeaders() {
     _headers['cookie'] = 'CONSENT=YES+1';
     for (final key in [
       'authorization',
       'X-Goog-PageId',
       'X-Goog-AuthUser',
+      'X-Goog-Visitor-Id',
       'X-Youtube-Bootstrap-Logged-In',
       'X-Origin',
       'X-Youtube-Identity-Token',
     ]) {
       _headers.remove(key);
     }
+    _context['context']['client'].remove('visitorData');
+  }
+
+  /// Invalidates only the currently active account whose cookie was rejected.
+  /// Saved secondary accounts are retained so the user can switch back to them.
+  Future<void> _handleExpiredYouTubeSession(String? failedCookie) async {
+    if (failedCookie == null || failedCookie.isEmpty) return;
+
+    final box = Hive.box(appPrefsBoxName);
+    final currentCookies = box.get('yt_cookies')?.toString();
+    // Ignore late failures from requests sent before the user switched account
+    // or completed a newer login.
+    if (currentCookies != failedCookie) return;
+
+    final activeKey = box.get('yt_active_account_key')?.toString();
+    final storedAccounts = box.get('yt_accounts');
+    if (storedAccounts is Map && activeKey != null) {
+      final accounts = <String, dynamic>{
+        for (final entry in storedAccounts.entries)
+          entry.key.toString(): entry.value,
+      };
+      final activeAccount = accounts[activeKey];
+      if (activeAccount is Map &&
+          activeAccount['cookies']?.toString() == failedCookie) {
+        accounts.remove(activeKey);
+        if (accounts.isEmpty) {
+          await box.delete('yt_accounts');
+        } else {
+          await box.put('yt_accounts', accounts);
+        }
+      }
+    }
+
+    await InnerTubeSessionManager().clearCookies();
+    for (final key in [
+      'yt_cookies',
+      'yt_active_account_key',
+      'yt_visitor_data',
+      'yt_data_sync_id',
+      'yt_auth_user',
+      'yt_identity_token',
+      'AccountName',
+      'AccountThumbUrl',
+      'yt_account_name',
+      'yt_account_photo_url',
+    ]) {
+      await box.delete(key);
+    }
+    await box.put('yt_logged_in', false);
+    _resetInMemoryAuthHeaders();
   }
 
   set hlCode(String code) {
@@ -286,17 +351,7 @@ class MusicServices extends getx.GetxService {
 
   Future<Response> _sendRequest(String action, Map<dynamic, dynamic> data,
       {additionalParams = ""}) async {
-    // Generate a fresh time-bound authorization hash for every request.
-    try {
-      _headers.addAll(
-        InnerTubeSessionManager()
-            .getAuthenticatedHeaders('https://music.youtube.com'),
-      );
-    } on InnerTubeSessionException {
-      // Preserve anonymous/consent requests when no valid account session exists.
-      _headers.remove('authorization');
-    }
-    try {
+    // InnerTubeAuthInterceptor injects the latest Hive cookies and a fresh\n    // SAPISIDHASH for every request, including continuation requests.\n    try {
       final response =
           await dio.post("$baseUrl$action$fixedParms$additionalParams",
               options: Options(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'services/constant.dart';
 import 'utils/update_check_flag_file.dart';
@@ -17,6 +18,8 @@ import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
 import './services/isar_database_service.dart';
+import './services/innertube_auth_interceptor.dart';
+import './ui/screens/Settings/youtube_login_screen.dart';
 import './services/music_service.dart';
 import './ui/intro_video_splash.dart';
 import './ui/player/player_controller.dart';
@@ -71,31 +74,89 @@ class MyApp extends StatelessWidget {
           final mQuery = MediaQuery.of(context);
           final scale =
               mQuery.textScaler.clamp(minScaleFactor: 1.0, maxScaleFactor: 1.1);
-          return Stack(
-            children: [
-              GetX<ThemeController>(
-                builder: (controller) => MediaQuery(
-                  data: mQuery.copyWith(textScaler: scale),
-                  child: AnimatedTheme(
-                      duration: const Duration(milliseconds: 700),
-                      data: controller.themedata.value!,
-                      child: child!),
-                ),
-              ),
-              GestureDetector(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    color: Colors.transparent,
-                    height: mQuery.padding.bottom,
-                    width: mQuery.size.width,
+          return _YouTubeSessionExpiryListener(
+            child: Stack(
+              children: [
+                GetX<ThemeController>(
+                  builder: (controller) => MediaQuery(
+                    data: mQuery.copyWith(textScaler: scale),
+                    child: AnimatedTheme(
+                        duration: const Duration(milliseconds: 700),
+                        data: controller.themedata.value!,
+                        child: child!),
                   ),
                 ),
-              )
-            ],
+                GestureDetector(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      color: Colors.transparent,
+                      height: mQuery.padding.bottom,
+                      width: mQuery.size.width,
+                    ),
+                  ),
+                )
+              ],
+            ),
           );
         });
   }
+}
+
+class _YouTubeSessionExpiryListener extends StatefulWidget {
+  const _YouTubeSessionExpiryListener({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_YouTubeSessionExpiryListener> createState() =>
+      _YouTubeSessionExpiryListenerState();
+}
+
+class _YouTubeSessionExpiryListenerState
+    extends State<_YouTubeSessionExpiryListener> {
+  StreamSubscription<InnerTubeSessionExpiredEvent>? _subscription;
+  bool _openingLogin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription =
+        InnerTubeAuthInterceptor.sessionExpiredEvents.listen((_) {
+      _redirectToYouTubeLogin();
+    });
+  }
+
+  Future<void> _redirectToYouTubeLogin() async {
+    if (!mounted || _openingLogin) return;
+    _openingLogin = true;
+
+    Get.snackbar(
+      'YouTube session expired',
+      'Your YouTube sign-in has expired. Please sign in again to restore your personalized music feed.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 5),
+      margin: const EdgeInsets.all(12),
+    );
+
+    try {
+      await Get.to(
+        () => const YoutubeLoginScreen(),
+        preventDuplicates: true,
+      );
+    } finally {
+      _openingLogin = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 Future<void> startApplicationServices() async {
