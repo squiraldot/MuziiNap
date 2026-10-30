@@ -541,7 +541,7 @@ void main() {
     test('includes every supported client in the primary race', () {
       expect(
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
-        ['ANDROID', 'WEB_REMIX', 'ANDROID_VR',
+        ['ANDROID', 'WEB_REMIX', 'WEB_EMBEDDED', 'ANDROID_VR',
           'TVHTML5_SIMPLY_EMBEDDED_PLAYER'],
       );
     });
