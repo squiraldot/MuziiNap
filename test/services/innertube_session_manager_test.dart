@@ -77,12 +77,17 @@ void main() {
   });
 
   test('rejects an explicitly expired session', () async {
-    await manager.storeCookies(
-      'SAPISID=secret-value',
-      expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
-    ).catchError((Object error) {
-      expect(error, isA<InnerTubeSessionException>());
-    });
+    await expectLater(
+      manager.storeCookies(
+        'SAPISID=secret-value',
+        expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+      ),
+      throwsA(isA<InnerTubeSessionException>().having(
+        (error) => error.code,
+        'code',
+        InnerTubeSessionError.expired,
+      )),
+    );
   });
 }
 
