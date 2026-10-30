@@ -459,7 +459,8 @@ class StreamProvider {
     }
   }
 
-  static Codec? _codecFromMimeType(String mimeType) {
+  static Codec? _codecFromMimeType(String? mimeType) {
+    if (mimeType == null) return null;
     final normalized = mimeType.toLowerCase();
     if (normalized.contains('mp4a') || normalized.contains('aac')) {
       return Codec.mp4a;
