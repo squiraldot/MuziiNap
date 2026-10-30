@@ -77,6 +77,7 @@ void main() {
       breaker.setTrack('track-1');
       playbackRequested = true;
       loadingIntent.add(true);
+      processing.add(ProcessingState.loading);
       // The just_audio playing stream is still false while setAudioSource is loading.
       await Future<void>.delayed(const Duration(milliseconds: 35));
       expect(recoveries, hasLength(1));
