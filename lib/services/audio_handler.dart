@@ -97,6 +97,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   bool _audioFocusDucked = false;
   int _volumeFadeGeneration = 0;
   int _manualPauseGeneration = 0;
+  bool _isPlaybackRequested = false;
+  Duration? _pendingPlaybackPosition;
 
   // One in-flight/ready stream lookup for the next queue item. Futures are
   // keyed by video ID so a rapid skip can safely reuse a completed lookup.
@@ -127,8 +129,15 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       processingStateStream: _player.processingStateStream,
       playingStream: _player.playingStream,
       onlineStream: connectivity.onConnectivityChanged.map(_hasNetworkConnection),
+      loadingIntentStream: playbackState.map((state) =>
+          state.processingState == AudioProcessingState.loading ||
+          state.processingState == AudioProcessingState.buffering),
+      isPlaybackRequested: () => _isPlaybackRequested,
       checkOnline: () async => _hasNetworkConnection(await connectivity.checkConnectivity()),
-      positionProvider: () => _player.position,
+      positionProvider: () => _player.playing ||
+              _player.processingState == ProcessingState.buffering
+          ? _player.position
+          : (_pendingPlaybackPosition ?? _player.position),
       onFrozen: _recoverFrozenPlayback,
       onRetriesExhausted: _failFrozenPlayback,
     );
@@ -231,6 +240,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<void> _pauseForAudioFocus() async {
     _manualPauseGeneration++;
+    _isPlaybackRequested = false;
     _audioFocusDucked = false;
     await _applyOutputVolume(smooth: true);
     await _player.pause();
@@ -238,6 +248,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<void> _pauseForBecomingNoisy() async {
     _manualPauseGeneration++;
+    _isPlaybackRequested = false;
     // Do not fade first: route removal should stop output immediately.
     _audioFocusDucked = false;
     _volumeFadeGeneration++;
@@ -396,7 +407,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   Future<void> _recoverFrozenPlayback(Duration cachedPosition, int retryNumber) async {
     final index = currentIndex;
     if (index is! int || index < 0 || index >= queue.value.length ||
-        !_player.playing || isPlayingUsingLockCachingSource) {
+        (!_player.playing && !_isPlaybackRequested) ||
+        isPlayingUsingLockCachingSource) {
       return;
     }
     final song = queue.value[index];
@@ -485,6 +497,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   void _markPlaybackFailed(Object error) {
+    _isPlaybackRequested = false;
+    _pendingPlaybackPosition = null;
     currentSongUrl = null;
     isSongLoading = false;
     playbackState.add(playbackState.value.copyWith(
@@ -746,6 +760,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   @override
   Future<void> play() async {
+    _isPlaybackRequested = true;
     if (_backgroundResourcesReleased) {
       final resumePosition = _backgroundReleasedPosition;
       _backgroundResourcesReleased = false;
@@ -770,6 +785,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   @override
   Future<void> pause() async {
     _manualPauseGeneration++;
+    _isPlaybackRequested = false;
     await _player.pause();
   }
 
@@ -907,6 +923,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final isNewUrlReq = extras['newUrl'] ?? false;
         if (!isNewUrlReq) _playbackRecoverySongId = null;
         final currentSong = queue.value[currentIndex];
+        _isPlaybackRequested = extras['restoreSession'] != true;
+        final requestedPosition = extras['position'];
+        _pendingPlaybackPosition = requestedPosition is int
+            ? Duration(milliseconds: requestedPosition)
+            : Duration.zero;
         _playbackCircuitBreaker.setTrack(currentSong.id);
         _autoAdvanceSongId = currentSong.id;
         final currentSession = ++_playSessionId;
@@ -1022,6 +1043,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             return;
           }
           final playFuture = _player.play();
+          _pendingPlaybackPosition = null;
           _applyEqualizerAfterPlaybackStarts();
           await playFuture;
 
@@ -1088,6 +1110,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
+        _isPlaybackRequested = true;
+        _pendingPlaybackPosition = Duration.zero;
         _playbackCircuitBreaker.setTrack(currMed.id);
         _autoAdvanceSongId = currMed.id;
         final currentSession = ++_playSessionId;
@@ -1132,6 +1156,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         if (currentSession != _playSessionId) return;
 
         final playFuture = _player.play();
+        _pendingPlaybackPosition = null;
         _applyEqualizerAfterPlaybackStarts();
         await playFuture;
         break;
@@ -1418,6 +1443,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     // this, a tap-to-play request can finish after dismissal and start audio
     // (and recreate the Android media notification) after stop() returns.
     _playSessionId++;
+    _isPlaybackRequested = false;
+    _pendingPlaybackPosition = null;
     _playbackCircuitBreaker.setTrack(null);
     _playbackRecoverySongId = null;
     _streamPrefetches.clear();
