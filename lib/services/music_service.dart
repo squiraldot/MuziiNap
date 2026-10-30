@@ -1,9 +1,9 @@
 // ignore_for_file: constant_identifier_names
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:audio_service/audio_service.dart';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
@@ -14,6 +14,7 @@ import '../models/playlist.dart';
 import './utils.dart';
 import '../utils/helper.dart';
 import '../utils/youtube_auth.dart';
+import 'innertube_session_manager.dart';
 import '../models/home_mood.dart';
 import 'constant.dart';
 import 'continuations.dart';
@@ -206,36 +207,18 @@ class MusicServices extends getx.GetxService {
     }
     _headers['X-Origin'] = 'https://music.youtube.com';
 
-    final sapisid = _extractCookie(normalizedCookies, 'SAPISID') ??
-        _extractCookie(normalizedCookies, '__Secure-3PAPISID') ??
-        _extractCookie(normalizedCookies, '__Secure-1PAPISID');
-    if (sapisid == null || sapisid.isEmpty) {
+    try {
+      final sessionManager = InnerTubeSessionManager();
+      await sessionManager.storeCookies(normalizedCookies);
+      _headers.addAll(
+        sessionManager.getAuthenticatedHeaders('https://music.youtube.com'),
+      );
+      return true;
+    } on InnerTubeSessionException catch (error) {
       _headers.remove('authorization');
+      printINFO('YouTube session rejected: ${error.code.name}');
       return false;
     }
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final hash = sha1.convert(
-      utf8.encode('$timestamp $sapisid https://music.youtube.com'),
-    ).toString();
-    final auth = 'SAPISIDHASH ${timestamp}_$hash';
-
-    final sapisid1p = _extractCookie(normalizedCookies, '__Secure-1PAPISID');
-    final sapisid3p = _extractCookie(normalizedCookies, '__Secure-3PAPISID');
-    final authParts = <String>[auth];
-    for (final entry in <String, String?>{
-      'SAPISID1PHASH': sapisid1p,
-      'SAPISID3PHASH': sapisid3p,
-    }.entries) {
-      final sid = entry.value;
-      if (sid == null || sid.isEmpty) continue;
-      final sidHash = sha1
-          .convert(utf8.encode('$timestamp $sid https://music.youtube.com'))
-          .toString();
-      authParts.add(entry.key + ' ' + timestamp.toString() + '_' + sidHash);
-    }
-    _headers['authorization'] = authParts.join(' ');
-    return true;
   }
 
   String? _extractCookie(String cookies, String name) {
@@ -270,6 +253,7 @@ class MusicServices extends getx.GetxService {
   }
 
   void clearAuthCookies() {
+    unawaited(InnerTubeSessionManager().clearCookies());
     _headers['cookie'] = 'CONSENT=YES+1';
     for (final key in [
       'authorization',
@@ -310,34 +294,15 @@ class MusicServices extends getx.GetxService {
 
   Future<Response> _sendRequest(String action, Map<dynamic, dynamic> data,
       {additionalParams = ""}) async {
-    // SAPISIDHASH is timestamped; rebuild it for every request so a
-    // long-lived signed-in session does not start returning 401.
-    final cookies = _headers['cookie'] ?? '';
-    final sapisid = _extractCookie(cookies, 'SAPISID') ??
-        _extractCookie(cookies, '__Secure-3PAPISID') ??
-        _extractCookie(cookies, '__Secure-1PAPISID');
-    if (sapisid != null && sapisid.isNotEmpty) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final authParts = <String>[];
-      final hash = sha1
-          .convert(utf8.encode('$timestamp $sapisid https://music.youtube.com'))
-          .toString();
-      authParts.add('SAPISIDHASH ${timestamp}_$hash');
-
-      final sapisid1p = _extractCookie(cookies, '__Secure-1PAPISID');
-      final sapisid3p = _extractCookie(cookies, '__Secure-3PAPISID');
-      for (final entry in <String, String?>{
-        'SAPISID1PHASH': sapisid1p,
-        'SAPISID3PHASH': sapisid3p,
-      }.entries) {
-        final sid = entry.value;
-        if (sid == null || sid.isEmpty) continue;
-        final sidHash = sha1
-            .convert(utf8.encode('$timestamp $sid https://music.youtube.com'))
-            .toString();
-        authParts.add(entry.key + ' ' + timestamp.toString() + '_' + sidHash);
-      }
-      _headers['authorization'] = authParts.join(' ');
+    // Generate a fresh time-bound authorization hash for every request.
+    try {
+      _headers.addAll(
+        InnerTubeSessionManager()
+            .getAuthenticatedHeaders('https://music.youtube.com'),
+      );
+    } on InnerTubeSessionException {
+      // Preserve anonymous/consent requests when no valid account session exists.
+      _headers.remove('authorization');
     }
     try {
       final response =
