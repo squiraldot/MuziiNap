@@ -45,6 +45,16 @@ void main() {
       );
     });
 
+    test('does not apply the fast deadline when WEB_REMIX is a later fallback', () {
+      expect(
+        StreamProvider.requestTimeoutForClient(
+          'WEB_REMIX',
+          isInitialAttempt: false,
+        ),
+        const Duration(seconds: 5),
+      );
+    });
+
     test('preserves server-issued stream query parameters verbatim', () {
       const signedUrl =
           'https://media.example.com/audio?expire=123&sig=abc%2Fdef&cpn=serverNonce';
