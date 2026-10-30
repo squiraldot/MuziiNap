@@ -430,8 +430,8 @@ void main() {
 
     test('rejects a cache when either stored quality URL is expired', () {
       final entry = cacheEntry(
-        lowUrl: 'https://media.example/audio?expire=1799999999',
-        highUrl: 'https://media.example/audio?expire=1799999999',
+        lowUrl: 'https://media.example/audio?expire=1700000000',
+        highUrl: 'https://media.example/audio?expire=1700000000',
         resolvedAt: now.millisecondsSinceEpoch,
       );
 
