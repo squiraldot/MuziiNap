@@ -345,6 +345,132 @@ void main() {
     });
   });
 
+  group('InnerTube primary race', () {
+    test('returns the first playable response without waiting for slower clients', () async {
+      final slow = Completer<StreamProvider>();
+      final fast = Completer<StreamProvider>();
+      final winner = StreamProvider(
+        playable: true,
+        statusMSG: 'OK',
+        audioFormats: [
+          Audio(
+            itag: 140,
+            audioCodec: Codec.mp4a,
+            bitrate: 128000,
+            duration: 0,
+            loudnessDb: 0,
+            url: 'https://media.example.com/fast',
+            size: 0,
+          ),
+        ],
+      );
+
+      final result = StreamProvider.firstPlayableResult([
+        slow.future,
+        fast.future,
+      ]);
+      fast.complete(winner);
+
+      expect(await result, same(winner));
+      expect(slow.isCompleted, isFalse);
+    });
+
+    test('waits for every primary client to fail before returning failure', () async {
+      final first = Completer<StreamProvider>();
+      final second = Completer<StreamProvider>();
+      final result = StreamProvider.firstPlayableResult([
+        first.future,
+        second.future,
+      ]);
+
+      first.complete(StreamProvider(
+        playable: false,
+        statusMSG: 'WEB_REMIX unavailable',
+      ));
+      second.complete(StreamProvider(
+        playable: false,
+        statusMSG: 'ANDROID unavailable',
+      ));
+
+      final failure = await result;
+      expect(failure.playable, isFalse);
+      expect(failure.statusMSG, 'ANDROID unavailable');
+    });
+  });
+
+  group('Stream URL cache validation', () {
+    final now = DateTime.utc(2026, 10, 30, 12);
+    Map<String, dynamic> cacheEntry({
+      required String lowUrl,
+      required String highUrl,
+      int? resolvedAt,
+      bool includeHeaders = false,
+    }) => {
+      'playable': true,
+      'lowQualityAudio': {'url': lowUrl},
+      'highQualityAudio': {'url': highUrl},
+      if (resolvedAt != null) 'resolvedAt': resolvedAt,
+      if (includeHeaders) 'streamHeaders': <String, String>{},
+    };
+
+    test('accepts cached Piped-style URLs without stream headers', () {
+      final entry = cacheEntry(
+        lowUrl: 'https://piped.example/audio-low',
+        highUrl: 'https://piped.example/audio-high',
+        resolvedAt: now.millisecondsSinceEpoch,
+      );
+
+      expect(
+        StreamProvider.isCachedStreamUsable(entry, now: now),
+        isTrue,
+      );
+    });
+
+    test('rejects a cache when either stored quality URL is expired', () {
+      final entry = cacheEntry(
+        lowUrl: 'https://media.example/audio?expire=1799999999',
+        highUrl: 'https://media.example/audio?expire=1799999999',
+        resolvedAt: now.millisecondsSinceEpoch,
+      );
+
+      expect(
+        StreamProvider.isCachedStreamUsable(entry, now: now),
+        isFalse,
+      );
+    });
+
+    test('uses a bounded cache age for URLs without explicit expiry', () {
+      final fresh = cacheEntry(
+        lowUrl: 'https://piped.example/audio-low',
+        highUrl: 'https://piped.example/audio-high',
+        resolvedAt: now.subtract(const Duration(minutes: 5)).millisecondsSinceEpoch,
+      );
+      final stale = cacheEntry(
+        lowUrl: 'https://piped.example/audio-low',
+        highUrl: 'https://piped.example/audio-high',
+        resolvedAt: now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
+      );
+
+      expect(StreamProvider.isCachedStreamUsable(fresh, now: now), isTrue);
+      expect(StreamProvider.isCachedStreamUsable(stale, now: now), isFalse);
+    });
+
+    test('rejects malformed cache records and missing quality URLs', () {
+      expect(StreamProvider.isCachedStreamUsable(null, now: now), isFalse);
+      expect(
+        StreamProvider.isCachedStreamUsable(
+          cacheEntry(
+            lowUrl: 'https://piped.example/audio-low',
+            highUrl: '',
+            resolvedAt: now.millisecondsSinceEpoch,
+          ),
+          now: now,
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('StreamProvider client fallback order', () {
     test('starts with WEB_REMIX for the primary authenticated request', () {
       expect(
