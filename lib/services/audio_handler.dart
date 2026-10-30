@@ -7,6 +7,7 @@ import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 
 import 'package:hive/hive.dart';
@@ -22,6 +23,7 @@ import '../models/playlist.dart';
 import './equalizer.dart';
 import './stream_service.dart';
 import './device_adaptive_stream_selector.dart';
+import './playback_circuit_breaker.dart';
 import './music_service.dart';
 import './innertube_session_manager.dart';
 import './audio_cache_manager.dart';
@@ -69,6 +71,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   late final String _cacheDir;
   late final Future<void> _cacheDirReady;
   late AudioPlayer _player;
+  late PlaybackCircuitBreaker _playbackCircuitBreaker;
   late MediaLibrary _mediaLibrary;
   // ignore: prefer_typing_uninitialized_variables
   dynamic currentIndex;
@@ -118,6 +121,16 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         androidLoadControl: _deviceStreamProfile.androidLoadControl,
       ),
     );
+    final connectivity = Connectivity();
+    _playbackCircuitBreaker = PlaybackCircuitBreaker(
+      processingStateStream: _player.processingStateStream,
+      playingStream: _player.playingStream,
+      onlineStream: connectivity.onConnectivityChanged.map(_hasNetworkConnection),
+      checkOnline: () async => _hasNetworkConnection(await connectivity.checkConnectivity()),
+      positionProvider: () => _player.position,
+      onFrozen: _recoverFrozenPlayback,
+    );
+    unawaited(_playbackCircuitBreaker.start());
     _cacheDirReady = _createCacheDir();
     _notifyAudioHandlerAboutPlaybackEvents();
     _listenToPlaybackForNextSong();
@@ -362,6 +375,43 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         printERROR('Playback stream error: $e');
       }
       await _recoverFromPlaybackError(e);
+    }));
+  }
+
+  static bool _hasNetworkConnection(List<ConnectivityResult> results) =>
+      results.any((result) => result != ConnectivityResult.none);
+
+  /// Replaces a stream pipe that stopped making progress without emitting an error.
+  Future<void> _recoverFrozenPlayback(Duration cachedPosition, int retryNumber) async {
+    final index = currentIndex;
+    if (index is! int || index < 0 || index >= queue.value.length ||
+        !_player.playing || isPlayingUsingLockCachingSource) {
+      return;
+    }
+    final song = queue.value[index];
+    if (mediaItem.value?.id != song.id) return;
+    final currentUrl = currentSongUrl ?? song.extras?['url']?.toString();
+    if (currentUrl != null && currentUrl.startsWith('file://')) return;
+    final session = _playSessionId;
+    printINFO('Playback pipe frozen for ${song.id}; recovery ${retryNumber}/2');
+    await _player.stop();
+    if (session != _playSessionId || currentIndex != index ||
+        mediaItem.value?.id != song.id) {
+      return;
+    }
+    currentSongUrl = null;
+    final extras = song.extras;
+    extras?.remove('url');
+    extras?.remove('streamHeaders');
+    isSongLoading = true;
+    // Existing newUrl flow bypasses cache and promotes the ANDROID client;
+    // legacy devices retain their WEB_REMIX compatibility policy.
+    unawaited(customAction('playByIndex', {
+      'index': index,
+      'newUrl': true,
+      'position': cachedPosition.inMilliseconds,
+    }).catchError((Object error, StackTrace stackTrace) {
+      _markPlaybackFailed(error);
     }));
   }
 
@@ -818,6 +868,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           await subscription.cancel();
         }
         _playerSubscriptions.clear();
+        await _playbackCircuitBreaker.dispose();
         _streamPrefetches.clear();
         _autoAdvanceSongId = null;
         await _player.dispose();
@@ -830,6 +881,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final isNewUrlReq = extras['newUrl'] ?? false;
         if (!isNewUrlReq) _playbackRecoverySongId = null;
         final currentSong = queue.value[currentIndex];
+        _playbackCircuitBreaker.setTrack(currentSong.id);
         _autoAdvanceSongId = currentSong.id;
         final currentSession = ++_playSessionId;
         isSongLoading = true;
@@ -999,6 +1051,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
+        _playbackCircuitBreaker.setTrack(currMed.id);
         _autoAdvanceSongId = currMed.id;
         final currentSession = ++_playSessionId;
         isSongLoading = true;
@@ -1328,6 +1381,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     // this, a tap-to-play request can finish after dismissal and start audio
     // (and recreate the Android media notification) after stop() returns.
     _playSessionId++;
+    _playbackCircuitBreaker.setTrack(null);
     _playbackRecoverySongId = null;
     _streamPrefetches.clear();
     _autoAdvanceSongId = null;
