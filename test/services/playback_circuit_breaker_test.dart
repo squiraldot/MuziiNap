@@ -45,7 +45,7 @@ void main() {
     test('recovers a continuously buffering active stream while online', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
-      breaker.start();
+      await breaker.start();
       breaker.setTrack('track-1');
       playing.add(true);
       processing.add(ProcessingState.buffering);
@@ -60,7 +60,7 @@ void main() {
     test('does not recover while paused or offline', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
-      breaker.start();
+      await breaker.start();
       breaker.setTrack('track-1');
       online.add(false);
       playing.add(false);
@@ -78,7 +78,7 @@ void main() {
     test('caps recovery at two attempts per track and resets on track change', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
-      breaker.start();
+      await breaker.start();
       breaker.setTrack('track-1');
       playing.add(true);
       processing.add(ProcessingState.loading);
@@ -94,7 +94,7 @@ void main() {
     test('ready state resets the continuous frozen interval', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
-      breaker.start();
+      await breaker.start();
       breaker.setTrack('track-1');
       playing.add(true);
       processing.add(ProcessingState.buffering);
