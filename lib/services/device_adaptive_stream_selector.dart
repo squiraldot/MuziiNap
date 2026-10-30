@@ -83,6 +83,20 @@ class DeviceAdaptiveStreamSelector {
   final DeviceInfoPlugin _deviceInfo;
   final Connectivity _connectivity;
 
+  /// Recognizes native decoder/renderer failures so playback can retry with
+  /// the AAC fallback retained in the low-quality stream slot.
+  static bool isDecoderCompatibilityFailure(Object error) {
+    final message = error.toString().toLowerCase();
+    return const [
+      'decoderinitializationexception',
+      'mediacodecrenderer',
+      'mediacodec',
+      'no suitable decoder',
+      'unsupported audio format',
+      'audio sink',
+    ].any(message.contains);
+  }
+
   Future<DeviceStreamProfile> detect() async {
     int? apiLevel;
     var isLowRamDevice = true;
