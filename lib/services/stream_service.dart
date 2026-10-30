@@ -205,7 +205,9 @@ class StreamProvider {
         language = savedLanguage;
       }
       if (savedCountry != null &&
-          RegExp(r'^[A-Za-z]{2}
+          RegExp(r'^[A-Za-z]{2}$').hasMatch(savedCountry)) {
+        country = savedCountry.toUpperCase();
+      }
       final visitorData = prefs.get('visitorId');
       if (visitorData is Map) {
         visitorId = (visitorData['id'] ?? '').toString();
