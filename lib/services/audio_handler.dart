@@ -397,6 +397,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       results.any((result) => result != ConnectivityResult.none);
 
   Future<void> _failFrozenPlayback() async {
+    _playSessionId++;
+    _isPlaybackRequested = false;
+    _pendingPlaybackPosition = null;
     await _player.stop();
     _markPlaybackFailed(
       StateError('Playback stream remained frozen after two recovery attempts.'),
@@ -921,6 +924,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final songIndex = extras!['index'];
         currentIndex = songIndex;
         final isNewUrlReq = extras['newUrl'] ?? false;
+        final requestPauseGeneration = extras['recoveryPauseGeneration'] is int
+            ? extras['recoveryPauseGeneration'] as int
+            : _manualPauseGeneration;
         if (!isNewUrlReq) _playbackRecoverySongId = null;
         final currentSong = queue.value[currentIndex];
         _isPlaybackRequested = extras['restoreSession'] != true;
@@ -1032,9 +1038,12 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             await _player.seek(Duration(milliseconds: resumePosition));
           }
           final recoveryPauseGeneration = extras['recoveryPauseGeneration'];
-          if (recoveryPauseGeneration is int &&
-              recoveryPauseGeneration != _manualPauseGeneration) {
+          if (!_isPlaybackRequested ||
+              requestPauseGeneration != _manualPauseGeneration ||
+              (recoveryPauseGeneration is int &&
+                  recoveryPauseGeneration != _manualPauseGeneration)) {
             isSongLoading = false;
+            _pendingPlaybackPosition = null;
             playbackState.add(playbackState.value.copyWith(
               playing: false,
               processingState: AudioProcessingState.ready,
@@ -1110,6 +1119,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
+        final requestPauseGeneration = _manualPauseGeneration;
         _isPlaybackRequested = true;
         _pendingPlaybackPosition = Duration.zero;
         _playbackCircuitBreaker.setTrack(currMed.id);
@@ -1155,6 +1165,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
         if (currentSession != _playSessionId) return;
 
+        if (!_isPlaybackRequested ||
+            requestPauseGeneration != _manualPauseGeneration) {
+          isSongLoading = false;
+          _pendingPlaybackPosition = null;
+          playbackState.add(playbackState.value.copyWith(
+            playing: false,
+            processingState: AudioProcessingState.ready,
+            updatePosition: _player.position,
+          ));
+          return;
+        }
         final playFuture = _player.play();
         _pendingPlaybackPosition = null;
         _applyEqualizerAfterPlaybackStarts();
