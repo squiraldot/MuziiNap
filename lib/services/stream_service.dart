@@ -264,7 +264,7 @@ class StreamProvider {
         );
       }
 
-      final audioFormats = _parseInnerTubeFormats(formats);
+      final audioFormats = parseInnerTubeAudioFormats(formats);
       if (audioFormats.isEmpty) {
         return StreamProvider(
           playable: false,
@@ -286,7 +286,7 @@ class StreamProvider {
     }
   }
 
-  static List<Audio> _parseInnerTubeFormats(List<dynamic> formats) {
+  static List<Audio> parseInnerTubeAudioFormats(List<dynamic> formats) {
     final parsed = <Audio>[];
     for (final item in formats) {
       if (item is! Map) continue;
