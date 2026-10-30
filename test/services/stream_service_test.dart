@@ -564,24 +564,24 @@ void main() {
   });
 
   group('InnerTube primary race client preference', () {
-    test('prioritizes WEB_REMIX for the initial authenticated request', () {
+    test('prioritizes VISIONOS before the token-gated web clients', () {
       expect(
-        StreamProvider.clientNamesFor().take(2).toList(),
-        ['WEB_REMIX', 'WEB_EMBEDDED'],
+        StreamProvider.clientNamesFor().take(3).toList(),
+        ['VISIONOS', 'WEB_REMIX', 'WEB_EMBEDDED'],
       );
     });
 
-    test('prioritizes ANDROID after a playback source failure', () {
+    test('keeps VISIONOS primary and promotes ANDROID for recovery', () {
       expect(
-        StreamProvider.clientNamesFor(preferredClient: 'ANDROID').take(2).toList(),
-        ['ANDROID', 'WEB_REMIX'],
+        StreamProvider.clientNamesFor(preferredClient: 'ANDROID').take(3).toList(),
+        ['VISIONOS', 'ANDROID', 'WEB_REMIX'],
       );
     });
 
     test('includes every supported client in the primary race', () {
       expect(
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
-        ['ANDROID', 'WEB_REMIX', 'WEB_EMBEDDED', 'ANDROID_VR',
+        ['VISIONOS', 'ANDROID', 'WEB_REMIX', 'WEB_EMBEDDED', 'ANDROID_VR',
           'TVHTML5_SIMPLY_EMBEDDED_PLAYER'],
       );
     });
