@@ -939,6 +939,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             : _manualPauseGeneration;
         if (!isNewUrlReq) _playbackRecoverySongId = null;
         final currentSong = queue.value[currentIndex];
+        currentSongUrl = null;
         _isPlaybackRequested = extras['restoreSession'] != true;
         final requestedPosition = extras['position'];
         _pendingPlaybackPosition = requestedPosition is int
@@ -1128,6 +1129,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
+        currentSongUrl = null;
         final sourcePauseGeneration = _manualPauseGeneration;
         _isPlaybackRequested = true;
         _pendingPlaybackPosition = Duration.zero;
