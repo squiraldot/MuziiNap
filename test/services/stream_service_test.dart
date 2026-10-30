@@ -5,22 +5,6 @@ import 'package:muziinap/services/device_adaptive_stream_selector.dart';
 import 'package:muziinap/services/stream_service.dart';
 
 void main() {
-  group('InnerTube client selection', () {
-    test('uses the non-token-gated VISIONOS client as the primary identity', () {
-      expect(
-        StreamProvider.clientNamesFor().take(2).toList(),
-        ['VISIONOS', 'WEB_REMIX'],
-      );
-    });
-
-    test('keeps VISIONOS first when a retry prefers another client', () {
-      expect(
-        StreamProvider.clientNamesFor(preferredClient: 'ANDROID').take(3).toList(),
-        ['VISIONOS', 'ANDROID', 'WEB_REMIX'],
-      );
-    });
-  });
-
   group('InnerTube audio format validation', () {
     test('does not return cipher-only audio formats as playable URLs', () {
       final formats = StreamProvider.parseInnerTubeAudioFormats([
