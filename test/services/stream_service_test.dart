@@ -71,6 +71,17 @@ void main() {
       expect(profile.allowsOpus, isFalse);
     });
 
+    test('treats an unavailable API level conservatively', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: null,
+        isLowRamDevice: true,
+        networkType: DeviceNetworkType.wifi,
+      );
+      expect(profile.preferredItag, 140);
+      expect(profile.allowsOpus, isFalse);
+      expect(profile.requiresWebClient, isTrue);
+    });
+
     test('serializes profile for safe transfer into resolver isolate', () {
       const profile = DeviceStreamProfile(
         androidApiLevel: 33,
@@ -134,6 +145,18 @@ void main() {
       expect(selected.map((format) => format.itag), [140]);
     });
 
+    test('cellular data selects AAC even when Opus is also available', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        formats,
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 34,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.mobile,
+        ),
+      );
+      expect(selected.map((format) => format.itag), [140]);
+    });
+
     test('legacy Android excludes Opus and keeps standard AAC', () {
       final selected = StreamProvider.parseInnerTubeAudioFormats(
         formats,
@@ -144,6 +167,31 @@ void main() {
         ),
       );
       expect(selected.map((format) => format.itag), [140]);
+    });
+
+    test('falls back to the preferred codec when the preferred itag is absent', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        [
+          {
+            'itag': 250,
+            'mimeType': 'audio/webm; codecs="opus"',
+            'url': 'https://media.example.com/opus-low',
+            'bitrate': 70000,
+          },
+          {
+            'itag': 141,
+            'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+            'url': 'https://media.example.com/aac-high',
+            'bitrate': 256000,
+          },
+        ],
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 35,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected.map((format) => format.itag), [250]);
     });
 
     test('drops spatial and video-wrapped tracks', () {
