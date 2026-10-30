@@ -184,7 +184,7 @@ Future<void> startApplicationServices() async {
   await Get.putAsync<AudioPlaybackService>(() async {
     final handler = await initAudioService();
     Get.put<AudioHandler>(handler, permanent: true);
-    return AudioPlaybackService(handler);
+    return AudioPlaybackService.create(handler);
   }, permanent: true);
   Get.lazyPut(() => SearchScreenController(), fenix: true);
 }
