@@ -27,6 +27,23 @@ class StreamProvider {
     this.streamHeaders,
   });
 
+  // Reuse one Dio client across tracks so InnerTube requests share the
+  // underlying HttpClient connection pool instead of opening a new socket
+  // for every song. The API key remains sourced from the existing constant.
+  static final String _innerTubeApiKey =
+      Uri.parse('https://music.youtube.com/$fixedParms')
+          .queryParameters['key']!;
+  static final Dio _innerTubeDio = Dio(
+    BaseOptions(
+      connectTimeout: _requestTimeout,
+      sendTimeout: _requestTimeout,
+      receiveTimeout: _requestTimeout,
+    ),
+  )..httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () => HttpClient()
+        ..connectionTimeout = _requestTimeout,
+    );
+
   static const Duration _requestTimeout = Duration(seconds: 5);
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 800);
