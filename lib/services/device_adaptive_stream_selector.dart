@@ -72,7 +72,9 @@ class DeviceStreamProfile {
 
 /// Reads device/network state on the UI/platform isolate. Do not call this
 /// from StreamProvider's Isolate.run resolver; pass [DeviceStreamProfile.toJson]
-/// to that isolate instead.
+/// to that isolate instead. The public just_audio API does not expose the
+/// device's MediaCodec inventory, so actual decoder incompatibility is handled
+/// by retrying with AAC after a native decoder/renderer error.
 class DeviceAdaptiveStreamSelector {
   DeviceAdaptiveStreamSelector({
     DeviceInfoPlugin? deviceInfo,
