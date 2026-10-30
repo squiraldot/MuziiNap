@@ -15,6 +15,7 @@ import './services/downloader.dart';
 import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
+import './services/audio_playback_service.dart';
 import './services/music_service.dart';
 import './ui/intro_video_splash.dart';
 import './ui/player/player_controller.dart';
@@ -41,9 +42,8 @@ Future<void> main() async {
   };
   await initHive();
   _setAppInitPrefs();
-  startApplicationServices();
   await LocalProxy.start();
-  Get.put<AudioHandler>(await initAudioService(), permanent: true);
+  await startApplicationServices();
   WidgetsBinding.instance.addObserver(LifecycleHandler());
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   TerminateRestart.instance.initialize();
@@ -108,7 +108,17 @@ Future<void> startApplicationServices() async {
   Get.lazyPut(() => LibraryAlbumsController(), fenix: true);
   Get.lazyPut(() => LibraryArtistsController(), fenix: true);
   Get.lazyPut(() => SettingsScreenController(), fenix: true);
-  Get.lazyPut(() => Downloader(), fenix: true);
+  // Persistent download work must outlive route/controller disposal.
+  await Get.putAsync<DownloadCacheService>(
+    () async => DownloadCacheService(),
+    permanent: true,
+  );
+  // Keep the platform AudioHandler registered for the whole app process.
+  await Get.putAsync<AudioPlaybackService>(() async {
+    final handler = await initAudioService();
+    Get.put<AudioHandler>(handler, permanent: true);
+    return AudioPlaybackService(handler);
+  }, permanent: true);
   Get.lazyPut(() => SearchScreenController(), fenix: true);
 }
 
