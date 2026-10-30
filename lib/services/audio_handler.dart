@@ -69,6 +69,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   int _playSessionId = 0;
   String? _playbackRecoverySongId;
   int? _activeEqualizerSessionId;
+
+  // Retain every player subscription so the app-scoped owner can cancel it.
+  final List<StreamSubscription<dynamic>> _playerSubscriptions = [];
   EqualizerConfig _equalizerConfig = EqualizerConfig.graphic10Band();
 
   // list of shuffled queue songs ids
@@ -146,7 +149,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   void _listenSessionIdStream() {
-    _player.androidAudioSessionIdStream.listen((int? id) {
+    _playerSubscriptions.add(_player.androidAudioSessionIdStream.listen((int? id) {
       if (id == null || id <= 0) return;
 
       final previousSessionId = _activeEqualizerSessionId;
@@ -158,7 +161,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       // Keep session changes lightweight. DynamicsProcessing is initialized only
       // after playback starts so it cannot block startup or first-track loading.
       EqualizerService.initAudioEffect(id);
-    });
+    }));
   }
 
   void _applyEqualizerAfterPlaybackStarts() {
@@ -178,7 +181,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   void _notifyAudioHandlerAboutPlaybackEvents() {
-    _player.playbackEventStream.listen((PlaybackEvent event) {
+    _playerSubscriptions.add(_player.playbackEventStream.listen((PlaybackEvent event) {
       final playing = _player.playing;
       playbackState.add(playbackState.value.copyWith(
         controls: [
@@ -227,7 +230,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         printERROR('Playback stream error: $e');
       }
       await _recoverFromPlaybackError(e);
-    });
+    }));
   }
 
   Future<void> _recoverFromPlaybackError(Object error) async {
@@ -293,14 +296,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   void _listenToPlaybackForNextSong() {
     const playerDurationOffset = 0;
-    _player.positionStream.listen((value) async {
+    _playerSubscriptions.add(_player.positionStream.listen((value) async {
       if (_player.duration != null && _player.duration?.inSeconds != 0) {
         if (value.inMilliseconds >=
             (_player.duration!.inMilliseconds - playerDurationOffset)) {
           await _triggerNext();
         }
       }
-    });
+    }));
   }
 
   Future<void> _triggerNext() async {
@@ -315,14 +318,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   void _listenForSequenceStateChanges() {
-    _player.sequenceStateStream.listen((SequenceState? sequenceState) {
+    _playerSubscriptions.add(_player.sequenceStateStream.listen((SequenceState? sequenceState) {
       final sequence = sequenceState?.effectiveSequence;
       if (sequence == null || sequence.isEmpty) return;
-    });
+    }));
   }
 
   void _listenForDurationChanges() {
-    _player.durationStream.listen((duration) async {
+    _playerSubscriptions.add(_player.durationStream.listen((duration) async {
       final currQueue = queue.value;
       if (currentIndex == null || currQueue.isEmpty || duration == null) return;
       final currentSong = queue.value[currentIndex];
@@ -330,7 +333,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final newMediaItem = currentSong.copyWith(duration: duration);
         mediaItem.add(newMediaItem);
       }
-    });
+    }));
   }
 
   @override
@@ -558,8 +561,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           EqualizerService.endAudioEffect(_activeEqualizerSessionId!);
           _activeEqualizerSessionId = null;
         }
+        // Cancel all Dart stream listeners before releasing the native player.
+        for (final subscription in _playerSubscriptions) {
+          await subscription.cancel();
+        }
+        _playerSubscriptions.clear();
         await _player.dispose();
-        super.stop();
+        await super.stop();
         break;
 
       case 'playByIndex':
