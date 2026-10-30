@@ -447,7 +447,10 @@ void main() {
 
       final failure = await result;
       expect(failure.playable, isFalse);
-      expect(failure.statusMSG, 'ANDROID unavailable');
+      expect(
+        failure.statusMSG,
+        'WEB_REMIX unavailable; ANDROID unavailable',
+      );
     });
   });
 
