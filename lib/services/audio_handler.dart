@@ -75,6 +75,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   int _playSessionId = 0;
   String? _playbackRecoverySongId;
   int? _activeEqualizerSessionId;
+  double _baseOutputVolume = 1.0;
+  bool _audioFocusDucked = false;
+  int _volumeFadeGeneration = 0;
 
   // Retain every player subscription so the app-scoped owner can cancel it.
   final List<StreamSubscription<dynamic>> _playerSubscriptions = [];
@@ -153,6 +156,60 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   Future<void> _createCacheDir() async {
     _cacheDir = (await getTemporaryDirectory()).path;
     await Directory('$_cacheDir/cachedSongs').create(recursive: true);
+  }
+
+  /// Applies the user's output level while respecting temporary audio-focus
+  /// ducking. The base level is never overwritten by an interruption.
+  Future<void> _applyOutputVolume({bool smooth = false}) async {
+    final target = (_baseOutputVolume * (_audioFocusDucked ? 0.2 : 1.0))
+        .clamp(0.0, 1.0)
+        .toDouble();
+    final start = _player.volume;
+    final generation = ++_volumeFadeGeneration;
+    if (!smooth || (target - start).abs() < 0.001) {
+      await _player.setVolume(target);
+      return;
+    }
+
+    // Five short linear steps provide a brief fade without introducing a
+    // timer that can outlive the app-scoped player.
+    for (var step = 1; step <= 5; step++) {
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      if (generation != _volumeFadeGeneration) return;
+      final next = start + ((target - start) * step / 5);
+      await _player.setVolume(next.clamp(0.0, 1.0).toDouble());
+    }
+  }
+
+  Future<void> _setBaseOutputVolume(double volume) async {
+    _baseOutputVolume = volume.clamp(0.0, 1.0).toDouble();
+    await _applyOutputVolume(smooth: _audioFocusDucked);
+  }
+
+  Future<void> _duckForAudioFocus() async {
+    if (_audioFocusDucked) return;
+    _audioFocusDucked = true;
+    await _applyOutputVolume(smooth: true);
+  }
+
+  Future<void> _restoreAfterAudioFocus() async {
+    if (!_audioFocusDucked) return;
+    _audioFocusDucked = false;
+    await _applyOutputVolume(smooth: true);
+  }
+
+  Future<void> _pauseForAudioFocus() async {
+    _audioFocusDucked = false;
+    await _applyOutputVolume(smooth: true);
+    await _player.pause();
+  }
+
+  Future<void> _pauseForBecomingNoisy() async {
+    // Do not fade first: route removal should stop output immediately.
+    _audioFocusDucked = false;
+    _volumeFadeGeneration++;
+    await _player.pause();
+    await _player.setVolume(_baseOutputVolume);
   }
 
   /// Run cache cleanup serially so rapid skips cannot race file deletion.
@@ -876,7 +933,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         await _serializeAudioSetting(() async {
           loudnessNormalizationEnabled = enable;
           if (!enable) {
-            await _player.setVolume(1.0);
+            await _setBaseOutputVolume(1.0);
             return;
           }
 
@@ -1014,7 +1071,23 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       case 'setVolume':
         final rawValue = extras!['value'];
         final value = (rawValue as num).toDouble().clamp(0.0, 100.0);
-        await _player.setVolume(value / 100.0);
+        await _setBaseOutputVolume(value / 100.0);
+        break;
+
+      case 'audioFocusDuck':
+        await _duckForAudioFocus();
+        break;
+
+      case 'audioFocusRestore':
+        await _restoreAfterAudioFocus();
+        break;
+
+      case 'audioFocusPause':
+        await _pauseForAudioFocus();
+        break;
+
+      case 'audioFocusNoisy':
+        await _pauseForBecomingNoisy();
         break;
 
       case 'shuffleCmd':
@@ -1065,7 +1138,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final volumeAdjustment = pow(10.0, loudnessDifference / 20.0);
     printINFO(
         "loudness:$currentLoudnessDb Normalized volume: $volumeAdjustment");
-    await _player.setVolume(volumeAdjustment.toDouble().clamp(0, 1.0));
+    await _setBaseOutputVolume(volumeAdjustment.toDouble().clamp(0, 1.0));
   }
 
   Future<void> saveSessionData() async {
