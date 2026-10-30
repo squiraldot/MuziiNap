@@ -1582,7 +1582,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         );
         final streamInfoJson = resolved.hmStreamingData
           ..['deviceProfile'] = deviceProfileJson
-          ..['resolvedAt'] = DateTime.now().millisecondsSinceEpoch;
+          ..['resolvedAt'] = DateTime.now().millisecondsSinceEpoch
+          ..['streamResolverVersion'] = StreamProvider.streamResolverVersion;
         streamInfo = HMStreamingData.fromJson(streamInfoJson);
         if (streamInfo.playable) {
           songsUrlCacheBox.put(songId, streamInfoJson);
