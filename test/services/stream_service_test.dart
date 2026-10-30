@@ -431,8 +431,9 @@ void main() {
       bool includeHeaders = false,
     }) => {
       'playable': true,
-      'lowQualityAudio': {'url': lowUrl},
-      'highQualityAudio': {'url': highUrl},
+      'statusMSG': 'OK',
+      'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': lowUrl},
+      'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': highUrl},
       if (resolvedAt != null) 'resolvedAt': resolvedAt,
       if (includeHeaders) 'streamHeaders': <String, String>{},
     };
