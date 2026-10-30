@@ -7,6 +7,8 @@ import 'package:dio/io.dart';
 import 'package:hive/hive.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'device_adaptive_stream_selector.dart';
+
 import '../utils/helper.dart';
 import 'constant.dart';
 
@@ -99,6 +101,7 @@ class StreamProvider {
     bool preferYoutubeExplode = false,
     String? preferredClient,
     Map<String, String>? authenticatedHeaders,
+    DeviceStreamProfile? deviceProfile,
   }) async {
     // Retain the legacy argument for source compatibility. Client selection
     // is deterministic; the caller may promote a different context on retry.
@@ -137,19 +140,27 @@ class StreamProvider {
       visitorId,
       preferredClient: preferredClient,
       authenticatedHeaders: authenticatedHeaders,
+      deviceProfile: deviceProfile,
     );
     if (innerTube.playable) return innerTube;
     if (innerTube.statusMSG.isNotEmpty) lastFailure = innerTube.statusMSG;
 
     // 2. Secondary: YouTubeExplode is invoked only after all primary clients
     // fail to provide at least one validated direct audio URL.
-    final youtubeExplode = await _fetchYoutubeExplode(cleanId);
+    final youtubeExplode = await _fetchYoutubeExplode(
+      cleanId,
+      deviceProfile: deviceProfile,
+    );
     if (youtubeExplode != null && youtubeExplode.playable) {
       return youtubeExplode;
     }
 
     // 3. Optional last resort: configured/public Piped instances.
-    final piped = await _fetchPipedStreams(cleanId, pipedInstances);
+    final piped = await _fetchPipedStreams(
+      cleanId,
+      pipedInstances,
+      deviceProfile: deviceProfile,
+    );
     if (piped != null && piped.playable) return piped;
 
     return StreamProvider(playable: false, statusMSG: lastFailure);
@@ -249,6 +260,7 @@ class StreamProvider {
     String visitorId, {
     String? preferredClient,
     Map<String, String>? authenticatedHeaders,
+    DeviceStreamProfile? deviceProfile,
   }) async {
     var lastFailure = 'All InnerTube clients failed';
     final clients = _orderedClients(preferredClient);
@@ -268,6 +280,7 @@ class StreamProvider {
           visitorId: visitorId,
           authenticatedHeaders: authenticatedHeaders,
           requestTimeout: requestTimeout,
+          deviceProfile: deviceProfile,
         );
 
         if (result.playable) return result;
@@ -297,6 +310,7 @@ class StreamProvider {
     required String visitorId,
     Map<String, String>? authenticatedHeaders,
     required Duration requestTimeout,
+    DeviceStreamProfile? deviceProfile,
   }) async {
     final cancelToken = CancelToken();
     final timeoutTimer = Timer(
@@ -386,7 +400,10 @@ class StreamProvider {
         );
       }
 
-      final audioFormats = parseInnerTubeAudioFormats(formats);
+      final audioFormats = parseInnerTubeAudioFormats(
+        formats,
+        profile: deviceProfile,
+      );
       if (audioFormats.isEmpty) {
         final hasCipherOnlyAudio = formats.any((item) =>
             item is Map &&
@@ -416,14 +433,18 @@ class StreamProvider {
     }
   }
 
-  static List<Audio> parseInnerTubeAudioFormats(List<dynamic> formats) {
+  static List<Audio> parseInnerTubeAudioFormats(
+    List<dynamic> formats, {
+    DeviceStreamProfile? profile,
+  }) {
     final parsed = <Audio>[];
     for (final item in formats) {
       if (item is! Map) continue;
       final mimeType = item['mimeType']?.toString();
       final rawUrl = item['url']?.toString();
       if (!isAudioMimeType(mimeType) ||
-          !isValidAudioFormatUrl(rawUrl)) {
+          !isValidAudioFormatUrl(rawUrl) ||
+          _isSpatialOrWrappedAudio(item)) {
         // signatureCipher/cipher-only formats are intentionally not selected:
         // this extractor does not currently implement player-JS deciphering.
         continue;
@@ -442,10 +463,65 @@ class StreamProvider {
         size: _asInt(item['contentLength']),
       ));
     }
-    return _sortFormats(parsed);
+    return _applyDeviceProfile(parsed, profile);
   }
 
-  static Future<StreamProvider?> _fetchYoutubeExplode(String videoId) async {
+  static bool _isSpatialOrWrappedAudio(Map item) {
+    if (item['isSpatialAudio'] == true || item['isSpatialAudioTrack'] == true) {
+      return true;
+    }
+
+    for (final key in const ['spatialAudioType', 'audioSpatialFormat']) {
+      final value = item[key]?.toString().trim().toLowerCase();
+      if (value != null &&
+          value.isNotEmpty &&
+          value != 'none' &&
+          value != 'false' &&
+          value != '0') {
+        return true;
+      }
+    }
+
+    final trackType = item['audioTrackType']?.toString().toLowerCase();
+    if (trackType != null && trackType.contains('spatial')) return true;
+    final track = item['audioTrack'];
+    if (track is Map) {
+      final nestedType = track['audioTrackType']?.toString().toLowerCase();
+      if (nestedType != null && nestedType.contains('spatial')) return true;
+      if (track['isSpatialAudio'] == true) return true;
+    } else if (track is String && track.toLowerCase().contains('spatial')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Keeps the requested itag when available, then falls back to the same
+  /// codec. Legacy Android is intentionally AAC-only; other profiles may use
+  /// the alternate audio codec if the preferred codec is absent.
+  static List<Audio> _applyDeviceProfile(
+    List<Audio> formats,
+    DeviceStreamProfile? profile,
+  ) {
+    if (profile == null || formats.isEmpty) return _sortFormats(formats);
+
+    final preferredItag =
+        formats.where((format) => format.itag == profile.preferredItag).toList();
+    if (preferredItag.isNotEmpty) return _sortFormats(preferredItag);
+
+    final preferredCodec = profile.prefersOpus ? Codec.opus : Codec.mp4a;
+    final codecMatches = formats
+        .where((format) => format.audioCodec == preferredCodec)
+        .toList();
+    if (codecMatches.isNotEmpty) return _sortFormats(codecMatches);
+
+    if (profile.isLegacyAndroid) return <Audio>[];
+    return _sortFormats(formats);
+  }
+
+  static Future<StreamProvider?> _fetchYoutubeExplode(
+    String videoId, {
+    DeviceStreamProfile? deviceProfile,
+  }) async {
     final yt = YoutubeExplode();
     try {
       final manifest = await yt.videos.streamsClient
@@ -457,7 +533,7 @@ class StreamProvider {
       }).toList();
 
       if (audio.isEmpty) return null;
-      final formats = audio.map((stream) => Audio(
+      final formats = _applyDeviceProfile(audio.map((stream) => Audio(
         itag: stream.tag,
         audioCodec: _codecFromName(stream.audioCodec)!,
         bitrate: stream.bitrate.bitsPerSecond,
@@ -465,13 +541,14 @@ class StreamProvider {
         loudnessDb: 0.0,
         url: stream.url.toString(),
         size: stream.size.totalBytes,
-      )).toList();
+      )).toList(), deviceProfile);
 
+      if (formats.isEmpty) return null;
       printINFO('YouTubeExplode fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
         statusMSG: 'OK',
-        audioFormats: _sortFormats(formats),
+        audioFormats: formats,
         streamHeaders: {
           'User-Agent':
               'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
@@ -488,8 +565,9 @@ class StreamProvider {
 
   static Future<StreamProvider?> _fetchPipedStreams(
     String videoId,
-    List<String> instances,
-  ) async {
+    List<String> instances, {
+    DeviceStreamProfile? deviceProfile,
+  }) async {
     if (instances.isEmpty) return null;
 
     // Piped remains the final provider fallback. Its configured instances may
@@ -574,12 +652,13 @@ class StreamProvider {
         ));
       }
 
-      if (formats.isEmpty) return null;
+      final selectedFormats = _applyDeviceProfile(formats, deviceProfile);
+      if (selectedFormats.isEmpty) return null;
       printINFO('Piped last-resort fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
         statusMSG: 'OK',
-        audioFormats: _sortFormats(formats),
+        audioFormats: selectedFormats,
       );
     } catch (error) {
       printINFO('Piped fallback failed: $error');
