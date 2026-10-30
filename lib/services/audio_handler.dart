@@ -393,12 +393,19 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     }));
   }
 
+  bool _isLocalAudioUrl(String? rawUrl) {
+    if (rawUrl == null) return false;
+    if (rawUrl.startsWith('file://')) return true;
+    final uri = Uri.tryParse(rawUrl);
+    return uri != null && uri.scheme.isEmpty && rawUrl.startsWith('/');
+  }
+
   bool _shouldMonitorNetworkPlayback() {
     if (!_isPlaybackRequested || isPlayingUsingLockCachingSource) return false;
     final index = currentIndex;
     if (index is int && index >= 0 && index < queue.value.length) {
       final url = currentSongUrl ?? queue.value[index].extras?['url']?.toString();
-      if (url != null && url.startsWith('file://')) return false;
+      if (_isLocalAudioUrl(url)) return false;
     }
     return true;
   }
@@ -427,7 +434,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final song = queue.value[index];
     if (mediaItem.value?.id != song.id) return;
     final currentUrl = currentSongUrl ?? song.extras?['url']?.toString();
-    if (currentUrl != null && currentUrl.startsWith('file://')) return;
+    if (_isLocalAudioUrl(currentUrl)) return;
     final session = _playSessionId;
     final pauseGeneration = _manualPauseGeneration;
     printINFO('Playback pipe frozen for ${song.id}; recovery ${retryNumber}/2');
