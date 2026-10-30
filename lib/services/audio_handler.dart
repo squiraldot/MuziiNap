@@ -162,6 +162,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     _audioCacheTrimQueue = _audioCacheTrimQueue.then((_) async {
       await _cacheDirReady;
       final protectedIds = queue.value.map((item) => item.id).toSet();
+      // The currently audible item may temporarily be removed from the
+      // editable queue. Keep its cache file protected until playback changes.
+      final activeSongId = mediaItem.value?.id;
+      if (activeSongId != null) protectedIds.add(activeSongId);
       final result = await AudioCacheManager.trimDirectory(
         Directory('$_cacheDir/cachedSongs'),
         protectedSongIds: protectedIds,
