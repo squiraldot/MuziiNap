@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:hive/hive.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
@@ -25,6 +26,26 @@ class StreamProvider {
   });
 
   static const Duration _requestTimeout = Duration(seconds: 5);
+  static const Duration _initialHandshakeTimeout =
+      Duration(milliseconds: 800);
+
+  // Reuse one IO client so repeated player requests share pooled keep-alive
+  // connections instead of paying a fresh TCP/TLS handshake on every track.
+  static final Dio _innerTubeDio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 4),
+    sendTimeout: _requestTimeout,
+    receiveTimeout: _requestTimeout,
+    responseType: ResponseType.json,
+    validateStatus: (status) => status != null,
+  ))..httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        return HttpClient()
+          ..connectionTimeout = const Duration(seconds: 4)
+          ..idleTimeout = const Duration(seconds: 30)
+          ..maxConnectionsPerHost = 6;
+      },
+    );
+
   static const String _innerTubeApiKey =
       'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
 
@@ -43,6 +64,34 @@ class StreamProvider {
   static bool isAudioMimeType(String? mimeType) {
     if (mimeType == null) return false;
     return mimeType.trim().toLowerCase().startsWith('audio/');
+  }
+
+  /// Validates a server-issued stream URL without rewriting its signed query.
+  /// Mutating cpn/signature/n/expiry can invalidate a provider-issued URL.
+  static String prepareStreamUrl(String rawUrl) {
+    final normalized = rawUrl.trim();
+    if (!isValidAudioFormatUrl(normalized)) {
+      throw FormatException('Expected an absolute HTTPS media URL');
+    }
+    return normalized;
+  }
+
+  /// Native media headers only; never forward account cookies or InnerTube
+  /// authorization headers to a separate media host.
+  static Map<String, String> buildMediaRequestHeaders(String userAgent) => {
+        'User-Agent': userAgent,
+        'Accept': '*/*',
+      };
+
+  /// A slow initial WEB_REMIX handshake is cancelled before trying ANDROID.
+  static Duration requestTimeoutForClient(
+    String clientName, {
+    bool isInitialAttempt = true,
+  }) {
+    if (clientName == 'WEB_REMIX' && isInitialAttempt) {
+      return _initialHandshakeTimeout;
+    }
+    return _requestTimeout;
   }
 
   static Future<StreamProvider> fetch(
@@ -202,7 +251,13 @@ class StreamProvider {
     Map<String, String>? authenticatedHeaders,
   }) async {
     var lastFailure = 'All InnerTube clients failed';
-    for (final client in _orderedClients(preferredClient)) {
+    final clients = _orderedClients(preferredClient);
+    for (var index = 0; index < clients.length; index++) {
+      final client = clients[index];
+      final requestTimeout = requestTimeoutForClient(
+        client.name,
+        isInitialAttempt: index == 0,
+      );
       try {
         final result = await _fetchInnerTube(
           videoId: videoId,
@@ -212,16 +267,21 @@ class StreamProvider {
           clientId: client.id,
           visitorId: visitorId,
           authenticatedHeaders: authenticatedHeaders,
-        ).timeout(_requestTimeout);
+          requestTimeout: requestTimeout,
+        );
 
         if (result.playable) return result;
         if (result.statusMSG.isNotEmpty) {
           lastFailure = '${client.name}: ${result.statusMSG}';
         }
       } on TimeoutException {
-        lastFailure = '${client.name}: request timed out';
+        lastFailure =
+            '${client.name}: request timed out after ${requestTimeout.inMilliseconds} ms';
       } catch (error) {
-        lastFailure = '${client.name}: request failed';
+        lastFailure = error is DioException &&
+                error.type == DioExceptionType.cancel
+            ? '${client.name}: handshake exceeded ${requestTimeout.inMilliseconds} ms'
+            : '${client.name}: request failed';
         printINFO('InnerTube ${client.name} failed: $error');
       }
     }
@@ -236,14 +296,13 @@ class StreamProvider {
     required String clientId,
     required String visitorId,
     Map<String, String>? authenticatedHeaders,
+    required Duration requestTimeout,
   }) async {
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 4),
-      sendTimeout: _requestTimeout,
-      receiveTimeout: _requestTimeout,
-      responseType: ResponseType.json,
-      validateStatus: (status) => status != null,
-    ));
+    final cancelToken = CancelToken();
+    final timeoutTimer = Timer(
+      requestTimeout,
+      () => cancelToken.cancel('InnerTube handshake deadline exceeded'),
+    );
     try {
       final uri = Uri.parse(
         'https://music.youtube.com/youtubei/v1/player?key=$_innerTubeApiKey',
@@ -254,6 +313,8 @@ class StreamProvider {
         'x-youtube-client-name': clientId,
         'x-youtube-client-version': clientVersion,
         'user-agent': userAgent,
+        // HttpClient retains HTTP/1.1 connections in its shared pool.
+        'connection': 'keep-alive',
       };
       if (visitorId.isNotEmpty) {
         headers['x-goog-visitor-id'] = visitorId;
@@ -268,16 +329,21 @@ class StreamProvider {
       };
       if (visitorId.isNotEmpty) clientContext['visitorData'] = visitorId;
 
-      final response = await dio.post<dynamic>(
+      final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
-        options: Options(headers: headers),
+        cancelToken: cancelToken,
+        options: Options(
+          headers: headers,
+          sendTimeout: requestTimeout,
+          receiveTimeout: requestTimeout,
+        ),
         data: {
           'context': {'client': clientContext, 'user': <String, dynamic>{}},
           'videoId': videoId,
           'contentCheckOk': true,
           'racyCheckOk': true,
         },
-      ).timeout(_requestTimeout);
+      );
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(
           playable: false,
@@ -343,10 +409,10 @@ class StreamProvider {
         statusMSG: 'OK',
         audioFormats: audioFormats,
         // Never forward account cookies to googlevideo media hosts.
-        streamHeaders: {'User-Agent': userAgent},
+        streamHeaders: buildMediaRequestHeaders(userAgent),
       );
     } finally {
-      dio.close(force: true);
+      timeoutTimer.cancel();
     }
   }
 
