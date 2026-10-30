@@ -745,8 +745,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (userAgent == null) {
             userAgent = Util.getUserAgent(context, "just_audio");
         }
+        // Keep native media requests resilient to slow OEM radios and brief
+        // background scheduling stalls. ExoPlayer's DefaultHttpDataSource
+        // already maps DataSpec.position/length to HTTP Range requests; do not
+        // replace or rewrite Range headers in an interceptor.
         DefaultHttpDataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
             .setUserAgent(userAgent)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
             .setAllowCrossProtocolRedirects(true);
         if (stringHeaders != null && stringHeaders.size() > 0) {
             httpDataSourceFactory.setDefaultRequestProperties(stringHeaders);
