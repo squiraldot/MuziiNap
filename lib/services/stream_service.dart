@@ -45,14 +45,29 @@ class StreamProvider {
     DateTime? now,
     Duration maxAge = _urlCacheMaxAge,
   }) {
-    if (cacheEntry is! Map || cacheEntry['playable'] != true) return false;
+    if (cacheEntry is! Map ||
+        cacheEntry['playable'] != true ||
+        cacheEntry['statusMSG'] is! String) {
+      return false;
+    }
 
     final lowQuality = cacheEntry['lowQualityAudio'];
     final highQuality = cacheEntry['highQualityAudio'];
     if (lowQuality is! Map ||
         highQuality is! Map ||
+        lowQuality['audioCodec'] is! String ||
+        highQuality['audioCodec'] is! String ||
         !isValidAudioFormatUrl(lowQuality['url']?.toString()) ||
         !isValidAudioFormatUrl(highQuality['url']?.toString())) {
+      return false;
+    }
+
+    final headers = cacheEntry['streamHeaders'];
+    if (headers != null &&
+        (headers is! Map ||
+            headers.entries.any(
+              (entry) => entry.key is! String || entry.value is! String,
+            ))) {
       return false;
     }
 
