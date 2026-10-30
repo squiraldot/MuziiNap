@@ -220,7 +220,8 @@ class StreamProvider {
       // make one bounded refresh attempt before asking the player endpoint.
       if (visitorId.isEmpty && refreshVisitorId != null) {
         try {
-          final refreshed = await refreshVisitorId();
+          final refreshed = await refreshVisitorId()
+              .timeout(const Duration(seconds: 3));
           if (refreshed != null && refreshed.trim().isNotEmpty) {
             visitorId = refreshed.trim();
             await prefs.put('visitorId', {
@@ -260,7 +261,8 @@ class StreamProvider {
     final visitorRejected = normalizedFailure.contains('visitor');
     if (visitorRejected && refreshVisitorId != null) {
       try {
-        final refreshed = await refreshVisitorId();
+        final refreshed = await refreshVisitorId()
+            .timeout(const Duration(seconds: 3));
         if (refreshed != null && refreshed.trim().isNotEmpty) {
           visitorId = refreshed.trim();
           try {
