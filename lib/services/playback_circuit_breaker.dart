@@ -12,7 +12,7 @@ class PlaybackCircuitBreaker {
     required Stream<bool> playingStream,
     required Stream<bool> onlineStream,
     required Stream<bool> loadingIntentStream,
-    required bool Function() isPlaybackRequested,
+    required bool Function() shouldMonitorPlayback,
     required Future<bool> Function() checkOnline,
     required Duration Function() positionProvider,
     required Future<void> Function(Duration position, int retryNumber) onFrozen,
@@ -23,7 +23,7 @@ class PlaybackCircuitBreaker {
         _playingStream = playingStream,
         _onlineStream = onlineStream,
         _loadingIntentStream = loadingIntentStream,
-        _isPlaybackRequested = isPlaybackRequested,
+        _shouldMonitorPlayback = shouldMonitorPlayback,
         _checkOnline = checkOnline,
         _positionProvider = positionProvider,
         _onFrozen = onFrozen,
@@ -40,7 +40,7 @@ class PlaybackCircuitBreaker {
   final Stream<bool> _playingStream;
   final Stream<bool> _onlineStream;
   final Stream<bool> _loadingIntentStream;
-  final bool Function() _isPlaybackRequested;
+  final bool Function() _shouldMonitorPlayback;
   final Future<bool> Function() _checkOnline;
   final Duration Function() _positionProvider;
   final Future<void> Function(Duration position, int retryNumber) _onFrozen;
@@ -119,8 +119,8 @@ class PlaybackCircuitBreaker {
         _recovering ||
         _trackId == null ||
         !_isOnline ||
-        !(_isPlaying || _isPlaybackRequested()) ||
-        !(isFrozenState(_processingState) || _isLoadingIntent) ||
+        !(_isPlaying || _isLoadingIntent) ||
+        !_shouldMonitorPlayback() ||
         _exhausted) {
       _cancelFrozenTimer();
       return;
@@ -135,8 +135,8 @@ class PlaybackCircuitBreaker {
         _recovering ||
         _trackId == null ||
         !_isOnline ||
-        !(_isPlaying || _isPlaybackRequested()) ||
-        !(isFrozenState(_processingState) || _isLoadingIntent) ||
+        !(_isPlaying || _isLoadingIntent) ||
+        !_shouldMonitorPlayback() ||
         _exhausted) {
       _evaluate();
       return;
