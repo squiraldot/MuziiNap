@@ -9,14 +9,18 @@ void main() {
     late StreamController<ProcessingState> processing;
     late StreamController<bool> playing;
     late StreamController<bool> online;
+    late StreamController<bool> loadingIntent;
     late Duration position;
+    var playbackRequested = false;
     var exhaustedCount = 0;
 
     setUp(() {
       processing = StreamController<ProcessingState>.broadcast();
       playing = StreamController<bool>.broadcast();
       online = StreamController<bool>.broadcast();
+      loadingIntent = StreamController<bool>.broadcast();
       position = const Duration(seconds: 42);
+      playbackRequested = false;
       exhaustedCount = 0;
     });
 
@@ -24,6 +28,7 @@ void main() {
       await processing.close();
       await playing.close();
       await online.close();
+      await loadingIntent.close();
     });
 
     PlaybackCircuitBreaker createBreaker(
@@ -34,6 +39,8 @@ void main() {
         processingStateStream: processing.stream,
         playingStream: playing.stream,
         onlineStream: online.stream,
+        loadingIntentStream: loadingIntent.stream,
+        isPlaybackRequested: () => playbackRequested,
         checkOnline: () async => true,
         positionProvider: () => position,
         frozenThreshold: const Duration(milliseconds: 20),
@@ -62,6 +69,19 @@ void main() {
       await breaker.dispose();
     });
 
+    test('recovers a stuck handler loading spinner before player play starts', () async {
+      final recoveries = <(Duration, int)>[];
+      final breaker = createBreaker(recoveries);
+      await breaker.start();
+      breaker.setTrack('track-1');
+      playbackRequested = true;
+      loadingIntent.add(true);
+      // The just_audio playing stream is still false while setAudioSource is loading.
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+      expect(recoveries, hasLength(1));
+      expect(recoveries.single.$1, position);
+      await breaker.dispose();
+    });
     test('does not recover while paused or offline', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
