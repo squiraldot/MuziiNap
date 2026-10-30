@@ -221,14 +221,6 @@ class MusicServices extends getx.GetxService {
     }
   }
 
-  String? _extractCookie(String cookies, String name) {
-    final match = RegExp(
-      '(^|;\\s*)${RegExp.escape(name)}=([^;]*)',
-      caseSensitive: true,
-    ).firstMatch(cookies);
-    return match?.group(2);
-  }
-
   Future<bool> validateYouTubeSession() async {
     await ensureReady();
     try {
