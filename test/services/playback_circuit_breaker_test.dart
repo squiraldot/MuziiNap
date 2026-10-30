@@ -10,12 +10,14 @@ void main() {
     late StreamController<bool> playing;
     late StreamController<bool> online;
     late Duration position;
+    var exhaustedCount = 0;
 
     setUp(() {
       processing = StreamController<ProcessingState>.broadcast();
       playing = StreamController<bool>.broadcast();
       online = StreamController<bool>.broadcast();
       position = const Duration(seconds: 42);
+      exhaustedCount = 0;
     });
 
     tearDown(() async {
@@ -38,6 +40,9 @@ void main() {
         maxRetriesPerTrack: maxRetries,
         onFrozen: (cachedPosition, retry) async {
           recoveries.add((cachedPosition, retry));
+        },
+        onRetriesExhausted: () async {
+          exhaustedCount++;
         },
       );
     }
@@ -84,10 +89,12 @@ void main() {
       processing.add(ProcessingState.loading);
       await Future<void>.delayed(const Duration(milliseconds: 65));
       expect(recoveries.map((item) => item.$2), [1, 2]);
+      expect(exhaustedCount, 1);
 
       breaker.setTrack('track-2');
       await Future<void>.delayed(const Duration(milliseconds: 35));
       expect(recoveries.map((item) => item.$2), [1, 2, 1]);
+      expect(exhaustedCount, 1);
       await breaker.dispose();
     });
 
