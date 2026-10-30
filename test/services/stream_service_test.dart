@@ -377,6 +377,28 @@ void main() {
       expect(slow.isCompleted, isFalse);
     });
 
+    test('invokes the winner callback once when a client succeeds', () async {
+      final first = Completer<StreamProvider>();
+      final second = Completer<StreamProvider>();
+      var cancelledLosers = 0;
+      final result = StreamProvider.firstPlayableResult(
+        [first.future, second.future],
+        onWinner: () => cancelledLosers++,
+      );
+
+      first.complete(StreamProvider(
+        playable: true,
+        statusMSG: 'OK',
+      ));
+      second.complete(StreamProvider(
+        playable: true,
+        statusMSG: 'late result',
+      ));
+
+      expect((await result).playable, isTrue);
+      expect(cancelledLosers, 1);
+    });
+
     test('waits for every primary client to fail before returning failure', () async {
       final first = Completer<StreamProvider>();
       final second = Completer<StreamProvider>();
