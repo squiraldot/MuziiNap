@@ -302,14 +302,14 @@ void main() {
       );
     });
 
-    test('uses the normal timeout for fallback clients', () {
+    test('uses the normal timeout for other clients in the race', () {
       expect(
         StreamProvider.requestTimeoutForClient('ANDROID'),
         const Duration(seconds: 5),
       );
     });
 
-    test('does not apply the fast deadline when WEB_REMIX is a later fallback', () {
+    test('does not apply the fast deadline when WEB_REMIX is later in the race', () {
       expect(
         StreamProvider.requestTimeoutForClient(
           'WEB_REMIX',
@@ -523,22 +523,22 @@ void main() {
     });
   });
 
-  group('StreamProvider client fallback order', () {
-    test('starts with WEB_REMIX for the primary authenticated request', () {
+  group('InnerTube primary race client preference', () {
+    test('prioritizes WEB_REMIX for the initial authenticated request', () {
       expect(
         StreamProvider.clientNamesFor().take(2).toList(),
         ['WEB_REMIX', 'ANDROID'],
       );
     });
 
-    test('moves ANDROID to the front after a playback source failure', () {
+    test('prioritizes ANDROID after a playback source failure', () {
       expect(
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID').take(2).toList(),
         ['ANDROID', 'WEB_REMIX'],
       );
     });
 
-    test('keeps remaining supported clients as deterministic fallbacks', () {
+    test('includes every supported client in the primary race', () {
       expect(
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
         ['ANDROID', 'WEB_REMIX', 'ANDROID_VR',
