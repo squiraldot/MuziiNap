@@ -21,6 +21,7 @@ import '../models/playlist.dart';
 import './equalizer.dart';
 import './stream_service.dart';
 import './music_service.dart';
+import './innertube_session_manager.dart';
 import '../models/hm_streaming_data.dart';
 import '../models/equalizer.dart';
 import '../ui/player/player_controller.dart';
@@ -1130,6 +1131,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       if (streamInfo == null) {
         final token = RootIsolateToken.instance;
+        Map<String, String>? authenticatedHeaders;
+        try {
+          authenticatedHeaders = InnerTubeSessionManager()
+              .getAuthenticatedHeaders('https://music.youtube.com');
+        } on InnerTubeSessionException {
+          // Anonymous extraction remains available when no account session exists.
+        }
+        // A first attempt uses WEB_REMIX. On URL/source refresh, promote
+        // ANDROID so the retry changes client context instead of replaying
+        // the same failed direct URL.
+        final preferredClient = generateNewUrl ? 'ANDROID' : 'WEB_REMIX';
         Map<String, dynamic>? streamInfoJson;
         try {
           streamInfoJson = await Isolate.run(
@@ -1137,6 +1149,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
               songId,
               token,
               preferYoutubeExplode: generateNewUrl,
+              preferredClient: preferredClient,
+              authenticatedHeaders: authenticatedHeaders,
             ),
           );
         } catch (e) {
@@ -1145,6 +1159,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
             songId,
             token,
             preferYoutubeExplode: generateNewUrl,
+            preferredClient: preferredClient,
+            authenticatedHeaders: authenticatedHeaders,
           );
         }
         streamInfo = HMStreamingData.fromJson(streamInfoJson);
