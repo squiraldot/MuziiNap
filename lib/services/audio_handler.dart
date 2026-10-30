@@ -70,6 +70,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   Future<void> _audioCacheTrimQueue = Future<void>.value();
   bool _backgroundResourcesReleased = false;
   Duration? _backgroundReleasedPosition;
+  String? _lastCacheCleanupSongId;
   bool isSongLoading = true;
   int _playSessionId = 0;
   String? _playbackRecoverySongId;
@@ -372,10 +373,24 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   void _listenForSequenceStateChanges() {
-    _playerSubscriptions.add(_player.sequenceStateStream.listen((SequenceState? sequenceState) {
-      final sequence = sequenceState?.effectiveSequence;
-      if (sequence == null || sequence.isEmpty) return;
-    }));
+    _playerSubscriptions.add(
+      _player.sequenceStateStream.listen((SequenceState? sequenceState) {
+        final sequence = sequenceState?.effectiveSequence;
+        if (sequence == null || sequence.isEmpty) return;
+
+        // A new source/current queue index means the user changed tracks.
+        // Run disk GC here, after just_audio has switched away from the old
+        // source, while preserving every song still in the playback queue.
+        final index = currentIndex;
+        if (index is int && index >= 0 && index < queue.value.length) {
+          final songId = queue.value[index].id;
+          if (songId != _lastCacheCleanupSongId) {
+            _lastCacheCleanupSongId = songId;
+            _scheduleAudioCacheTrim();
+          }
+        }
+      }),
+    );
   }
 
   void _listenForDurationChanges() {
@@ -698,7 +713,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           if (currentSession != _playSessionId) return;
           _backgroundResourcesReleased = false;
           _backgroundReleasedPosition = null;
-          _scheduleAudioCacheTrim();
         } catch (sourceError) {
           // setAudioSource can throw before playbackEventStream emits an
           // error. Refresh the URL once here as well so the first tap is not
@@ -833,7 +847,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         if (currentSession != _playSessionId) return;
         _backgroundResourcesReleased = false;
         _backgroundReleasedPosition = null;
-        _scheduleAudioCacheTrim();
         isSongLoading = false;
 
         // Normalize audio
