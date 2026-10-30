@@ -47,8 +47,11 @@ Future<AudioHandler> initAudioService() async {
   } catch (error) {
     printINFO("Unable to configure music audio session: $error");
   }
+  // Resolve device/network capabilities before the native player is created;
+  // just_audio serializes AndroidLoadControl into the platform creation call.
+  final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
   return await AudioService.init(
-    builder: () => MyAudioHandler(),
+    builder: () => MyAudioHandler(deviceProfile: deviceProfile),
     config: const AudioServiceConfig(
       androidNotificationIcon: 'mipmap/ic_launcher_monochrome',
       androidNotificationChannelId: 'com.mycompany.myapp.audio',
@@ -60,6 +63,10 @@ Future<AudioHandler> initAudioService() async {
 }
 
 class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
+  MyAudioHandler({required DeviceStreamProfile deviceProfile})
+      : _deviceStreamProfile = deviceProfile {
+  final DeviceStreamProfile _deviceStreamProfile;
+
   // ignore: prefer_typing_uninitialized_variables
   late final String _cacheDir;
   late final Future<void> _cacheDirReady;
@@ -103,7 +110,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
 
 
-  MyAudioHandler() {
     _mediaLibrary = MediaLibrary();
     _player = AudioPlayer(
       // AudioPlaybackService owns the focus policy; disable just_audio's
@@ -111,16 +117,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       handleInterruptions: false,
       useProxyForRequestHeaders: false,
       audioLoadConfiguration: const AudioLoadConfiguration(
-        androidLoadControl: AndroidLoadControl(
-          // Keep a modest rolling buffer without holding the previous 20 s
-          // target in memory. Startup threshold stays at 250 ms: increasing
-          // it to 1.5 s would make tap-to-audio latency worse, not better.
-          minBufferDuration: Duration(seconds: 3),
-          maxBufferDuration: Duration(seconds: 15),
-          bufferForPlaybackDuration: Duration(milliseconds: 250),
-          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 1),
-          prioritizeTimeOverSizeThresholds: true,
-        ),
+        androidLoadControl: _deviceStreamProfile.androidLoadControl,
       ),
     );
     _cacheDirReady = _createCacheDir();
