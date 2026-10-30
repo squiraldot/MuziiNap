@@ -16,14 +16,17 @@ Future<Map<String, dynamic>> getStreamInfo(
     songId = songId.substring(4);
   }
   BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+  final profile = deviceProfile == null
+      ? null
+      : DeviceStreamProfile.fromJson(deviceProfile);
   final playerResponse = await StreamProvider.fetch(
     songId,
     preferYoutubeExplode: preferYoutubeExplode,
     preferredClient: preferredClient,
     authenticatedHeaders: authenticatedHeaders,
-    deviceProfile: deviceProfile == null
-        ? null
-        : DeviceStreamProfile.fromJson(deviceProfile),
+    deviceProfile: profile,
   );
-  return playerResponse.hmStreamingData;
+  final result = playerResponse.hmStreamingData;
+  if (profile != null) result['deviceProfile'] = profile.toJson();
+  return result;
 }
