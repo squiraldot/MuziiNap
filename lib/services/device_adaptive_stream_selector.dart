@@ -1,0 +1,117 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+
+/// Network transport categories used by the adaptive stream policy.
+enum DeviceNetworkType { wifi, mobile, offline, other }
+
+/// Immutable, isolate-safe snapshot of the device capabilities relevant to
+/// stream selection. It contains only primitive values and can cross isolates.
+class DeviceStreamProfile {
+  const DeviceStreamProfile({
+    required this.androidApiLevel,
+    required this.isLowRamDevice,
+    required this.networkType,
+  });
+
+  final int? androidApiLevel;
+  final bool isLowRamDevice;
+  final DeviceNetworkType networkType;
+
+  bool get isLegacyAndroid =>
+      androidApiLevel != null && androidApiLevel! < 29;
+
+  /// Opus is reserved for API 29+ devices that are not marked low-RAM and
+  /// currently use Wi-Fi. Cellular networks intentionally prefer AAC.
+  bool get prefersOpus =>
+      !isLegacyAndroid &&
+      androidApiLevel != null &&
+      !isLowRamDevice &&
+      networkType == DeviceNetworkType.wifi;
+
+  bool get allowsOpus => !isLegacyAndroid;
+
+  int get preferredItag => prefersOpus ? 251 : 140;
+
+  Map<String, Object?> toJson() => {
+        'androidApiLevel': androidApiLevel,
+        'isLowRamDevice': isLowRamDevice,
+        'networkType': networkType.name,
+      };
+
+  factory DeviceStreamProfile.fromJson(Map<String, Object?> json) {
+    final rawNetworkType = json['networkType']?.toString();
+    final networkType = DeviceNetworkType.values.firstWhere(
+      (value) => value.name == rawNetworkType,
+      orElse: () => DeviceNetworkType.other,
+    );
+    return DeviceStreamProfile(
+      androidApiLevel: (json['androidApiLevel'] as num?)?.toInt(),
+      // Missing capability data must not accidentally enable high-bitrate
+      // experimental formats on an unknown device.
+      isLowRamDevice: json['isLowRamDevice'] is bool
+          ? json['isLowRamDevice'] as bool
+          : true,
+      networkType: networkType,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeviceStreamProfile &&
+      other.androidApiLevel == androidApiLevel &&
+      other.isLowRamDevice == isLowRamDevice &&
+      other.networkType == networkType;
+
+  @override
+  int get hashCode =>
+      Object.hash(androidApiLevel, isLowRamDevice, networkType);
+}
+
+/// Reads device/network state on the UI/platform isolate. Do not call this
+/// from StreamProvider's Isolate.run resolver; pass [DeviceStreamProfile.toJson]
+/// to that isolate instead.
+class DeviceAdaptiveStreamSelector {
+  DeviceAdaptiveStreamSelector({
+    DeviceInfoPlugin? deviceInfo,
+    Connectivity? connectivity,
+  })  : _deviceInfo = deviceInfo ?? DeviceInfoPlugin(),
+        _connectivity = connectivity ?? Connectivity();
+
+  final DeviceInfoPlugin _deviceInfo;
+  final Connectivity _connectivity;
+
+  Future<DeviceStreamProfile> detect() async {
+    int? apiLevel;
+    var isLowRamDevice = true;
+
+    try {
+      final android = await _deviceInfo.androidInfo;
+      apiLevel = android.version.sdkInt;
+      isLowRamDevice = android.isLowRamDevice;
+    } catch (_) {
+      // Keep conservative defaults when the platform channel is unavailable.
+    }
+
+    var networkType = DeviceNetworkType.other;
+    try {
+      final results = await _connectivity.checkConnectivity();
+      if (results.contains(ConnectivityResult.wifi) ||
+          results.contains(ConnectivityResult.ethernet)) {
+        networkType = DeviceNetworkType.wifi;
+      } else if (results.contains(ConnectivityResult.mobile)) {
+        networkType = DeviceNetworkType.mobile;
+      } else if (results.contains(ConnectivityResult.none) ||
+          results.isEmpty) {
+        networkType = DeviceNetworkType.offline;
+      }
+    } catch (_) {
+      // Network detection is advisory; resolver timeouts remain authoritative.
+    }
+
+    return DeviceStreamProfile(
+      androidApiLevel: apiLevel,
+      isLowRamDevice: isLowRamDevice,
+      networkType: networkType,
+    );
+  }
+}
