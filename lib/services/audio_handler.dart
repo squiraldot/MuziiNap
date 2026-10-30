@@ -176,10 +176,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     });
   }
 
-  /// Unload the paused source when the app leaves the foreground. just_audio
-  /// has no public decoder-buffer-pool flush API; stop() is the supported way
-  /// to unload the source and release native playback resources. Playback is
-  /// restored from the saved position when the user presses Play again.
+  /// Release native decoders/resources for a paused source when the app leaves
+  /// the foreground. just_audio has no public decoder-buffer-pool flush API;
+  /// stop() is the supported resource-release operation. The Dart source is
+  /// retained for reliable resume, using the saved position when Play is tapped.
   Future<void> releasePausedPlaybackResources() async {
     final index = currentIndex;
     if (_backgroundResourcesReleased ||
