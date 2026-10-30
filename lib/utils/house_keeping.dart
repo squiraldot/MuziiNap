@@ -15,9 +15,8 @@ void startHouseKeeping() {
 
 /// Returns true for malformed or expired cached stream entries.
 ///
-/// A cache record is expected to be a list whose second element contains a
-/// URL map. Treat incomplete records as stale so one corrupt Hive entry does
-/// not abort cleanup for every other entry.
+/// Current records use the map schema produced by [StreamProvider]; legacy
+/// list-shaped records remain supported during cache migration.
 bool shouldRemoveSongUrlCacheEntry(
   dynamic cacheEntry, {
   DateTime? now,
