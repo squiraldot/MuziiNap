@@ -1039,6 +1039,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     await _player.stop();
     mediaItem.add(null);
     queue.add(<MediaItem>[]);
+    _backgroundResourcesReleased = false;
+    _backgroundReleasedPosition = null;
+    _scheduleAudioCacheTrim();
     playbackState.add(playbackState.value.copyWith(
       controls: const [],
       playing: false,

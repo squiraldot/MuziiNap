@@ -224,10 +224,23 @@ void _setAppInitPrefs() {
 class LifecycleHandler extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
+    final handler = Get.find<AudioHandler>();
     if (state == AppLifecycleState.resumed) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    } else if (state == AppLifecycleState.detached) {
-      await Get.find<AudioHandler>().customAction("saveSession");
+      return;
+    }
+
+    if (state == AppLifecycleState.detached) {
+      await handler.customAction("saveSession");
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // MyAudioHandler checks playing/processing state before unloading. Active
+      // background music is never interrupted by a lifecycle transition.
+      await handler.customAction("releasePausedResources");
     }
   }
 }
