@@ -40,7 +40,7 @@ void main() {
         playingStream: playing.stream,
         onlineStream: online.stream,
         loadingIntentStream: loadingIntent.stream,
-        isPlaybackRequested: () => playbackRequested,
+        shouldMonitorPlayback: () => playbackRequested,
         checkOnline: () async => true,
         positionProvider: () => position,
         frozenThreshold: const Duration(milliseconds: 20),
@@ -59,6 +59,7 @@ void main() {
       final breaker = createBreaker(recoveries);
       await breaker.start();
       breaker.setTrack('track-1');
+      playbackRequested = true;
       playing.add(true);
       processing.add(ProcessingState.buffering);
       await Future<void>.delayed(const Duration(milliseconds: 35));
@@ -105,6 +106,7 @@ void main() {
       final breaker = createBreaker(recoveries);
       await breaker.start();
       breaker.setTrack('track-1');
+      playbackRequested = true;
       playing.add(true);
       processing.add(ProcessingState.loading);
       await Future<void>.delayed(const Duration(milliseconds: 90));
@@ -123,6 +125,7 @@ void main() {
       final breaker = createBreaker(recoveries);
       await breaker.start();
       breaker.setTrack('track-1');
+      playbackRequested = true;
       playing.add(true);
       processing.add(ProcessingState.buffering);
       await Future<void>.delayed(const Duration(milliseconds: 12));
