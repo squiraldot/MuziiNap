@@ -1534,7 +1534,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       final deviceProfileJson = deviceProfile.toJson();
       if (songsUrlCacheBox.containsKey(songId) && !generateNewUrl) {
         final cachedStreamInfo = songsUrlCacheBox.get(songId);
-        if (StreamProvider.isCachedStreamUsable(cachedStreamInfo) &&
+        if (StreamProvider.isCachedStreamUsable(
+              cachedStreamInfo,
+              qualityIndex: qualityIndex as int,
+            ) &&
             cachedStreamInfo is Map &&
             cachedStreamInfo['deviceProfile'] is Map &&
             DeviceStreamProfile.fromJson(
