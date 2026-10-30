@@ -16,7 +16,6 @@ import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
-import './services/battery_optimization_service.dart';
 import './services/music_service.dart';
 import './ui/intro_video_splash.dart';
 import './ui/player/player_controller.dart';
@@ -99,10 +98,6 @@ class MyApp extends StatelessWidget {
 }
 
 Future<void> startApplicationServices() async {
-  Get.put<BatteryOptimizationService>(
-    BatteryOptimizationService(),
-    permanent: true,
-  );
   Get.lazyPut(() => PipedServices(), fenix: true);
   Get.lazyPut(() => MusicServices(), fenix: true);
   Get.lazyPut(() => ThemeController(), fenix: true);
