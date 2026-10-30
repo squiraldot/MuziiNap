@@ -83,6 +83,7 @@ void main() {
       expect(recoveries.single.$1, position);
       await breaker.dispose();
     });
+
     test('does not recover while paused or offline', () async {
       final recoveries = <(Duration, int)>[];
       final breaker = createBreaker(recoveries);
@@ -95,6 +96,7 @@ void main() {
       expect(recoveries, isEmpty);
 
       online.add(true);
+      playbackRequested = true;
       playing.add(true);
       await Future<void>.delayed(const Duration(milliseconds: 35));
       expect(recoveries, hasLength(1));
