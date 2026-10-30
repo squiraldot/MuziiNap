@@ -11,6 +11,8 @@ class PlaybackCircuitBreaker {
     required Stream<ProcessingState> processingStateStream,
     required Stream<bool> playingStream,
     required Stream<bool> onlineStream,
+    required Stream<bool> loadingIntentStream,
+    required bool Function() isPlaybackRequested,
     required Future<bool> Function() checkOnline,
     required Duration Function() positionProvider,
     required Future<void> Function(Duration position, int retryNumber) onFrozen,
@@ -20,6 +22,8 @@ class PlaybackCircuitBreaker {
   })  : _processingStateStream = processingStateStream,
         _playingStream = playingStream,
         _onlineStream = onlineStream,
+        _loadingIntentStream = loadingIntentStream,
+        _isPlaybackRequested = isPlaybackRequested,
         _checkOnline = checkOnline,
         _positionProvider = positionProvider,
         _onFrozen = onFrozen,
@@ -35,6 +39,8 @@ class PlaybackCircuitBreaker {
   final Stream<ProcessingState> _processingStateStream;
   final Stream<bool> _playingStream;
   final Stream<bool> _onlineStream;
+  final Stream<bool> _loadingIntentStream;
+  final bool Function() _isPlaybackRequested;
   final Future<bool> Function() _checkOnline;
   final Duration Function() _positionProvider;
   final Future<void> Function(Duration position, int retryNumber) _onFrozen;
@@ -47,12 +53,14 @@ class PlaybackCircuitBreaker {
   StreamSubscription<ProcessingState>? _processingSubscription;
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<bool>? _onlineSubscription;
+  StreamSubscription<bool>? _loadingIntentSubscription;
   Timer? _frozenTimer;
 
   String? _trackId;
   ProcessingState _processingState = ProcessingState.idle;
   bool _isPlaying = false;
   bool _isOnline = false;
+  bool _isLoadingIntent = false;
   bool _recovering = false;
   bool _started = false;
   bool _disposed = false;
@@ -87,6 +95,10 @@ class PlaybackCircuitBreaker {
       _isOnline = online;
       _evaluate();
     });
+    _loadingIntentSubscription = _loadingIntentStream.listen((loading) {
+      _isLoadingIntent = loading;
+      _evaluate();
+    });
     _evaluate();
   }
 
@@ -107,8 +119,8 @@ class PlaybackCircuitBreaker {
         _recovering ||
         _trackId == null ||
         !_isOnline ||
-        !_isPlaying ||
-        !isFrozenState(_processingState) ||
+        !(_isPlaying || _isPlaybackRequested()) ||
+        !(isFrozenState(_processingState) || _isLoadingIntent) ||
         _exhausted) {
       _cancelFrozenTimer();
       return;
@@ -123,8 +135,8 @@ class PlaybackCircuitBreaker {
         _recovering ||
         _trackId == null ||
         !_isOnline ||
-        !_isPlaying ||
-        !isFrozenState(_processingState) ||
+        !(_isPlaying || _isPlaybackRequested()) ||
+        !(isFrozenState(_processingState) || _isLoadingIntent) ||
         _exhausted) {
       _evaluate();
       return;
@@ -172,8 +184,10 @@ class PlaybackCircuitBreaker {
     await _processingSubscription?.cancel();
     await _playingSubscription?.cancel();
     await _onlineSubscription?.cancel();
+    await _loadingIntentSubscription?.cancel();
     _processingSubscription = null;
     _playingSubscription = null;
     _onlineSubscription = null;
+    _loadingIntentSubscription = null;
   }
 }
