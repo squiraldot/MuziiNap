@@ -551,6 +551,18 @@ void main() {
   });
 
   group('InnerTube primary race client preference', () {
+    test('starts the primary client immediately and staggers fallbacks', () {
+      expect(StreamProvider.clientStartDelayFor(0), Duration.zero);
+      expect(
+        StreamProvider.clientStartDelayFor(1),
+        const Duration(milliseconds: 200),
+      );
+      expect(
+        StreamProvider.clientStartDelayFor(4),
+        const Duration(milliseconds: 800),
+      );
+    });
+
     test('prioritizes VISIONOS before the token-gated web clients', () {
       expect(
         StreamProvider.clientNamesFor().take(3).toList(),
