@@ -398,7 +398,7 @@ class StreamProvider {
             authenticatedHeaders: authenticatedHeaders,
             requestTimeout: requestTimeout,
             deviceProfile: deviceProfile,
-            cancelToken: requestCancelToken,
+            cancelToken: cancelToken,
           );
         } on TimeoutException {
           return StreamProvider(
@@ -474,7 +474,7 @@ class StreamProvider {
 
       final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
-        cancelToken: cancelToken,
+        cancelToken: requestCancelToken,
         options: Options(
           headers: headers,
           sendTimeout: requestTimeout,
