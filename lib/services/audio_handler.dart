@@ -130,6 +130,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       checkOnline: () async => _hasNetworkConnection(await connectivity.checkConnectivity()),
       positionProvider: () => _player.position,
       onFrozen: _recoverFrozenPlayback,
+      onRetriesExhausted: _failFrozenPlayback,
     );
     unawaited(_playbackCircuitBreaker.start());
     _cacheDirReady = _createCacheDir();
@@ -383,6 +384,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   static bool _hasNetworkConnection(List<ConnectivityResult> results) =>
       results.any((result) => result != ConnectivityResult.none);
+
+  Future<void> _failFrozenPlayback() async {
+    await _player.stop();
+    _markPlaybackFailed(
+      StateError('Playback stream remained frozen after two recovery attempts.'),
+    );
+  }
 
   /// Replaces a stream pipe that stopped making progress without emitting an error.
   Future<void> _recoverFrozenPlayback(Duration cachedPosition, int retryNumber) async {
