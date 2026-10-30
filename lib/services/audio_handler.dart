@@ -96,6 +96,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   double _baseOutputVolume = 1.0;
   bool _audioFocusDucked = false;
   int _volumeFadeGeneration = 0;
+  int _manualPauseGeneration = 0;
 
   // One in-flight/ready stream lookup for the next queue item. Futures are
   // keyed by video ID so a rapid skip can safely reuse a completed lookup.
@@ -228,12 +229,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   Future<void> _pauseForAudioFocus() async {
+    _manualPauseGeneration++;
     _audioFocusDucked = false;
     await _applyOutputVolume(smooth: true);
     await _player.pause();
   }
 
   Future<void> _pauseForBecomingNoisy() async {
+    _manualPauseGeneration++;
     // Do not fade first: route removal should stop output immediately.
     _audioFocusDucked = false;
     _volumeFadeGeneration++;
@@ -393,9 +396,12 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final currentUrl = currentSongUrl ?? song.extras?['url']?.toString();
     if (currentUrl != null && currentUrl.startsWith('file://')) return;
     final session = _playSessionId;
+    final pauseGeneration = _manualPauseGeneration;
     printINFO('Playback pipe frozen for ${song.id}; recovery ${retryNumber}/2');
     await _player.stop();
-    if (session != _playSessionId || currentIndex != index ||
+    if (session != _playSessionId ||
+        pauseGeneration != _manualPauseGeneration ||
+        currentIndex != index ||
         mediaItem.value?.id != song.id) {
       return;
     }
@@ -410,6 +416,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       'index': index,
       'newUrl': true,
       'position': cachedPosition.inMilliseconds,
+      'recoveryPauseGeneration': pauseGeneration,
     }).catchError((Object error, StackTrace stackTrace) {
       _markPlaybackFailed(error);
     }));
@@ -745,7 +752,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    _manualPauseGeneration++;
+    await _player.pause();
+  }
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
@@ -983,6 +993,12 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           final resumePosition = extras['position'];
           if (resumePosition is int && resumePosition > 0) {
             await _player.seek(Duration(milliseconds: resumePosition));
+          }
+          final recoveryPauseGeneration = extras['recoveryPauseGeneration'];
+          if (recoveryPauseGeneration is int &&
+              recoveryPauseGeneration != _manualPauseGeneration) {
+            isSongLoading = false;
+            return;
           }
           final playFuture = _player.play();
           _applyEqualizerAfterPlaybackStarts();
