@@ -387,6 +387,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
     _playbackRecoverySongId = song.id;
     final position = _player.position;
+    final forceCompatibleAudio =
+        DeviceAdaptiveStreamSelector.isDecoderCompatibilityFailure(error);
     try {
       await _player.stop();
 
@@ -404,6 +406,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           'index': index,
           'newUrl': true,
           'position': position.inMilliseconds,
+          'forceCompatibleAudio': forceCompatibleAudio,
         }).catchError((Object retryError, StackTrace stackTrace) {
           _markPlaybackFailed(retryError);
         }),
@@ -872,7 +875,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
         if (songIndex != currentIndex || currentSession != _playSessionId) {
           return;
-        } else if (!streamInfo.playable) {
+        }
+        if (extras['forceCompatibleAudio'] == true) {
+          // The adaptive resolver retains AAC in the low-quality slot on
+          // capable devices. Use it after an actual native decoder failure.
+          streamInfo.setQualityIndex(0);
+        }
+        if (!streamInfo.playable) {
           currentSongUrl = null;
           isSongLoading = false;
           Get.find<PlayerController>().notifyPlayError(streamInfo.statusMSG);
