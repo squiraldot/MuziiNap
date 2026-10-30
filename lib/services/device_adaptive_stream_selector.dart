@@ -1,5 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:just_audio/just_audio.dart';
 
 /// Network transport categories used by the adaptive stream policy.
 enum DeviceNetworkType { wifi, mobile, offline, other }
@@ -34,6 +35,37 @@ class DeviceStreamProfile {
   bool get requiresWebClient => !allowsOpus;
 
   int get preferredItag => prefersOpus ? 251 : 140;
+
+  /// ExoPlayer buffer profile selected once before AudioPlayer construction.
+  /// A constrained device gets a smaller ceiling; capable Wi-Fi devices use
+  /// the requested 30-second ceiling and 1.5-second startup reserve.
+  AndroidLoadControl get androidLoadControl {
+    final Duration minBuffer;
+    final Duration maxBuffer;
+
+    if (isLowRamDevice || !allowsOpus && networkType != DeviceNetworkType.mobile) {
+      minBuffer = const Duration(milliseconds: 2500);
+      maxBuffer = const Duration(seconds: 12);
+    } else if (prefersOpus) {
+      minBuffer = const Duration(milliseconds: 1500);
+      maxBuffer = const Duration(seconds: 30);
+    } else if (networkType == DeviceNetworkType.mobile) {
+      minBuffer = const Duration(seconds: 2);
+      maxBuffer = const Duration(seconds: 18);
+    } else {
+      minBuffer = const Duration(milliseconds: 2500);
+      maxBuffer = const Duration(seconds: 15);
+    }
+
+    return AndroidLoadControl(
+      minBufferDuration: minBuffer,
+      maxBufferDuration: maxBuffer,
+      bufferForPlaybackDuration: const Duration(seconds: 1),
+      bufferForPlaybackAfterRebufferDuration: const Duration(seconds: 2),
+      prioritizeTimeOverSizeThresholds: !isLowRamDevice,
+      backBufferDuration: Duration.zero,
+    );
+  }
 
   Map<String, Object?> toJson() => {
         'androidApiLevel': androidApiLevel,
