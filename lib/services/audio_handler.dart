@@ -6,6 +6,7 @@ import 'dart:isolate';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
+import 'package:audio_session/audio_session.dart';
 
 
 import 'package:hive/hive.dart';
@@ -79,6 +80,12 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   bool _audioFocusDucked = false;
   int _volumeFadeGeneration = 0;
 
+  // One in-flight/ready stream lookup for the next queue item. Futures are
+  // keyed by video ID so a rapid skip can safely reuse a completed lookup.
+  final Map<String, Future<HMStreamingData>> _streamPrefetches = {};
+  String? _lastPrefetchCandidateId;
+  String? _autoAdvanceSongId;
+
   // Retain every player subscription so the app-scoped owner can cancel it.
   final List<StreamSubscription<dynamic>> _playerSubscriptions = [];
   EqualizerConfig _equalizerConfig = EqualizerConfig.graphic10Band();
@@ -96,16 +103,20 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       handleInterruptions: false,
       useProxyForRequestHeaders: false,
       audioLoadConfiguration: const AudioLoadConfiguration(
-            androidLoadControl: AndroidLoadControl(
-      minBufferDuration: Duration(seconds: 8),
-      // A shorter ExoPlayer buffer reduces queued compressed/decoded audio
-      // while preserving enough headroom for ordinary network jitter. This
-      // is a buffer target, not a hard cap on total process RAM.
-      maxBufferDuration: Duration(seconds: 20),
-      bufferForPlaybackDuration: Duration(milliseconds: 250),
-      bufferForPlaybackAfterRebufferDuration: Duration(seconds: 1),
-    )));
+        androidLoadControl: AndroidLoadControl(
+          // Keep a modest rolling buffer without holding the previous 20 s
+          // target in memory. Startup threshold stays at 250 ms: increasing
+          // it to 1.5 s would make tap-to-audio latency worse, not better.
+          minBufferDuration: Duration(seconds: 3),
+          maxBufferDuration: Duration(seconds: 15),
+          bufferForPlaybackDuration: Duration(milliseconds: 250),
+          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 1),
+          prioritizeTimeOverSizeThresholds: true,
+        ),
+      ),
+    );
     _cacheDirReady = _createCacheDir();
+    unawaited(_configureMusicAudioSession());
     _notifyAudioHandlerAboutPlaybackEvents();
     _listenToPlaybackForNextSong();
     _listenForSequenceStateChanges();
@@ -153,6 +164,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       await _serializeAudioSetting(() => _player.setSkipSilenceEnabled(enabled));
     } catch (e) {
       printERROR("Failed to restore skip-silence setting: $e");
+    }
+  }
+
+  Future<void> _configureMusicAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(AudioSessionConfiguration.music());
+    } catch (error) {
+      // Playback must remain available on devices where audio-session
+      // configuration is unavailable or rejected by the platform.
+      printINFO("Unable to configure music audio session: $error");
     }
   }
 
@@ -413,13 +435,94 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     }
   }
 
+  /// Pure threshold policy exposed for deterministic unit tests.
+  static bool shouldPrefetchNextTrack(
+    Duration position,
+    Duration? duration,
+  ) {
+    if (duration == null || duration.inMilliseconds <= 0) return false;
+    if (position.isNegative) return false;
+    return position.inMilliseconds * 100 >= duration.inMilliseconds * 80;
+  }
+
+  int? _peekNextSongIndex() {
+    final items = queue.value;
+    final index = currentIndex;
+    if (index is! int || index < 0 || index >= items.length) return null;
+
+    if (shuffleModeEnabled) {
+      final nextShuffleIndex = currentShuffleIndex + 1;
+      if (nextShuffleIndex >= shuffledQueue.length) return null;
+      final nextId = shuffledQueue[nextShuffleIndex];
+      final nextIndex = items.indexWhere((item) => item.id == nextId);
+      return nextIndex >= 0 ? nextIndex : null;
+    }
+
+    if (index + 1 < items.length) return index + 1;
+    if (queueLoopModeEnabled && items.length > 1) return 0;
+    return null;
+  }
+
+  void _prefetchNextSong() {
+    final nextIndex = _peekNextSongIndex();
+    if (nextIndex == null) return;
+
+    final nextSong = queue.value[nextIndex];
+    if (nextSong.id == mediaItem.value?.id ||
+        _streamPrefetches.containsKey(nextSong.id)) {
+      return;
+    }
+
+    // Keep at most one retained prefetch. Removing a Future does not pretend
+    // to cancel the underlying HTTP request, but it releases our reference and
+    // prevents stale results from being consumed by a later queue selection.
+    _streamPrefetches.removeWhere((songId, _) => songId != nextSong.id);
+    _lastPrefetchCandidateId = nextSong.id;
+
+    final future = checkNGetUrl(nextSong.id);
+    _streamPrefetches[nextSong.id] = future;
+    unawaited(future.then<void>(
+      (result) {
+        if (!result.playable &&
+            identical(_streamPrefetches[nextSong.id], future)) {
+          _streamPrefetches.remove(nextSong.id);
+          printINFO("Next-track prefetch was not playable: ${nextSong.id}");
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (identical(_streamPrefetches[nextSong.id], future)) {
+          _streamPrefetches.remove(nextSong.id);
+        }
+        printINFO("Next-track prefetch failed for ${nextSong.id}: $error");
+      },
+    ));
+  }
+
+  Future<HMStreamingData> _resolveStreamInfo(
+    String songId, {
+    bool generateNewUrl = false,
+  }) {
+    if (!generateNewUrl) {
+      final prefetched = _streamPrefetches.remove(songId);
+      if (prefetched != null) return prefetched;
+    }
+    return checkNGetUrl(songId, generateNewUrl: generateNewUrl);
+  }
+
   void _listenToPlaybackForNextSong() {
-    const playerDurationOffset = 0;
-    _playerSubscriptions.add(_player.positionStream.listen((value) async {
-      if (_player.duration != null && _player.duration?.inSeconds != 0) {
-        if (value.inMilliseconds >=
-            (_player.duration!.inMilliseconds - playerDurationOffset)) {
-          await _triggerNext();
+    _playerSubscriptions.add(_player.positionStream.listen((position) {
+      final duration = _player.duration;
+      if (shouldPrefetchNextTrack(position, duration)) {
+        _prefetchNextSong();
+      }
+
+      if (duration != null &&
+          duration > Duration.zero &&
+          position >= duration) {
+        final currentId = mediaItem.value?.id;
+        if (currentId != null && _autoAdvanceSongId != currentId) {
+          _autoAdvanceSongId = currentId;
+          unawaited(_triggerNext());
         }
       }
     }));
@@ -715,6 +818,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           await subscription.cancel();
         }
         _playerSubscriptions.clear();
+        _streamPrefetches.clear();
+        _lastPrefetchCandidateId = null;
+        _autoAdvanceSongId = null;
         await _player.dispose();
         await super.stop();
         break;
@@ -733,12 +839,15 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // Stop playing the old song immediately while loading the new one
         await _player.pause();
 
-        final futureStreamInfo =
-            checkNGetUrl(currentSong.id, generateNewUrl: isNewUrlReq);
-        final bool restoreSession = extras['restoreSession'] ?? false;
-
-
+        // Publish metadata immediately so the UI/artwork workers can start
+        // while the InnerTube handshake runs in the background.
         mediaItem.add(currentSong);
+        _autoAdvanceSongId = null;
+        final futureStreamInfo = _resolveStreamInfo(
+          currentSong.id,
+          generateNewUrl: isNewUrlReq,
+        );
+        final bool restoreSession = extras['restoreSession'] ?? false;
         HMStreamingData streamInfo;
         try {
           streamInfo = await futureStreamInfo;
@@ -888,9 +997,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // Stop playing the old song immediately while loading the new one
         await _player.pause();
 
-        final futureStreamInfo = checkNGetUrl(currMed.id);
-
+        // Metadata listeners are notified before awaiting stream resolution.
         mediaItem.add(currMed);
+        _autoAdvanceSongId = null;
+        final futureStreamInfo = _resolveStreamInfo(currMed.id);
         queue.add([currMed]);
         final streamInfo = (await futureStreamInfo);
         if (currentSession != _playSessionId) {
@@ -1207,6 +1317,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     // (and recreate the Android media notification) after stop() returns.
     _playSessionId++;
     _playbackRecoverySongId = null;
+    _streamPrefetches.clear();
+    _lastPrefetchCandidateId = null;
+    _autoAdvanceSongId = null;
     isSongLoading = false;
     currentSongUrl = null;
     await _player.stop();
