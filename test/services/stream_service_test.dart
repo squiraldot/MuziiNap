@@ -130,7 +130,9 @@ void main() {
           networkType: DeviceNetworkType.wifi,
         ),
       );
-      expect(selected.map((format) => format.itag), [251]);
+      expect(selected.map((format) => format.itag), [140, 251]);
+      expect(selected.last.itag, 251);
+      expect(selected.first.itag, 140);
     });
 
     test('selects AAC 140 for a low-RAM or cellular device', () {
@@ -191,7 +193,7 @@ void main() {
           networkType: DeviceNetworkType.wifi,
         ),
       );
-      expect(selected.map((format) => format.itag), [250]);
+      expect(selected.map((format) => format.itag), [250, 141]);
     });
 
     test('drops spatial and video-wrapped tracks', () {
