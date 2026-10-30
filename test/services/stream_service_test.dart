@@ -308,10 +308,10 @@ void main() {
   });
 
   group('InnerTube request and media transport policy', () {
-    test('uses a bounded 800 ms first-client handshake budget', () {
+    test('uses a bounded 1.5 second first-choice VISIONOS handshake', () {
       expect(
-        StreamProvider.requestTimeoutForClient('WEB_REMIX'),
-        const Duration(milliseconds: 800),
+        StreamProvider.requestTimeoutForClient('VISIONOS'),
+        const Duration(milliseconds: 1500),
       );
     });
 
@@ -322,12 +322,19 @@ void main() {
       );
     });
 
-    test('does not apply the fast deadline when WEB_REMIX is later in the race', () {
+    test('does not apply the fast deadline when VISIONOS is later in the race', () {
       expect(
         StreamProvider.requestTimeoutForClient(
-          'WEB_REMIX',
+          'VISIONOS',
           isInitialAttempt: false,
         ),
+        const Duration(seconds: 5),
+      );
+    });
+
+    test('does not shorten the WEB_REMIX fallback timeout', () {
+      expect(
+        StreamProvider.requestTimeoutForClient('WEB_REMIX'),
         const Duration(seconds: 5),
       );
     });
