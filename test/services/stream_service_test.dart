@@ -31,6 +31,51 @@ void main() {
     });
   });
 
+  group('Adaptive Android buffer configuration', () {
+    test('uses fast-start 30 second buffer on capable Wi-Fi devices', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      final config = profile.androidLoadControl;
+      expect(config.minBufferDuration, const Duration(milliseconds: 1500));
+      expect(config.maxBufferDuration, const Duration(seconds: 30));
+      expect(config.bufferForPlaybackDuration, const Duration(seconds: 1));
+      expect(
+        config.bufferForPlaybackAfterRebufferDuration,
+        const Duration(seconds: 2),
+      );
+    });
+
+    test('caps buffer on low-RAM devices', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: true,
+        networkType: DeviceNetworkType.wifi,
+      );
+      final config = profile.androidLoadControl;
+      expect(config.minBufferDuration, const Duration(milliseconds: 2500));
+      expect(config.maxBufferDuration, const Duration(seconds: 12));
+      expect(config.bufferForPlaybackDuration, const Duration(seconds: 1));
+      expect(
+        config.bufferForPlaybackAfterRebufferDuration,
+        const Duration(seconds: 2),
+      );
+    });
+
+    test('uses a moderate buffer on mobile data', () {
+      const profile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.mobile,
+      );
+      final config = profile.androidLoadControl;
+      expect(config.minBufferDuration, const Duration(seconds: 2));
+      expect(config.maxBufferDuration, const Duration(seconds: 18));
+    });
+  });
+
   group('Device adaptive stream policy', () {
     test('prefers Opus 251 on API 29+ Wi-Fi devices with adequate RAM', () {
       const profile = DeviceStreamProfile(
