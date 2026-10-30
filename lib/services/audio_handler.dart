@@ -83,7 +83,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   // One in-flight/ready stream lookup for the next queue item. Futures are
   // keyed by video ID so a rapid skip can safely reuse a completed lookup.
   final Map<String, Future<HMStreamingData>> _streamPrefetches = {};
-  String? _lastPrefetchCandidateId;
   String? _autoAdvanceSongId;
 
   // Retain every player subscription so the app-scoped owner can cancel it.
@@ -477,7 +476,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     // to cancel the underlying HTTP request, but it releases our reference and
     // prevents stale results from being consumed by a later queue selection.
     _streamPrefetches.removeWhere((songId, _) => songId != nextSong.id);
-    _lastPrefetchCandidateId = nextSong.id;
 
     final future = checkNGetUrl(nextSong.id);
     _streamPrefetches[nextSong.id] = future;
@@ -516,14 +514,21 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _prefetchNextSong();
       }
 
+      final currentId = mediaItem.value?.id;
       if (duration != null &&
           duration > Duration.zero &&
-          position >= duration) {
-        final currentId = mediaItem.value?.id;
-        if (currentId != null && _autoAdvanceSongId != currentId) {
-          _autoAdvanceSongId = currentId;
-          unawaited(_triggerNext());
-        }
+          position < duration &&
+          currentId != null &&
+          _autoAdvanceSongId == currentId) {
+        _autoAdvanceSongId = null;
+      }
+      if (duration != null &&
+          duration > Duration.zero &&
+          position >= duration &&
+          currentId != null &&
+          _autoAdvanceSongId != currentId) {
+        _autoAdvanceSongId = currentId;
+        unawaited(_triggerNext());
       }
     }));
   }
@@ -819,7 +824,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
         _playerSubscriptions.clear();
         _streamPrefetches.clear();
-        _lastPrefetchCandidateId = null;
         _autoAdvanceSongId = null;
         await _player.dispose();
         await super.stop();
@@ -831,6 +835,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         final isNewUrlReq = extras['newUrl'] ?? false;
         if (!isNewUrlReq) _playbackRecoverySongId = null;
         final currentSong = queue.value[currentIndex];
+        _autoAdvanceSongId = currentSong.id;
         final currentSession = ++_playSessionId;
         isSongLoading = true;
         playbackState.add(playbackState.value
@@ -839,18 +844,21 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // Stop playing the old song immediately while loading the new one
         await _player.pause();
 
-        // Publish metadata immediately so the UI/artwork workers can start
-        // while the InnerTube handshake runs in the background.
-        mediaItem.add(currentSong);
-        _autoAdvanceSongId = null;
-        final futureStreamInfo = _resolveStreamInfo(
-          currentSong.id,
-          generateNewUrl: isNewUrlReq,
-        );
+        // Run metadata publication and InnerTube resolution concurrently.
+        // PlayerController's mediaItem listeners can start artwork/palette work
+        // while the network/isolate resolver is still running.
+        final preparation = Future.wait<dynamic>([
+          _resolveStreamInfo(
+            currentSong.id,
+            generateNewUrl: isNewUrlReq,
+          ),
+          Future<void>.sync(() => mediaItem.add(currentSong)),
+        ]);
         final bool restoreSession = extras['restoreSession'] ?? false;
         HMStreamingData streamInfo;
         try {
-          streamInfo = await futureStreamInfo;
+          final preparationResults = await preparation;
+          streamInfo = preparationResults.first as HMStreamingData;
         } catch (streamError) {
           printERROR(
             "Stream resolution failed for first/current track $songIndex ($currentSong.id): $streamError",
@@ -990,6 +998,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'setSourceNPlay':
         final currMed = (extras!['mediaItem'] as MediaItem);
+        _autoAdvanceSongId = currMed.id;
         final currentSession = ++_playSessionId;
         isSongLoading = true;
         currentIndex = 0;
@@ -997,12 +1006,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         // Stop playing the old song immediately while loading the new one
         await _player.pause();
 
-        // Metadata listeners are notified before awaiting stream resolution.
-        mediaItem.add(currMed);
-        _autoAdvanceSongId = null;
-        final futureStreamInfo = _resolveStreamInfo(currMed.id);
+        // Start UI metadata work and stream resolution in the same turn.
+        final preparation = Future.wait<dynamic>([
+          _resolveStreamInfo(currMed.id),
+          Future<void>.sync(() => mediaItem.add(currMed)),
+        ]);
         queue.add([currMed]);
-        final streamInfo = (await futureStreamInfo);
+        final preparationResults = await preparation;
+        final streamInfo = preparationResults.first as HMStreamingData;
         if (currentSession != _playSessionId) {
           return;
         }
@@ -1318,7 +1329,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     _playSessionId++;
     _playbackRecoverySongId = null;
     _streamPrefetches.clear();
-    _lastPrefetchCandidateId = null;
     _autoAdvanceSongId = null;
     isSongLoading = false;
     currentSongUrl = null;
