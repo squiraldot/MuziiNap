@@ -132,7 +132,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       loadingIntentStream: playbackState.map((state) =>
           state.processingState == AudioProcessingState.loading ||
           state.processingState == AudioProcessingState.buffering),
-      isPlaybackRequested: _shouldMonitorNetworkPlayback,
+      shouldMonitorPlayback: _shouldMonitorNetworkPlayback,
       checkOnline: () async => _hasNetworkConnection(await connectivity.checkConnectivity()),
       positionProvider: () => _player.playing ||
               _player.processingState == ProcessingState.buffering
