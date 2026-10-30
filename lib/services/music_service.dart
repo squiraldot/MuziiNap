@@ -352,7 +352,9 @@ class MusicServices extends getx.GetxService {
 
   Future<Response> _sendRequest(String action, Map<dynamic, dynamic> data,
       {additionalParams = ""}) async {
-    // InnerTubeAuthInterceptor injects the latest Hive cookies and a fresh\n    // SAPISIDHASH for every request, including continuation requests.\n    try {
+    // InnerTubeAuthInterceptor injects the latest Hive cookies and a fresh
+    // SAPISIDHASH for every request, including continuation requests.
+    try {
       final response =
           await dio.post("$baseUrl$action$fixedParms$additionalParams",
               options: Options(
