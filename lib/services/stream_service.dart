@@ -31,6 +31,56 @@ class StreamProvider {
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 800);
 
+  static const Duration _urlCacheMaxAge = Duration(minutes: 10);
+  static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
+
+  /// Returns whether a persisted stream result can safely be reused.
+  ///
+  /// Headers are optional: Piped URLs are often self-contained and do not
+  /// require request headers. Both quality slots are validated because the
+  /// selected quality can change while the cached record remains in Hive.
+  static bool isCachedStreamUsable(
+    dynamic cacheEntry, {
+    DateTime? now,
+    Duration maxAge = _urlCacheMaxAge,
+  }) {
+    if (cacheEntry is! Map || cacheEntry['playable'] != true) return false;
+
+    final resolvedAtValue = cacheEntry['resolvedAt'];
+    final resolvedAt = resolvedAtValue is num
+        ? resolvedAtValue.toInt()
+        : int.tryParse(resolvedAtValue?.toString() ?? '');
+    final currentTime = now ?? DateTime.now();
+
+    for (final key in const ['lowQualityAudio', 'highQualityAudio']) {
+      final audio = cacheEntry[key];
+      if (audio is! Map) return false;
+      final rawUrl = audio['url']?.toString();
+      if (!isValidAudioFormatUrl(rawUrl)) return false;
+
+      final uri = Uri.tryParse(rawUrl!);
+      final expiryValue = uri?.queryParameters['expire'] ??
+          uri?.queryParameters['expires'];
+      if (expiryValue != null) {
+        final expiry = int.tryParse(expiryValue);
+        if (expiry == null ||
+            expiry <= currentTime.millisecondsSinceEpoch ~/ 1000 +
+                _urlExpirySafetyWindow.inSeconds) {
+          return false;
+        }
+        continue;
+      }
+
+      // Providers without an explicit expiry are cached for a short bounded
+      // period. Old records without a timestamp are deliberately re-resolved.
+      if (resolvedAt == null || resolvedAt <= 0) return false;
+      final age = currentTime.millisecondsSinceEpoch - resolvedAt;
+      if (age < 0 || age > maxAge.inMilliseconds) return false;
+    }
+
+    return true;
+  }
+
   // Reuse one IO client so repeated player requests share pooled keep-alive
   // connections instead of paying a fresh TCP/TLS handshake on every track.
   static final Dio _innerTubeDio = Dio(BaseOptions(
@@ -239,6 +289,62 @@ class StreamProvider {
           .map((client) => client.name)
           .toList(growable: false);
 
+  /// Races independent provider attempts and returns the first playable result.
+  /// A failure is returned only after every attempt has completed unsuccessfully.
+  /// [onWinner] is invoked once so callers can cancel requests that lost the race.
+  static Future<StreamProvider> firstPlayableResult(
+    Iterable<Future<StreamProvider>> attempts, {
+    void Function()? onWinner,
+  }) {
+    final pendingAttempts = attempts.toList(growable: false);
+    if (pendingAttempts.isEmpty) {
+      return Future.value(StreamProvider(
+        playable: false,
+        statusMSG: 'No InnerTube clients were available',
+      ));
+    }
+
+    final completer = Completer<StreamProvider>();
+    var remaining = pendingAttempts.length;
+    var lastFailure = 'All InnerTube clients failed';
+
+    for (final attempt in pendingAttempts) {
+      attempt.then((result) {
+        if (result.playable) {
+          if (!completer.isCompleted) {
+            completer.complete(result);
+            try {
+              onWinner?.call();
+            } catch (_) {
+              // Cancellation is best-effort; a playable URL must still win.
+            }
+          }
+          return;
+        }
+
+        if (result.statusMSG.isNotEmpty) lastFailure = result.statusMSG;
+        remaining--;
+        if (remaining == 0 && !completer.isCompleted) {
+          completer.complete(StreamProvider(
+            playable: false,
+            statusMSG: lastFailure,
+          ));
+        }
+      }, onError: (Object error) {
+        lastFailure = 'InnerTube request failed: $error';
+        remaining--;
+        if (remaining == 0 && !completer.isCompleted) {
+          completer.complete(StreamProvider(
+            playable: false,
+            statusMSG: lastFailure,
+          ));
+        }
+      });
+    }
+
+    return completer.future;
+  }
+
   static List<
       ({
         String name,
@@ -262,45 +368,65 @@ class StreamProvider {
     Map<String, String>? authenticatedHeaders,
     DeviceStreamProfile? deviceProfile,
   }) async {
-    var lastFailure = 'All InnerTube clients failed';
     final clients = _orderedClients(
       deviceProfile?.requiresWebClient == true ? 'WEB_REMIX' : preferredClient,
     );
+    final cancelTokens = <CancelToken>[];
+    final attempts = <Future<StreamProvider>>[];
+
+    // Start every InnerTube client in the same event-loop turn. Client order
+    // only controls the preferred context and timeout budget; it does not
+    // serialize requests or make later clients wait for WEB_REMIX.
     for (var index = 0; index < clients.length; index++) {
       final client = clients[index];
       final requestTimeout = requestTimeoutForClient(
         client.name,
         isInitialAttempt: index == 0,
       );
-      try {
-        final result = await _fetchInnerTube(
-          videoId: videoId,
-          clientName: client.name,
-          clientVersion: client.version,
-          userAgent: client.userAgent,
-          clientId: client.id,
-          visitorId: visitorId,
-          authenticatedHeaders: authenticatedHeaders,
-          requestTimeout: requestTimeout,
-          deviceProfile: deviceProfile,
-        );
+      final cancelToken = CancelToken();
+      cancelTokens.add(cancelToken);
 
-        if (result.playable) return result;
-        if (result.statusMSG.isNotEmpty) {
-          lastFailure = '${client.name}: ${result.statusMSG}';
+      attempts.add(() async {
+        try {
+          return await _fetchInnerTube(
+            videoId: videoId,
+            clientName: client.name,
+            clientVersion: client.version,
+            userAgent: client.userAgent,
+            clientId: client.id,
+            visitorId: visitorId,
+            authenticatedHeaders: authenticatedHeaders,
+            requestTimeout: requestTimeout,
+            deviceProfile: deviceProfile,
+            cancelToken: requestCancelToken,
+          );
+        } on TimeoutException {
+          return StreamProvider(
+            playable: false,
+            statusMSG:
+                '${client.name}: request timed out after ${requestTimeout.inMilliseconds} ms',
+          );
+        } catch (error) {
+          final message = error is DioException &&
+                  error.type == DioExceptionType.cancel
+              ? '${client.name}: request cancelled or timed out'
+              : '${client.name}: request failed';
+          printINFO('InnerTube ${client.name} failed: $error');
+          return StreamProvider(playable: false, statusMSG: message);
         }
-      } on TimeoutException {
-        lastFailure =
-            '${client.name}: request timed out after ${requestTimeout.inMilliseconds} ms';
-      } catch (error) {
-        lastFailure = error is DioException &&
-                error.type == DioExceptionType.cancel
-            ? '${client.name}: handshake exceeded ${requestTimeout.inMilliseconds} ms'
-            : '${client.name}: request failed';
-        printINFO('InnerTube ${client.name} failed: $error');
-      }
+      }());
     }
-    return StreamProvider(playable: false, statusMSG: lastFailure);
+
+    return firstPlayableResult(
+      attempts,
+      onWinner: () {
+        for (final token in cancelTokens) {
+          if (!token.isCancelled) {
+            token.cancel('Another InnerTube client returned a playable stream');
+          }
+        }
+      },
+    );
   }
 
   static Future<StreamProvider> _fetchInnerTube({
@@ -313,11 +439,12 @@ class StreamProvider {
     Map<String, String>? authenticatedHeaders,
     required Duration requestTimeout,
     DeviceStreamProfile? deviceProfile,
+    CancelToken? cancelToken,
   }) async {
-    final cancelToken = CancelToken();
+    final requestCancelToken = cancelToken ?? CancelToken();
     final timeoutTimer = Timer(
       requestTimeout,
-      () => cancelToken.cancel('InnerTube handshake deadline exceeded'),
+      () => requestCancelToken.cancel('InnerTube handshake deadline exceeded'),
     );
     try {
       final uri = Uri.parse(
