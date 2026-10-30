@@ -450,7 +450,7 @@ void main() {
       );
     });
 
-    test('rejects a cache when either stored quality URL is expired', () {
+    test('rejects a cache when the selected quality URL is expired', () {
       final entry = cacheEntry(
         lowUrl: 'https://media.example/audio?expire=1700000000',
         highUrl: 'https://media.example/audio?expire=1700000000',
@@ -459,6 +459,33 @@ void main() {
 
       expect(
         StreamProvider.isCachedStreamUsable(entry, now: now),
+        isFalse,
+      );
+    });
+
+    test('keeps a fresh high-quality URL when only low quality has expired', () {
+      final futureExpiry =
+          now.millisecondsSinceEpoch ~/ 1000 + const Duration(hours: 2).inSeconds;
+      final entry = cacheEntry(
+        lowUrl: 'https://media.example/audio-low?expire=1700000000',
+        highUrl: 'https://media.example/audio-high?expire=$futureExpiry',
+        resolvedAt: now.millisecondsSinceEpoch,
+      );
+
+      expect(
+        StreamProvider.isCachedStreamUsable(
+          entry,
+          qualityIndex: 1,
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        StreamProvider.isCachedStreamUsable(
+          entry,
+          qualityIndex: 0,
+          now: now,
+        ),
         isFalse,
       );
     });
