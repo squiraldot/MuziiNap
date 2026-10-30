@@ -133,6 +133,9 @@ void main() {
       expect(selected.map((format) => format.itag), [140, 251]);
       expect(selected.last.itag, 251);
       expect(selected.first.itag, 140);
+      final provider = StreamProvider(playable: true, audioFormats: selected);
+      expect(provider.lowQualityAudio?.itag, 140);
+      expect(provider.highestQualityAudio?.itag, 251);
     });
 
     test('selects AAC 140 for a low-RAM or cellular device', () {
@@ -194,6 +197,25 @@ void main() {
         ),
       );
       expect(selected.map((format) => format.itag), [250, 141]);
+    });
+
+    test('legacy devices fail closed when no AAC format exists', () {
+      final selected = StreamProvider.parseInnerTubeAudioFormats(
+        [
+          {
+            'itag': 251,
+            'mimeType': 'audio/webm; codecs="opus"',
+            'url': 'https://media.example.com/opus',
+            'bitrate': 160000,
+          },
+        ],
+        profile: const DeviceStreamProfile(
+          androidApiLevel: 28,
+          isLowRamDevice: false,
+          networkType: DeviceNetworkType.wifi,
+        ),
+      );
+      expect(selected, isEmpty);
     });
 
     test('drops spatial and video-wrapped tracks', () {
