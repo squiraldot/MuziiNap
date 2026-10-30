@@ -1579,6 +1579,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           preferredClient: preferredClient,
           authenticatedHeaders: authenticatedHeaders,
           deviceProfile: deviceProfile,
+          refreshVisitorId: () async {
+            if (!Get.isRegistered<MusicServices>()) return null;
+            return Get.find<MusicServices>().genrateVisitorId();
+          },
         );
         final streamInfoJson = resolved.hmStreamingData
           ..['deviceProfile'] = deviceProfileJson
