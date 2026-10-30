@@ -538,9 +538,16 @@ class StreamProvider {
       );
     } catch (error) {
       final message = error is DioException &&
-              error.response?.statusCode != null
-          ? '${primary.name}: HTTP ${error.response!.statusCode}'
-          : '${primary.name}: request failed';
+              error.type == DioExceptionType.cancel
+          ? '${primary.name}: request cancelled or timed out'
+          : error is DioException && error.response?.statusCode != null
+              ? '${primary.name}: HTTP ${error.response!.statusCode}'
+              : error is DioException &&
+                      (error.type == DioExceptionType.connectionTimeout ||
+                          error.type == DioExceptionType.sendTimeout ||
+                          error.type == DioExceptionType.receiveTimeout)
+                  ? '${primary.name}: request timed out'
+                  : '${primary.name}: request failed';
       printINFO('InnerTube ${primary.name} failed: $error');
       primaryResult = StreamProvider(playable: false, statusMSG: message);
     }
