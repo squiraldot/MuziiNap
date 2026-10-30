@@ -87,7 +87,7 @@ void main() {
       breaker.setTrack('track-1');
       playing.add(true);
       processing.add(ProcessingState.loading);
-      await Future<void>.delayed(const Duration(milliseconds: 65));
+      await Future<void>.delayed(const Duration(milliseconds: 90));
       expect(recoveries.map((item) => item.$2), [1, 2]);
       expect(exhaustedCount, 1);
 
