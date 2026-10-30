@@ -10,6 +10,7 @@ Future<Map<String, dynamic>> getStreamInfo(
   bool preferYoutubeExplode = false,
   String? preferredClient,
   Map<String, String>? authenticatedHeaders,
+  Map<String, Object?>? deviceProfile,
 }) async {
   if (songId.startsWith("MPED")) {
     songId = songId.substring(4);
@@ -20,6 +21,9 @@ Future<Map<String, dynamic>> getStreamInfo(
     preferYoutubeExplode: preferYoutubeExplode,
     preferredClient: preferredClient,
     authenticatedHeaders: authenticatedHeaders,
+    deviceProfile: deviceProfile == null
+        ? null
+        : DeviceStreamProfile.fromJson(deviceProfile),
   );
   return playerResponse.hmStreamingData;
 }
