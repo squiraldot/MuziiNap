@@ -74,7 +74,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   isar_community_generator: ^3.4.1
-  build_runner: ^2.17.1
+  build_runner: ^2.16.2
   jnigen: ^0.14.0
 
 flutter:
