@@ -89,6 +89,7 @@ class DeviceAdaptiveStreamSelector {
     final message = error.toString().toLowerCase();
     return const [
       'decoderinitializationexception',
+      'decoder',
       'mediacodecrenderer',
       'mediacodec',
       'no suitable decoder',
