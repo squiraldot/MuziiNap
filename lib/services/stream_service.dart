@@ -395,7 +395,10 @@ class StreamProvider {
             userAgent: client.userAgent,
             clientId: client.id,
             visitorId: visitorId,
-            authenticatedHeaders: authenticatedHeaders,
+            // SAPISIDHASH/cookies are scoped to the WEB_REMIX session; do not
+            // attach them to Android/TV client identities in the same race.
+            authenticatedHeaders:
+                client.name == 'WEB_REMIX' ? authenticatedHeaders : null,
             requestTimeout: requestTimeout,
             deviceProfile: deviceProfile,
             cancelToken: cancelToken,
