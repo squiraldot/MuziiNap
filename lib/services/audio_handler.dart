@@ -38,6 +38,14 @@ import '../utils/home_history.dart';
 import '../ui/screens/Library/library_controller.dart';
 
 Future<AudioHandler> initAudioService() async {
+  // Configure the shared Android audio session before AudioService creates
+  // the player, so the first play request cannot race session initialization.
+  try {
+    final session = await AudioSession.instance;
+    await session.configure(AudioSessionConfiguration.music());
+  } catch (error) {
+    printINFO("Unable to configure music audio session: $error");
+  }
   return await AudioService.init(
     builder: () => MyAudioHandler(),
     config: const AudioServiceConfig(
@@ -115,7 +123,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       ),
     );
     _cacheDirReady = _createCacheDir();
-    unawaited(_configureMusicAudioSession());
     _notifyAudioHandlerAboutPlaybackEvents();
     _listenToPlaybackForNextSong();
     _listenForSequenceStateChanges();
@@ -163,17 +170,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       await _serializeAudioSetting(() => _player.setSkipSilenceEnabled(enabled));
     } catch (e) {
       printERROR("Failed to restore skip-silence setting: $e");
-    }
-  }
-
-  Future<void> _configureMusicAudioSession() async {
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(AudioSessionConfiguration.music());
-    } catch (error) {
-      // Playback must remain available on devices where audio-session
-      // configuration is unavailable or rejected by the platform.
-      printINFO("Unable to configure music audio session: $error");
     }
   }
 
