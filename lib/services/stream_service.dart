@@ -313,8 +313,8 @@ class StreamProvider {
         'x-youtube-client-name': clientId,
         'x-youtube-client-version': clientVersion,
         'user-agent': userAgent,
-        // HttpClient retains HTTP/1.1 connections in its shared pool.
-        'connection': 'keep-alive',
+        // HttpClient retains HTTP/1.1 connections in its shared pool. Avoid
+        // forcing the hop-by-hop Connection header, which is invalid on HTTP/2.
       };
       if (visitorId.isNotEmpty) {
         headers['x-goog-visitor-id'] = visitorId;
@@ -438,7 +438,7 @@ class StreamProvider {
         bitrate: _asInt(item['bitrate'] ?? item['averageBitrate']),
         duration: _asInt(item['approxDurationMs']),
         loudnessDb: (item['loudnessDb'] as num?)?.toDouble() ?? 0.0,
-        url: rawUrl!.trim(),
+        url: prepareStreamUrl(rawUrl!),
         size: _asInt(item['contentLength']),
       ));
     }
