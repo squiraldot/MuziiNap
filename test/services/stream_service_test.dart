@@ -92,6 +92,22 @@ void main() {
   });
 
   group('Device adaptive stream policy', () {
+    test('updates network type without losing detected hardware capabilities', () {
+      const wifiProfile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+
+      final mobileProfile =
+          wifiProfile.withNetworkType(DeviceNetworkType.mobile);
+
+      expect(mobileProfile.androidApiLevel, 35);
+      expect(mobileProfile.isLowRamDevice, isFalse);
+      expect(mobileProfile.networkType, DeviceNetworkType.mobile);
+      expect(mobileProfile.preferredItag, 140);
+    });
+
     test('prefers Opus 251 on API 29+ Wi-Fi devices with adequate RAM', () {
       const profile = DeviceStreamProfile(
         androidApiLevel: 35,
