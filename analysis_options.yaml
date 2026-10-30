@@ -8,6 +8,8 @@
 # The following line activates a set of recommended lints for Flutter apps,
 # packages, and plugins designed to encourage good coding practices.
 analyzer:
+  errors:
+    close_sinks: error
   exclude:
     - build/**
     - android/**
@@ -26,6 +28,7 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
+    close_sinks: true
     # Internal imports use relative paths after the branding migration; keep the legacy
     # package identifier only for the protected compatibility test.
     avoid_relative_lib_imports: false
