@@ -21,8 +21,19 @@ class DownloadedSong {
 
   late String localFilePath;
 
-  /// Isar stores Duration values at millisecond precision.
-  late Duration duration;
+  /// Isar persists the duration as an integer because Duration is not an
+  /// Isar-supported value type.
+  late int durationInMilliseconds;
+
+  /// Keep the Duration API for callers while storing a supported integer.
+  @ignore
+  Duration get duration =>
+      Duration(milliseconds: durationInMilliseconds);
+
+  @ignore
+  set duration(Duration value) {
+    durationInMilliseconds = value.inMilliseconds;
+  }
 
   @Index()
   late DateTime timestamp;
