@@ -14,6 +14,7 @@ class PlaybackCircuitBreaker {
     required Future<bool> Function() checkOnline,
     required Duration Function() positionProvider,
     required Future<void> Function(Duration position, int retryNumber) onFrozen,
+    required Future<void> Function() onRetriesExhausted,
     this.frozenThreshold = const Duration(milliseconds: 3501),
     this.maxRetriesPerTrack = 2,
   })  : _processingStateStream = processingStateStream,
@@ -21,7 +22,8 @@ class PlaybackCircuitBreaker {
         _onlineStream = onlineStream,
         _checkOnline = checkOnline,
         _positionProvider = positionProvider,
-        _onFrozen = onFrozen {
+        _onFrozen = onFrozen,
+        _onRetriesExhausted = onRetriesExhausted {
     if (maxRetriesPerTrack < 0) {
       throw ArgumentError.value(maxRetriesPerTrack, 'maxRetriesPerTrack');
     }
@@ -36,6 +38,7 @@ class PlaybackCircuitBreaker {
   final Future<bool> Function() _checkOnline;
   final Duration Function() _positionProvider;
   final Future<void> Function(Duration position, int retryNumber) _onFrozen;
+  final Future<void> Function() _onRetriesExhausted;
 
   /// Slightly above 3.5 seconds so a stall must exceed the requested threshold.
   final Duration frozenThreshold;
@@ -54,6 +57,7 @@ class PlaybackCircuitBreaker {
   bool _started = false;
   bool _disposed = false;
   int _retryCount = 0;
+  bool _exhausted = false;
 
   int get retryCount => _retryCount;
   String? get trackId => _trackId;
@@ -92,6 +96,7 @@ class PlaybackCircuitBreaker {
     if (_disposed || _trackId == nextTrackId) return;
     _trackId = nextTrackId;
     _retryCount = 0;
+    _exhausted = false;
     _cancelFrozenTimer();
     _evaluate();
   }
@@ -104,7 +109,7 @@ class PlaybackCircuitBreaker {
         !_isOnline ||
         !_isPlaying ||
         !isFrozenState(_processingState) ||
-        _retryCount >= maxRetriesPerTrack) {
+        _exhausted) {
       _cancelFrozenTimer();
       return;
     }
@@ -120,8 +125,21 @@ class PlaybackCircuitBreaker {
         !_isOnline ||
         !_isPlaying ||
         !isFrozenState(_processingState) ||
-        _retryCount >= maxRetriesPerTrack) {
+        _exhausted) {
       _evaluate();
+      return;
+    }
+
+    if (_retryCount >= maxRetriesPerTrack) {
+      _exhausted = true;
+      _recovering = true;
+      try {
+        await _onRetriesExhausted();
+      } catch (_) {
+        // The owner handles terminal UI/error reporting.
+      } finally {
+        _recovering = false;
+      }
       return;
     }
 
