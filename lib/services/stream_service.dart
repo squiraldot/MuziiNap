@@ -241,9 +241,10 @@ class StreamProvider {
     // Refresh it only for bot/visitor/403-style refusals, then retry InnerTube
     // once before falling back to another extractor.
     final normalizedFailure = innerTube.statusMSG.toLowerCase();
-    final visitorRejected = normalizedFailure.contains('not a bot') ||
+    final visitorRejected = normalizedFailure.contains('bot') ||
         normalizedFailure.contains('visitor') ||
-        normalizedFailure.contains('http 403');
+        normalizedFailure.contains('http 403') ||
+        normalizedFailure.contains('403');
     if (visitorRejected && refreshVisitorId != null) {
       try {
         final refreshed = await refreshVisitorId();
@@ -404,7 +405,7 @@ class StreamProvider {
 
     final completer = Completer<StreamProvider>();
     var remaining = pendingAttempts.length;
-    var lastFailure = 'All InnerTube clients failed';
+    final failures = <String>[];
 
     for (final attempt in pendingAttempts) {
       attempt.then((result) {
@@ -420,21 +421,25 @@ class StreamProvider {
           return;
         }
 
-        if (result.statusMSG.isNotEmpty) lastFailure = result.statusMSG;
+        if (result.statusMSG.isNotEmpty) failures.add(result.statusMSG);
         remaining--;
         if (remaining == 0 && !completer.isCompleted) {
           completer.complete(StreamProvider(
             playable: false,
-            statusMSG: lastFailure,
+            statusMSG: failures.isEmpty
+                ? 'All InnerTube clients failed'
+                : failures.join('; '),
           ));
         }
       }, onError: (Object error) {
-        lastFailure = 'InnerTube request failed: $error';
+        failures.add('InnerTube request failed: $error');
         remaining--;
         if (remaining == 0 && !completer.isCompleted) {
           completer.complete(StreamProvider(
             playable: false,
-            statusMSG: lastFailure,
+            statusMSG: failures.isEmpty
+                ? 'All InnerTube clients failed'
+                : failures.join('; '),
           ));
         }
       });
