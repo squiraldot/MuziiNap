@@ -2,7 +2,6 @@ import 'dart:async';
 import './constant.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
@@ -31,7 +30,6 @@ import '../models/hm_streaming_data.dart';
 import '../models/equalizer.dart';
 import '../ui/player/player_controller.dart';
 import '../ui/screens/Home/home_screen_controller.dart';
-import './background_task.dart';
 import './permission_service.dart';
 import '../utils/helper.dart';
 import '../models/media_Item_builder.dart';
@@ -1138,71 +1136,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         break;
 
       case 'setSourceNPlay':
-        final currMed = (extras!['mediaItem'] as MediaItem);
-        currentSongUrl = null;
-        final sourcePauseGeneration = _manualPauseGeneration;
-        _isPlaybackRequested = true;
-        _pendingPlaybackPosition = Duration.zero;
-        _playbackCircuitBreaker.setTrack(currMed.id);
-        _autoAdvanceSongId = currMed.id;
-        final currentSession = ++_playSessionId;
-        isSongLoading = true;
-        currentIndex = 0;
-        
-        // Stop playing the old song immediately while loading the new one
-        await _player.pause();
-
-        // Start UI metadata work and stream resolution in the same turn.
-        final preparation = Future.wait<dynamic>([
-          _resolveStreamInfo(currMed.id),
-          Future<void>.sync(() => mediaItem.add(currMed)),
-        ]);
-        queue.add([currMed]);
-        final preparationResults = await preparation;
-        final streamInfo = preparationResults.first as HMStreamingData;
-        if (currentSession != _playSessionId) {
-          return;
-        }
-        if (!streamInfo.playable) {
-          _isPlaybackRequested = false;
-          _pendingPlaybackPosition = null;
-          currentSongUrl = null;
-          isSongLoading = false;
-          Get.find<PlayerController>().notifyPlayError(streamInfo.statusMSG);
-          playbackState.add(playbackState.value
-              .copyWith(processingState: AudioProcessingState.error));
-          return;
-        }
-        currentSongUrl = currMed.extras!['url'] = streamInfo.audio!.url;
-        currMed.extras!['streamHeaders'] = streamInfo.streamHeaders;
-
-        await _player.setAudioSource(await _createAudioSource(currMed));
-        if (currentSession != _playSessionId) return;
-        _backgroundResourcesReleased = false;
-        _backgroundReleasedPosition = null;
-        isSongLoading = false;
-
-        // Normalize audio
-        if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
-          await _normalizeVolume(streamInfo.audio!.loudnessDb);
-        }
-        if (currentSession != _playSessionId) return;
-
-        if (!_isPlaybackRequested ||
-            sourcePauseGeneration != _manualPauseGeneration) {
-          isSongLoading = false;
-          _pendingPlaybackPosition = null;
-          playbackState.add(playbackState.value.copyWith(
-            playing: false,
-            processingState: AudioProcessingState.ready,
-            updatePosition: _player.position,
-          ));
-          return;
-        }
-        final playFuture = _player.play();
-        _pendingPlaybackPosition = null;
-        _applyEqualizerAfterPlaybackStarts();
-        await playFuture;
+        final currentSong = extras!['mediaItem'] as MediaItem;
+        queue.add([currentSong]);
+        // Route single-track requests through the same recovery-aware path as
+        // queue playback so initial source errors receive one fresh URL retry.
+        await customAction('playByIndex', {'index': 0});
         break;
 
       case 'toggleSkipSilence':
@@ -1596,22 +1534,20 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       final deviceProfile = await DeviceAdaptiveStreamSelector().detect();
       final deviceProfileJson = deviceProfile.toJson();
       if (songsUrlCacheBox.containsKey(songId) && !generateNewUrl) {
-        final streamInfoJson = songsUrlCacheBox.get(songId);
-        if (streamInfoJson.runtimeType.toString().contains("Map") &&
-            streamInfoJson.containsKey('streamHeaders') &&
-            !isExpired(url: (streamInfoJson['lowQualityAudio']['url'])) &&
-            streamInfoJson['deviceProfile'] is Map &&
+        final cachedStreamInfo = songsUrlCacheBox.get(songId);
+        if (StreamProvider.isCachedStreamUsable(cachedStreamInfo) &&
+            cachedStreamInfo is Map &&
+            cachedStreamInfo['deviceProfile'] is Map &&
             DeviceStreamProfile.fromJson(
-                  Map<String, Object?>.from(streamInfoJson['deviceProfile']),
+                  Map<String, Object?>.from(cachedStreamInfo['deviceProfile']),
                 ) ==
                 deviceProfile) {
           printINFO("Got cached Url ($songId)");
-          streamInfo = HMStreamingData.fromJson(streamInfoJson);
+          streamInfo = HMStreamingData.fromJson(cachedStreamInfo);
         }
       }
 
       if (streamInfo == null) {
-        final token = RootIsolateToken.instance;
         Map<String, String>? authenticatedHeaders;
         try {
           authenticatedHeaders = InnerTubeSessionManager()
@@ -1619,37 +1555,31 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         } on InnerTubeSessionException {
           // Anonymous extraction remains available when no account session exists.
         }
-        // A first attempt uses WEB_REMIX. On URL/source refresh, promote
-        // ANDROID so the retry changes client context instead of replaying
-        // the same failed direct URL.
+
+        // A source refresh promotes ANDROID so a retry changes client context
+        // instead of replaying the same failed direct URL.
         final preferredClient = deviceProfile.isLegacyAndroid
             ? 'WEB_REMIX'
             : (generateNewUrl ? 'ANDROID' : 'WEB_REMIX');
-        Map<String, dynamic>? streamInfoJson;
-        try {
-          streamInfoJson = await Isolate.run(
-            () => getStreamInfo(
-              songId,
-              token,
-              preferYoutubeExplode: generateNewUrl,
-              preferredClient: preferredClient,
-              authenticatedHeaders: authenticatedHeaders,
-              deviceProfile: deviceProfileJson,
-            ),
-          );
-        } catch (e) {
-          printINFO("Isolate error (likely Hot Reload issue): \$e");
-          streamInfoJson = await getStreamInfo(
-            songId,
-            token,
-            preferYoutubeExplode: generateNewUrl,
-            preferredClient: preferredClient,
-            authenticatedHeaders: authenticatedHeaders,
-            deviceProfile: deviceProfileJson,
-          );
-        }
+
+        // Keep asynchronous HTTP work on the app isolate. This lets stream
+        // resolution read the already-open Hive preferences and reuse the
+        // process-wide Dio connection pool across songs. Isolate.run created a
+        // fresh resolver/client per track and could not reliably access Hive.
+        final resolved = await StreamProvider.fetch(
+          songId,
+          preferYoutubeExplode: generateNewUrl,
+          preferredClient: preferredClient,
+          authenticatedHeaders: authenticatedHeaders,
+          deviceProfile: deviceProfile,
+        );
+        final streamInfoJson = resolved.hmStreamingData
+          ..['deviceProfile'] = deviceProfileJson
+          ..['resolvedAt'] = DateTime.now().millisecondsSinceEpoch;
         streamInfo = HMStreamingData.fromJson(streamInfoJson);
-        if (streamInfo.playable) songsUrlCacheBox.put(songId, streamInfoJson);
+        if (streamInfo.playable) {
+          songsUrlCacheBox.put(songId, streamInfoJson);
+        }
       }
 
       streamInfo.setQualityIndex(qualityIndex as int);
