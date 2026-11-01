@@ -21,7 +21,11 @@ class PlayerScriptCache {
     Future<String> Function(Uri url)? fetcher,
     this.maxEntries = 4,
     this.timeout = const Duration(seconds: 8),
-  })  : _dio = dio ?? Dio(),
+  })  : _dio = dio ?? Dio(BaseOptions(
+          connectTimeout: timeout,
+          sendTimeout: timeout,
+          receiveTimeout: timeout,
+        )),
         _fetcher = fetcher;
 
   final Dio _dio;
@@ -77,7 +81,7 @@ class PlayerScriptCache {
     final source = await (_fetcher?.call(url) ?? _fetchWithDio(url))
         .timeout(timeout);
     final trimmed = source.trim();
-    if (trimmed.length < 64 ||
+    if (trimmed.length < 32 ||
         (!trimmed.contains('function') && !trimmed.contains('=>'))) {
       throw const FormatException('Invalid YouTube player JavaScript');
     }
