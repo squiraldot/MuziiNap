@@ -7,6 +7,11 @@ import 'package:dio/io.dart';
 import 'package:hive/hive.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'youtube/stream_url_decipherer.dart';
+import 'youtube/player_js_service.dart';
+import 'youtube/nsig_decipher_service.dart';
+import 'youtube/signature_decipher_service.dart';
+
 import 'device_adaptive_stream_selector.dart';
 
 import '../utils/helper.dart';
@@ -45,12 +50,17 @@ class StreamProvider {
     );
 
   static const Duration _requestTimeout = Duration(seconds: 5);
+  static final PlayerJsService _playerJsService = PlayerJsService();
+  static final StreamUrlDecipherer _streamUrlDecipherer = StreamUrlDecipherer(
+    nsig: NsigDecipherService(_playerJsService),
+    signature: SignatureDecipherService(_playerJsService),
+  );
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 1500);
 
   // Bump when URL playability semantics change so previously cached,
   // syntactically valid but unusable InnerTube URLs are re-resolved.
-  static const int streamResolverVersion = 3;
+  static const int streamResolverVersion = 4;
   static const Duration _urlCacheMaxAge = Duration(minutes: 10);
   static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
   static const List<String> _defaultPipedInstances = [
@@ -747,8 +757,13 @@ class StreamProvider {
         );
       }
 
-      final audioFormats = parseInnerTubeAudioFormats(
+      final playerJsUrl = _extractPlayerJsUrl(decoded);
+      final decipheredFormats = await _streamUrlDecipherer.decipherFormats(
         formats,
+        playerUrl: playerJsUrl,
+      );
+      final audioFormats = parseInnerTubeAudioFormats(
+        decipheredFormats,
         profile: deviceProfile,
       );
       if (audioFormats.isEmpty) {
@@ -778,6 +793,40 @@ class StreamProvider {
     } finally {
       timeoutTimer.cancel();
     }
+  }
+
+  /// Finds the player script associated with this exact InnerTube response.
+  static Uri? _extractPlayerJsUrl(Map response) {
+    final candidates = <dynamic>[
+      (response['assets'] is Map) ? response['assets']['js'] : null,
+      (response['playerConfig'] is Map &&
+              response['playerConfig']['assets'] is Map)
+          ? response['playerConfig']['assets']['js']
+          : null,
+      (response['playerResponse'] is Map &&
+              response['playerResponse']['assets'] is Map)
+          ? response['playerResponse']['assets']['js']
+          : null,
+    ];
+    for (final candidate in candidates) {
+      final raw = candidate?.toString().trim();
+      if (raw == null || raw.isEmpty) continue;
+      final parsed = Uri.tryParse(raw.startsWith('//') ? 'https:$raw' : raw);
+      final resolved = parsed == null
+          ? null
+          : parsed.hasScheme
+              ? parsed
+              : Uri.https('www.youtube.com', parsed.path);
+      if (resolved != null &&
+          resolved.scheme == 'https' &&
+          (resolved.host == 'youtube.com' ||
+              resolved.host == 'www.youtube.com' ||
+              resolved.host == 'youtube-nocookie.com' ||
+              resolved.host == 'www.youtube-nocookie.com')) {
+        return resolved;
+      }
+    }
+    return null;
   }
 
   static List<Audio> parseInnerTubeAudioFormats(
