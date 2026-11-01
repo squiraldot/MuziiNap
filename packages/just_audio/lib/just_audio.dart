@@ -3696,13 +3696,12 @@ class LockCachingAudioSource extends StreamAudioSource {
 /// also keeps track of the [end] of the byte range so that the producer knows
 /// when to stop adding data.
 class _InProgressCacheResponse {
-  // NOTE: This isn't necessarily memory efficient. Since the entire audio file
-  // will likely be downloaded at a faster rate than the rate at which the
-  // player is consuming audio data, it is also likely that this buffered data
-  // will never be used.
-  // TODO: Improve this code.
+  // The request future is completed before the upstream HTTP subscription is
+  // resumed, so the response stream attaches its listener before the next
+  // chunk arrives. PublishSubject therefore preserves the live stream without
+  // retaining every already-consumed chunk in an unbounded replay buffer.
   // ignore: close_sinks
-  final controller = ReplaySubject<List<int>>();
+  final controller = PublishSubject<List<int>>();
   final int? end;
   _InProgressCacheResponse({
     required this.end,

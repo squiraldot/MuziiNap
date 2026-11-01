@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/innertube-primary-streaming
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +32,8 @@ jobs:
           gradle-version: '8.14.2'
       - name: Install packages
         run: flutter pub get
+      - name: Generate Isar collection schemas
+        run: dart run build_runner build --delete-conflicting-outputs
       - name: Compile Android debug APK
         run: flutter build apk --debug
       - name: Native DSP unit tests

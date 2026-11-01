@@ -27,7 +27,7 @@ class LocalProxy {
           final task = _urlMap[realId];
           if (task == null) {
             request.response.statusCode = HttpStatus.notFound;
-            request.response.close();
+            await request.response.close();
             return;
           }
 
@@ -60,13 +60,13 @@ class LocalProxy {
           } catch (e) {
             printINFO("LocalProxy Error: $e");
             request.response.statusCode = HttpStatus.internalServerError;
-            request.response.close();
+            await request.response.close();
           } finally {
             client.close();
           }
         } else {
           request.response.statusCode = HttpStatus.notFound;
-          request.response.close();
+          await request.response.close();
         }
       });
     } catch (e) {

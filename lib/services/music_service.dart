@@ -1,9 +1,9 @@
 // ignore_for_file: constant_identifier_names
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:audio_service/audio_service.dart';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
@@ -14,6 +14,8 @@ import '../models/playlist.dart';
 import './utils.dart';
 import '../utils/helper.dart';
 import '../utils/youtube_auth.dart';
+import 'innertube_session_manager.dart';
+import 'innertube_auth_interceptor.dart';
 import '../models/home_mood.dart';
 import 'constant.dart';
 import 'continuations.dart';
@@ -75,8 +77,16 @@ class MusicServices extends getx.GetxService {
     'x-youtube-client-version': '20.10.38',
   };
 
+  late final InnerTubeAuthInterceptor _authInterceptor =
+      InnerTubeAuthInterceptor(
+    sessionManager: InnerTubeSessionManager(),
+    headersProvider: () => _headers,
+    onSessionExpired: _handleExpiredYouTubeSession,
+  );
+
   @override
   void onInit() {
+    dio.interceptors.add(_authInterceptor);
     _initFuture = init();
     super.onInit();
   }
@@ -206,44 +216,19 @@ class MusicServices extends getx.GetxService {
     }
     _headers['X-Origin'] = 'https://music.youtube.com';
 
-    final sapisid = _extractCookie(normalizedCookies, 'SAPISID') ??
-        _extractCookie(normalizedCookies, '__Secure-3PAPISID') ??
-        _extractCookie(normalizedCookies, '__Secure-1PAPISID');
-    if (sapisid == null || sapisid.isEmpty) {
+    try {
+      final sessionManager = InnerTubeSessionManager();
+      await sessionManager.storeCookies(normalizedCookies);
+      _headers.addAll(
+        sessionManager.getAuthenticatedHeaders('https://music.youtube.com'),
+      );
+      _authInterceptor.reset();
+      return true;
+    } on InnerTubeSessionException catch (error) {
       _headers.remove('authorization');
+      printINFO('YouTube session rejected: ${error.code.name}');
       return false;
     }
-
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final hash = sha1.convert(
-      utf8.encode('$timestamp $sapisid https://music.youtube.com'),
-    ).toString();
-    final auth = 'SAPISIDHASH ${timestamp}_$hash';
-
-    final sapisid1p = _extractCookie(normalizedCookies, '__Secure-1PAPISID');
-    final sapisid3p = _extractCookie(normalizedCookies, '__Secure-3PAPISID');
-    final authParts = <String>[auth];
-    for (final entry in <String, String?>{
-      'SAPISID1PHASH': sapisid1p,
-      'SAPISID3PHASH': sapisid3p,
-    }.entries) {
-      final sid = entry.value;
-      if (sid == null || sid.isEmpty) continue;
-      final sidHash = sha1
-          .convert(utf8.encode('$timestamp $sid https://music.youtube.com'))
-          .toString();
-      authParts.add(entry.key + ' ' + timestamp.toString() + '_' + sidHash);
-    }
-    _headers['authorization'] = authParts.join(' ');
-    return true;
-  }
-
-  String? _extractCookie(String cookies, String name) {
-    final match = RegExp(
-      '(^|;\\s*)${RegExp.escape(name)}=([^;]*)',
-      caseSensitive: true,
-    ).firstMatch(cookies);
-    return match?.group(2);
   }
 
   Future<bool> validateYouTubeSession() async {
@@ -270,17 +255,74 @@ class MusicServices extends getx.GetxService {
   }
 
   void clearAuthCookies() {
+    unawaited(InnerTubeSessionManager().clearCookies());
+    _resetInMemoryAuthHeaders();
+  }
+
+  void _resetInMemoryAuthHeaders() {
     _headers['cookie'] = 'CONSENT=YES+1';
     for (final key in [
       'authorization',
       'X-Goog-PageId',
       'X-Goog-AuthUser',
+      'X-Goog-Visitor-Id',
       'X-Youtube-Bootstrap-Logged-In',
       'X-Origin',
       'X-Youtube-Identity-Token',
     ]) {
       _headers.remove(key);
     }
+    _context['context']['client'].remove('visitorData');
+  }
+
+  /// Invalidates only the currently active account whose cookie was rejected.
+  /// Saved secondary accounts are retained so the user can switch back to them.
+  Future<bool> _handleExpiredYouTubeSession(String? failedCookie) async {
+    if (failedCookie == null || failedCookie.isEmpty) return false;
+
+    final box = Hive.box(appPrefsBoxName);
+    final currentCookies = box.get('yt_cookies')?.toString();
+    // Ignore late failures from requests sent before the user switched account
+    // or completed a newer login.
+    if (currentCookies != failedCookie) return false;
+
+    final activeKey = box.get('yt_active_account_key')?.toString();
+    final storedAccounts = box.get('yt_accounts');
+    if (storedAccounts is Map && activeKey != null) {
+      final accounts = <String, dynamic>{
+        for (final entry in storedAccounts.entries)
+          entry.key.toString(): entry.value,
+      };
+      final activeAccount = accounts[activeKey];
+      if (activeAccount is Map &&
+          activeAccount['cookies']?.toString() == failedCookie) {
+        accounts.remove(activeKey);
+        if (accounts.isEmpty) {
+          await box.delete('yt_accounts');
+        } else {
+          await box.put('yt_accounts', accounts);
+        }
+      }
+    }
+
+    await InnerTubeSessionManager().clearCookies();
+    for (final key in [
+      'yt_cookies',
+      'yt_active_account_key',
+      'yt_visitor_data',
+      'yt_data_sync_id',
+      'yt_auth_user',
+      'yt_identity_token',
+      'AccountName',
+      'AccountThumbUrl',
+      'yt_account_name',
+      'yt_account_photo_url',
+    ]) {
+      await box.delete(key);
+    }
+    await box.put('yt_logged_in', false);
+    _resetInMemoryAuthHeaders();
+    return true;
   }
 
   set hlCode(String code) {
@@ -310,35 +352,8 @@ class MusicServices extends getx.GetxService {
 
   Future<Response> _sendRequest(String action, Map<dynamic, dynamic> data,
       {additionalParams = ""}) async {
-    // SAPISIDHASH is timestamped; rebuild it for every request so a
-    // long-lived signed-in session does not start returning 401.
-    final cookies = _headers['cookie'] ?? '';
-    final sapisid = _extractCookie(cookies, 'SAPISID') ??
-        _extractCookie(cookies, '__Secure-3PAPISID') ??
-        _extractCookie(cookies, '__Secure-1PAPISID');
-    if (sapisid != null && sapisid.isNotEmpty) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      final authParts = <String>[];
-      final hash = sha1
-          .convert(utf8.encode('$timestamp $sapisid https://music.youtube.com'))
-          .toString();
-      authParts.add('SAPISIDHASH ${timestamp}_$hash');
-
-      final sapisid1p = _extractCookie(cookies, '__Secure-1PAPISID');
-      final sapisid3p = _extractCookie(cookies, '__Secure-3PAPISID');
-      for (final entry in <String, String?>{
-        'SAPISID1PHASH': sapisid1p,
-        'SAPISID3PHASH': sapisid3p,
-      }.entries) {
-        final sid = entry.value;
-        if (sid == null || sid.isEmpty) continue;
-        final sidHash = sha1
-            .convert(utf8.encode('$timestamp $sid https://music.youtube.com'))
-            .toString();
-        authParts.add(entry.key + ' ' + timestamp.toString() + '_' + sidHash);
-      }
-      _headers['authorization'] = authParts.join(' ');
-    }
+    // InnerTubeAuthInterceptor injects the latest Hive cookies and a fresh
+    // SAPISIDHASH for every request, including continuation requests.
     try {
       final response =
           await dio.post("$baseUrl$action$fixedParms$additionalParams",

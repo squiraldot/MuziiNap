@@ -143,7 +143,7 @@ class ExportFileDialogController extends GetxController {
       ready.value = true;
     } catch (e) {
       errorMessage.value = 'Could not scan downloaded files: $e';
-      print(errorMessage.value);
+      debugPrint(errorMessage.value);
     } finally {
       scanning.value = false;
     }
@@ -185,7 +185,7 @@ class ExportFileDialogController extends GetxController {
       }
     } catch (e) {
       errorMessage.value = 'Export failed: $e';
-      print(errorMessage.value);
+      debugPrint(errorMessage.value);
     } finally {
       exportRunning.value = false;
     }

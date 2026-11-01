@@ -767,9 +767,12 @@ class PlayerController extends GetxController
       return;
     }
 
-    await _playerPanelCheck();
-    await _audioHandler
-        .customAction("setSourceNPlay", {'mediaItem': mediaItem});
+    // Open/restore the player panel while the audio handler resolves the
+    // stream. Waiting for the panel animation first unnecessarily delays TTFP.
+    await Future.wait<void>([
+      _playerPanelCheck(),
+      _audioHandler.customAction("setSourceNPlay", {'mediaItem': mediaItem}),
+    ]);
 
     // The first tap after a cold app launch can start playback before the
     // mediaItem stream has emitted/updated currentSong. Fetch from the explicit
@@ -803,12 +806,15 @@ class PlayerController extends GetxController
       }
     });
 
-    await _playerPanelCheck();
+    final panelPreparation = _playerPanelCheck();
     await _audioHandler.updateQueue(mediaItems);
     if (isShuffleModeEnabled.value) {
       await _audioHandler.customAction("shuffleCmd", {"index": index});
     }
-    await _audioHandler.customAction("playByIndex", {"index": index});
+    await Future.wait<void>([
+      panelPreparation,
+      _audioHandler.customAction("playByIndex", {"index": index}),
+    ]);
   }
 
   Future<void> startRadio(MediaItem? mediaItem, {String? playlistid}) async {
@@ -1371,7 +1377,8 @@ class PlayerController extends GetxController
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    _audioHandler.customAction('dispose');
+    // AudioHandler is app-scoped; a route teardown must never stop playback.
+    // AudioPlaybackService owns final AudioPlayer disposal.
     keyboardSubscription.cancel();
     scrollController.dispose();
     gesturePlayerStateAnimationController?.dispose();

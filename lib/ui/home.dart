@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../services/update_checker.dart';
+import '../services/permission_service.dart';
 import '../utils/update_check_flag_file.dart';
 
 import './screens/Home/home_screen_controller.dart';
@@ -38,6 +40,17 @@ class Home extends StatelessWidget {
     final homeScreenController = Get.find<HomeScreenController>();
     final size = MediaQuery.of(context).size;
     final isWideScreen = size.width > 800;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Ask after the first frame so the app's home screen is visible before
+      // presenting the optional system battery-exemption explanation.
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
+        if (context.mounted) {
+          unawaited(
+            PermissionService.checkBatteryOptimization(context),
+          );
+        }
+      }));
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!playerController.initFlagForPlayer &&
           !playerController.isMiniPlayerDismissed.value &&

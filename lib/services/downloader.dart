@@ -20,7 +20,8 @@ import '../models/media_Item_builder.dart';
 import '../ui/screens/Library/library_controller.dart';
 import 'music_service.dart';
 
-class Downloader extends GetxService {
+/// App-scoped download queue/cache manager. Register once during startup.
+class DownloadCacheService extends GetxService {
   static const MethodChannel _downloadNotificationChannel =
       MethodChannel('muziinap/download_notifications');
   final _dio = Dio();
@@ -197,7 +198,13 @@ class Downloader extends GetxService {
       message: song.title,
       progress: 0,
     );
-    final playerResponse = await StreamProvider.fetch(song.id);
+    final playerResponse = await StreamProvider.fetch(
+      song.id,
+      refreshVisitorId: () async {
+        if (!Get.isRegistered<MusicServices>()) return null;
+        return Get.find<MusicServices>().genrateVisitorId();
+      },
+    );
 
     if (!playerResponse.playable) {
       ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
@@ -342,4 +349,16 @@ class Downloader extends GetxService {
 
     return complete.future;
   }
+
+  @override
+  void onClose() {
+    // Dio owns sockets/timers. Close only during explicit app-service teardown,
+    // never when a download screen is popped.
+    _dio.close(force: true);
+    super.onClose();
+  }
 }
+
+/// Backwards-compatible type name used by existing UI code.
+typedef Downloader = DownloadCacheService;
+
