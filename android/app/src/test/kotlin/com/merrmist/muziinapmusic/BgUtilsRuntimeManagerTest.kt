@@ -45,6 +45,19 @@ class BgUtilsRuntimeManagerTest {
     }
 
     @Test
+    fun elfLibraryValidationRejectsFourteenByteSymlinkPlaceholder() {
+        val file = File.createTempFile("bgutils-libz", ".so")
+        try {
+            file.writeBytes("libz.so.1.3.1".toByteArray())
+            assertFalse(BgUtilsRuntimeManager.isElfLibrary(file))
+            file.writeBytes(byteArrayOf(0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00))
+            assertTrue(BgUtilsRuntimeManager.isElfLibrary(file))
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
     fun verifiesSha256AndRejectsMismatch() {
         val file = File.createTempFile("bgutils-digest", ".bin")
         try {
