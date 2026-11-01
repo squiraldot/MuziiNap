@@ -148,7 +148,7 @@ internal object BgUtilsRuntimeManager {
             }
             archive.delete()
             val packageJson = File(serverDir, "package.json")
-            check(packageJson.isFile && packageJson.readText().contains("\\"version\\": \\"$PROVIDER_VERSION\\"")) {
+            check(packageJson.isFile && packageJson.readText().contains("\"version\": \"$PROVIDER_VERSION\"")) {
                 "Pinned BgUtils server package/version is missing from the source archive."
             }
 
