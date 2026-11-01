@@ -44,6 +44,9 @@ class BgUtilsPotService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (serverProcess?.isAlive == true && BgUtilsRuntimeManager.isServerReady()) {
+            return START_STICKY
+        }
         Thread({
             try {
                 BgUtilsRuntimeManager.prepareServer(this) { message -> updateNotification(message) }
@@ -69,7 +72,7 @@ class BgUtilsPotService : Service() {
                 stopSelf()
             }
         }, "MuziiNap-BgUtils-setup").start()
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun updateNotification(message: String) {
