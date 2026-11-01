@@ -15,6 +15,7 @@ class BgUtilsPotService : Service() {
     companion object {
         @Volatile var isRunning: Boolean = false
             private set
+        const val ACTION_STOP = "com.merrmist.muziinapmusic.BGUTILS_STOP"
     }
 
     @Volatile private var serverProcess: Process? = null
@@ -111,7 +112,4 @@ class BgUtilsPotService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    companion object {
-        const val ACTION_STOP = "com.merrmist.muziinapmusic.BGUTILS_STOP"
-    }
 }
