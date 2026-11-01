@@ -115,8 +115,11 @@ class MainActivity : AudioServiceActivity() {
                                     while (System.currentTimeMillis() < deadline) {
                                         if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils setup cancelled.")
                                         if (BgUtilsRuntimeManager.isServerReady()) { ready = true; break }
-                                        if (!BgUtilsPotService.isRunning) {
-                                            // Service may still be entering foreground startup; continue bounded polling.
+                                        if (BgUtilsPotService.setupState == "failed") {
+                                            throw IllegalStateException(BgUtilsPotService.lastFailure ?: "BgUtils service startup failed.")
+                                        }
+                                        if (!BgUtilsPotService.isRunning && BgUtilsPotService.setupState == "idle") {
+                                            throw IllegalStateException("BgUtils foreground service stopped before becoming healthy.")
                                         }
                                         Thread.sleep(500)
                                     }
