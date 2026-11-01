@@ -429,6 +429,7 @@ internal object BgUtilsRuntimeManager {
             finished.set(true)
             watchdog.interrupt()
             connection.disconnect()
+            if (activeDownloadConnection === connection) activeDownloadConnection = null
             if (part.exists()) part.delete()
         }
     }
