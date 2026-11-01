@@ -6,7 +6,7 @@ import 'package:hive/hive.dart';
 
 import '../../../services/constant.dart';
 
-enum _BgUtilsSetupState { idle, checkingRuntime, downloadingRuntime, verifyingRuntime, awaitingInstallation, startingService, running, failed }
+enum _BgUtilsSetupState { idle, checkingRuntime, downloadingRuntime, verifyingRuntime, awaitingInstallation, startingService, running, failed, cancelled }
 
 class BgUtilsProviderSettings extends StatefulWidget {
   const BgUtilsProviderSettings({super.key});
@@ -23,6 +23,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
   bool _setupInFlight = false;
   bool _waitingForInstaller = false;
   bool _awaitingInstallPermission = false;
+  bool _cancelRequested = false;
   int _downloadedBytes = 0;
   int _downloadTotalBytes = 0;
   int _pollGeneration = 0;
@@ -117,7 +118,10 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       _running = running;
       _downloadedBytes = downloaded;
       _downloadTotalBytes = total;
-      if (running) {
+      if (_cancelRequested && !running) {
+        _state = _BgUtilsSetupState.cancelled;
+        _stageMessage = 'Setup cancelled.';
+      } else if (running) {
         _state = _BgUtilsSetupState.running;
         _errorMessage = null;
         _stageMessage = 'Provider running successfully.';
@@ -132,7 +136,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
         _stageMessage = 'Waiting for Android installation...';
       } else if (serviceState != null && serviceState != 'idle' && serviceState != 'stopping') {
         _stageMessage = serviceState;
-      } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && !_waitingForInstaller) {
+      } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && _state != _BgUtilsSetupState.cancelled && !_waitingForInstaller) {
         _state = _BgUtilsSetupState.idle;
       }
     });
@@ -142,6 +146,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
   Future<void> _setup() async {
     if (_setupInFlight || _running) return;
     setState(() {
+      _cancelRequested = false;
       _setupInFlight = true;
       _errorMessage = null;
       _state = _BgUtilsSetupState.checkingRuntime;
@@ -177,17 +182,17 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       await _refreshStatus();
     } on TimeoutException {
       if (mounted) setState(() {
-        _state = _BgUtilsSetupState.failed;
+        _state = _cancelRequested ? _BgUtilsSetupState.cancelled : _BgUtilsSetupState.failed;
         _errorMessage = 'Setup exceeded the 18-minute limit. Check your connection and retry.';
       });
     } on PlatformException catch (error) {
       if (mounted) setState(() {
-        _state = _BgUtilsSetupState.failed;
+        _state = _cancelRequested ? _BgUtilsSetupState.cancelled : _BgUtilsSetupState.failed;
         _errorMessage = '${error.message ?? 'BgUtils setup failed'} (${error.code})';
       });
     } catch (error) {
       if (mounted) setState(() {
-        _state = _BgUtilsSetupState.failed;
+        _state = _cancelRequested ? _BgUtilsSetupState.cancelled : _BgUtilsSetupState.failed;
         _errorMessage = 'Unexpected setup error: $error';
       });
     } finally {
@@ -195,6 +200,24 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
         setState(() => _setupInFlight = false);
         await _refreshStatus();
       }
+    }
+  }
+
+  Future<void> _cancelSetup() async {
+    if (!_setupInFlight) return;
+    _cancelRequested = true;
+    try {
+      await _channel.invokeMethod<bool>('cancel').timeout(const Duration(seconds: 5));
+      if (mounted) {
+        setState(() {
+          _state = _BgUtilsSetupState.cancelled;
+          _stageMessage = 'Setup cancelled.';
+        });
+      }
+    } on PlatformException catch (error) {
+      if (mounted) _showMessage(error.message ?? 'Could not cancel setup.');
+    } on TimeoutException {
+      if (mounted) _showMessage('Timed out while requesting setup cancellation.');
     }
   }
 
@@ -240,6 +263,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       case _BgUtilsSetupState.startingService: return 'Starting local service...';
       case _BgUtilsSetupState.running: return 'Local BgUtils service is running';
       case _BgUtilsSetupState.failed: return 'Setup failed. Tap Retry.';
+      case _BgUtilsSetupState.cancelled: return 'Setup cancelled. Tap Retry to try again.';
     }
   }
 
@@ -272,7 +296,16 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: LinearProgressIndicator(value: (_downloadedBytes / _downloadTotalBytes).clamp(0.0, 1.0)),
         ),
-      if (_state == _BgUtilsSetupState.failed)
+      if (_setupInFlight)
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _cancelSetup,
+            icon: const Icon(Icons.close),
+            label: const Text('Cancel'),
+          ),
+        ),
+      if (_state == _BgUtilsSetupState.failed || _state == _BgUtilsSetupState.cancelled)
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
