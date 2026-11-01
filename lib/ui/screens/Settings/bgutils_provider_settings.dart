@@ -130,6 +130,8 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
         _state = _BgUtilsSetupState.awaitingInstallation;
         _stageMessage = 'Waiting for Android installation...';
+      } else if (serviceState != null && serviceState != 'idle' && serviceState != 'stopping') {
+        _stageMessage = serviceState;
       } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && !_waitingForInstaller) {
         _state = _BgUtilsSetupState.idle;
       }
@@ -176,7 +178,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     } on TimeoutException {
       if (mounted) setState(() {
         _state = _BgUtilsSetupState.failed;
-        _errorMessage = 'Setup exceeded the 9-minute limit. Check your connection and retry.';
+        _errorMessage = 'Setup exceeded the 18-minute limit. Check your connection and retry.';
       });
     } on PlatformException catch (error) {
       if (mounted) setState(() {
