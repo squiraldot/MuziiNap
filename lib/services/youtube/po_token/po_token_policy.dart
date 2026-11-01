@@ -66,10 +66,15 @@ class PoTokenPolicy {
 
   PoTokenPurpose? purposeRequiredByPlayerReason(Object? reason) {
     if (reason is! String) return null;
-    final normalized = reason.toLowerCase();
-    if (normalized.contains('potoken') ||
-        normalized.contains('po token') ||
-        normalized.contains('proof-of-origin') ||
+    // Upstream errors appear in both human-readable and enum-like forms.
+    // Normalize separators before matching, but keep the match explicit so
+    // generic forbidden responses never trigger token generation.
+    final normalized = reason
+        .toLowerCase()
+        .replaceAll(RegExp(r'[_-]+'), ' ')
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .trim();
+    if (normalized.contains('po token') ||
         normalized.contains('proof of origin')) {
       return PoTokenPurpose.player;
     }
