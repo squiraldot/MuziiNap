@@ -23,6 +23,8 @@ import java.util.concurrent.TimeUnit
 internal object BgUtilsRuntimeManager {
     const val HELPER_PACKAGE = "com.deniscerri.ytdl.nodejs"
     const val PORT = 4416
+    // Android network security config permits cleartext localhost, not the 127.0.0.1 literal.
+    internal const val HEALTH_CHECK_URL = "http://localhost:4416/ping"
     private const val PROVIDER_VERSION = "2.0.2"
     private const val RUNTIME_VERSION = "26.12.1"
     @Volatile var runtimeDownloadInProgress: Boolean = false
@@ -214,7 +216,7 @@ internal object BgUtilsRuntimeManager {
     }
 
     fun isServerReady(): Boolean = try {
-        val connection = URL("http://127.0.0.1:$PORT/ping").openConnection() as HttpURLConnection
+        val connection = URL(HEALTH_CHECK_URL).openConnection() as HttpURLConnection
         connection.connectTimeout = 800
         connection.readTimeout = 800
         connection.useCaches = false
