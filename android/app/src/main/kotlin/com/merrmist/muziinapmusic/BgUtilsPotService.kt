@@ -90,7 +90,7 @@ class BgUtilsPotService : Service() {
                     }
                     Thread.sleep(400)
                 }
-                check(BgUtilsRuntimeManager.isServerReady()) { "BgUtils server did not become ready." }
+                if (!stopping.get()) check(BgUtilsRuntimeManager.isServerReady()) { "BgUtils server did not become ready." }
             } catch (error: Exception) {
                 setupState = "failed"
                 lastFailure = error.message ?: error.javaClass.simpleName
