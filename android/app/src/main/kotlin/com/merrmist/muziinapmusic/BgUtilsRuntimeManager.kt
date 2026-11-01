@@ -114,6 +114,12 @@ internal object BgUtilsRuntimeManager {
     }
 
     fun launchInstaller(activity: Activity, apk: File): String {
+        val selectedAsset = runtimeAssets.entries.firstOrNull { apk.name.endsWith("-" + it.key + ".apk") }
+            ?: throw IllegalStateException("Runtime APK does not match a supported device ABI.")
+        check(apk.isFile && apk.length() > 0L && verifySha256(apk, selectedAsset.value.second)) {
+            runtimeInstallState = "failed"
+            "Refusing to install a missing or unverified Node.js runtime APK."
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !activity.packageManager.canRequestPackageInstalls()) {
             val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
                 .setData(Uri.parse("package:${activity.packageName}"))
