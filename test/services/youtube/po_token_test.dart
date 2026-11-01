@@ -29,7 +29,10 @@ class FakeProvider implements PoTokenProvider {
       token: 'test-token-${request.videoId}',
       providerId: id,
       clientName: request.clientName,
+      clientVersion: request.clientVersion,
       videoId: request.videoId,
+      visitorData: request.visitorData,
+      sessionId: request.sessionId,
       binding: request.binding,
       bindingValue: request.bindingValue!,
       purpose: request.purpose,
@@ -107,11 +110,32 @@ void main() {
       expect(provider.calls, 2);
     });
 
+    test('reuses visitor-bound tokens across videos in the same session', () async {
+      final provider = FakeProvider();
+      final manager = PoTokenManager(provider: provider);
+      final first = await manager.getToken(
+        request(videoId: 'one', binding: PoTokenBinding.visitor),
+      );
+      final second = await manager.getToken(
+        request(videoId: 'two', binding: PoTokenBinding.visitor),
+      );
+      expect(second?.token, first?.token);
+      expect(provider.calls, 1);
+    });
+
     test('isolates tokens by visitor session identity', () async {
       final provider = FakeProvider();
       final manager = PoTokenManager(provider: provider);
       await manager.getToken(request(visitorData: 'visitor-one'));
       await manager.getToken(request(visitorData: 'visitor-two'));
+      expect(provider.calls, 2);
+    });
+
+    test('isolates tokens by client version', () async {
+      final provider = FakeProvider();
+      final manager = PoTokenManager(provider: provider);
+      await manager.getToken(request());
+      await manager.getToken(request(clientVersion: '2.0'));
       expect(provider.calls, 2);
     });
 
@@ -166,6 +190,14 @@ void main() {
       );
     });
 
+    test('includes visitorData in the upstream InnerTube context', () {
+      final context = request(visitorData: 'visitor-123').innertubeContext;
+      expect(
+        (context['client'] as Map<String, dynamic>)['visitorData'],
+        'visitor-123',
+      );
+    });
+
     test('places a Player token only in serviceIntegrityDimensions', () {
       const policy = PoTokenPolicy();
       final body = policy.attachPlayerToken({'videoId': 'video-a'}, 'real-token');
@@ -209,7 +241,10 @@ class _WrongBindingProvider implements PoTokenProvider {
         token: 'wrong-binding-token',
         providerId: id,
         clientName: request.clientName,
+        clientVersion: request.clientVersion,
         videoId: request.videoId,
+        visitorData: request.visitorData,
+        sessionId: request.sessionId,
         binding: request.binding,
         bindingValue: 'another-video',
         purpose: request.purpose,

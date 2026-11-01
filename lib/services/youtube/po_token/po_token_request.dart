@@ -51,6 +51,7 @@ class PoTokenRequest {
           'clientName': clientName,
           'clientVersion': clientVersion,
           if (userAgent != null) 'userAgent': userAgent,
+          if (visitorData.isNotEmpty) 'visitorData': visitorData,
         },
       };
 }

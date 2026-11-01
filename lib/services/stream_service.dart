@@ -793,7 +793,7 @@ class StreamProvider {
             videoId: videoId,
             visitorData: visitorId,
             purpose: PoTokenPurpose.player,
-            binding: PoTokenBinding.video,
+            binding: PoTokenBinding.visitor,
             userAgent: userAgent,
           );
           if (poToken != null) {
@@ -806,7 +806,7 @@ class StreamProvider {
             if (tokenResult != null) {
               // YouTube.js places Player PO Tokens in serviceIntegrityDimensions,
               // not in the URL or an unrelated request header.
-              return _fetchInnerTube(
+              return await _fetchInnerTube(
                 videoId: videoId,
                 clientName: clientName,
                 clientVersion: clientVersion,
