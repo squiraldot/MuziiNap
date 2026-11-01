@@ -402,14 +402,14 @@ internal object BgUtilsRuntimeManager {
         }
     }
     /** Downloads to a sibling .part file and publishes only after size and SHA-256 verification. */
-    internal fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long, overallTimeoutMillis: Long = 180_000L, onProgress: (Long, Long) -> Unit) {
+    internal fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long, overallTimeoutMillis: Long = 180_000L, connectTimeoutMillis: Int = 20_000, readTimeoutMillis: Int = 20_000, onProgress: (Long, Long) -> Unit) {
         target.parentFile?.mkdirs()
         val part = File(target.parentFile, target.name + ".part")
         part.delete()
         val connection = URL(url).openConnection() as HttpURLConnection
         activeDownloadConnection = connection
-        connection.connectTimeout = 20_000
-        connection.readTimeout = 20_000
+        connection.connectTimeout = connectTimeoutMillis
+        connection.readTimeout = readTimeoutMillis
         connection.instanceFollowRedirects = true
         val expired = AtomicBoolean(false)
         val finished = AtomicBoolean(false)
