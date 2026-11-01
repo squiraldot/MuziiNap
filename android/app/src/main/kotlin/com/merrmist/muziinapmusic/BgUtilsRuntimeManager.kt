@@ -299,21 +299,40 @@ internal object BgUtilsRuntimeManager {
         }
     }
 
-    private fun downloadPinnedArchive(url: String, target: File, maxBytes: Long) {
+    private fun downloadPinnedArchive(url: String, target: File, maxBytes: Long, overallTimeoutMillis: Long = 180_000L) {
         target.parentFile?.mkdirs()
+        val part = File(target.parentFile, target.name + ".part")
+        part.delete()
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 60_000
+        connection.connectTimeout = 20_000
+        connection.readTimeout = 20_000
         connection.instanceFollowRedirects = true
+        val expired = AtomicBoolean(false)
+        val finished = AtomicBoolean(false)
+        val startedAt = System.currentTimeMillis()
+        val watchdog = Thread({
+            try {
+                Thread.sleep(overallTimeoutMillis)
+                if (finished.compareAndSet(false, true)) {
+                    expired.set(true)
+                    logError("BgUtils source archive exceeded overall download deadline", null)
+                    connection.disconnect()
+                }
+            } catch (_: InterruptedException) { }
+        }, "BgUtils-source-deadline").apply { isDaemon = true; start() }
         try {
-            check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
+            val response = connection.responseCode
+            logInfo("BgUtils source archive HTTP " + response + " host=" + connection.url.host)
+            check(response in 200..299) { "BgUtils source download failed: HTTP " + response }
             val declared = connection.contentLength.toLong()
             check(declared <= maxBytes || declared < 0) { "BgUtils source archive exceeds the allowed size." }
             var total = 0L
-            FileOutputStream(target).use { output ->
+            FileOutputStream(part).use { output ->
                 connection.inputStream.use { input ->
                     val buffer = ByteArray(32 * 1024)
                     while (true) {
+                        if (expired.get() || System.currentTimeMillis() - startedAt >= overallTimeoutMillis) throw SocketTimeoutException("BgUtils source download timed out.")
+                        if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils source download cancelled.")
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
@@ -322,8 +341,20 @@ internal object BgUtilsRuntimeManager {
                     }
                 }
             }
+            if (expired.get() || System.currentTimeMillis() - startedAt >= overallTimeoutMillis) throw SocketTimeoutException("BgUtils source download timed out.")
+            check(part.isFile && part.length() > 0L) { "BgUtils source download returned an empty file." }
+            if (declared >= 0L) check(total == declared) { "BgUtils source download was incomplete." }
+            check(part.renameTo(target)) { "Could not atomically publish BgUtils source archive." }
+        } catch (error: Exception) {
+            part.delete()
+            if (expired.get()) throw SocketTimeoutException("BgUtils source download timed out.")
+            logError("BgUtils source archive download failed", error)
+            throw error
         } finally {
+            finished.set(true)
+            watchdog.interrupt()
             connection.disconnect()
+            if (part.exists()) part.delete()
         }
     }
     /** Downloads to a sibling .part file and publishes only after size and SHA-256 verification. */
