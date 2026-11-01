@@ -435,6 +435,7 @@ class MainActivity : AudioServiceActivity() {
             bgutilsSetupThread?.let { worker ->
                 worker.interrupt()
                 BgUtilsRuntimeManager.cancelActiveDownload()
+                BgUtilsRuntimeManager.stopService(applicationContext)
             }
         }
         stopVisualizer()
