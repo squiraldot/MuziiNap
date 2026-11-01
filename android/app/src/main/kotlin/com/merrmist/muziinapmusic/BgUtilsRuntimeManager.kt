@@ -13,7 +13,9 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.zip.ZipInputStream
+import org.apache.commons.compress.archivers.zip.ZipFile
+import android.system.Os
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -168,22 +170,18 @@ internal object BgUtilsRuntimeManager {
         val root = File(context.filesDir, "bgutils").apply { mkdirs() }
         val runtimeDir = File(root, "node-runtime")
         val npmCli = File(runtimeDir, "usr/lib/node_modules/npm/bin/npm-cli.js")
-        if (!npmCli.isFile) {
+        val runtimeMarker = File(runtimeDir, ".muziinap-runtime-ready-v2")
+        val zlib = File(runtimeDir, "usr/lib/libz.so")
+        if (!runtimeMarker.isFile || !npmCli.isFile || !isElfLibrary(zlib)) {
             status("Preparing Node.js runtime")
             runtimeDir.deleteRecursively()
             runtimeDir.mkdirs()
-            ZipInputStream(zipLibrary.inputStream().buffered()).use { zip ->
-                while (true) {
-                    val entry = zip.nextEntry ?: break
-                    val output = safeChild(runtimeDir, entry.name)
-                    if (entry.isDirectory) output.mkdirs() else {
-                        output.parentFile?.mkdirs()
-                        FileOutputStream(output).use { out -> zip.copyTo(out) }
-                    }
-                    zip.closeEntry()
-                }
-            }
+            extractRuntimeArchive(zipLibrary, runtimeDir)
             check(npmCli.isFile) { "Node runtime npm files could not be extracted." }
+            check(isElfLibrary(zlib)) {
+                "Node runtime extraction produced an invalid usr/lib/libz.so. Unix symbolic links may not have been restored."
+            }
+            runtimeMarker.writeText(RUNTIME_VERSION)
         }
 
         val serverDir = File(root, "provider-$PROVIDER_VERSION/server")
@@ -486,6 +484,74 @@ internal object BgUtilsRuntimeManager {
         }
         val actual = digest.digest().joinToString("") { "%02x".format(it) }
         return actual.equals(expected, ignoreCase = true)
+    }
+
+    /**
+     * The package APK stores its Termux filesystem as a ZIP inside libnode.zip.so.
+     * Unix symlinks are represented by small ZIP entries; copying those bytes as
+     * ordinary files breaks the dynamic linker (for example libz.so becomes a
+     * 14-byte text file). Preserve the ZIP Unix file type and recreate links.
+     */
+    private fun extractRuntimeArchive(archive: File, targetDirectory: File) {
+        data class PendingSymlink(val destination: File, val target: String)
+        val pendingSymlinks = mutableListOf<PendingSymlink>()
+        val rootPath = targetDirectory.canonicalPath
+        ZipFile(archive).use { zip ->
+            val entries = zip.entries
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                val output = safeChild(targetDirectory, entry.name)
+                if (entry.isDirectory) {
+                    output.mkdirs()
+                } else if (entry.isUnixSymlink) {
+                    val target = zip.getInputStream(entry).use { input ->
+                        input.readBytes().toString(StandardCharsets.UTF_8)
+                    }
+                    check(target.isNotEmpty() && !target.contains('\u0000') && !File(target).isAbsolute) {
+                        "Runtime archive contains an invalid symbolic link: " + entry.name
+                    }
+                    val resolvedTarget = File(output.parentFile, target).canonicalFile
+                    check(resolvedTarget.path.startsWith(rootPath + File.separator)) {
+                        "Runtime archive symbolic link escapes its extraction directory: " + entry.name
+                    }
+                    pendingSymlinks += PendingSymlink(output, target)
+                } else {
+                    output.parentFile?.mkdirs()
+                    zip.getInputStream(entry).use { input ->
+                        FileOutputStream(output).use { destination -> input.copyTo(destination) }
+                    }
+                }
+            }
+        }
+        pendingSymlinks.forEach { link ->
+            link.destination.parentFile?.mkdirs()
+            if (link.destination.exists() || link.destination.isSymbolicLink()) link.destination.delete()
+            Os.symlink(link.target, link.destination.absolutePath)
+        }
+        pendingSymlinks.forEach { link ->
+            check(link.destination.exists()) {
+                "Runtime archive symbolic link target is missing: " + link.destination.relativeTo(targetDirectory).path
+            }
+        }
+    }
+
+    internal fun isElfLibrary(file: File): Boolean {
+        if (!file.isFile || file.length() < 4L) return false
+        return file.inputStream().use { input ->
+            val header = ByteArray(4)
+            input.read(header) == 4 &&
+                header[0] == 0x7f.toByte() &&
+                header[1] == 'E'.code.toByte() &&
+                header[2] == 'L'.code.toByte() &&
+                header[3] == 'F'.code.toByte()
+        }
+    }
+
+    private fun File.isSymbolicLink(): Boolean = try {
+        Os.readlink(absolutePath)
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun safeChild(root: File, relative: String): File {
