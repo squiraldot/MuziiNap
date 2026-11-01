@@ -16,7 +16,7 @@ class BgUtilsProviderSettings extends StatefulWidget {
 
 class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with WidgetsBindingObserver {
   static const _channel = MethodChannel('muziinap/bgutils');
-  static const _setupTimeout = Duration(minutes: 18);
+  static const _setupTimeout = Duration(minutes: 22);
   Timer? _statusTimer;
   _BgUtilsSetupState _state = _BgUtilsSetupState.idle;
   bool _running = false;
@@ -128,6 +128,9 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (downloading) {
         _state = _BgUtilsSetupState.downloadingRuntime;
         _stageMessage = 'Downloading Node.js runtime...';
+      } else if (runtimeState == 'failed') {
+        _state = _BgUtilsSetupState.failed;
+        _errorMessage = 'Node.js runtime download or verification failed. Check the connection and retry.';
       } else if (serviceState == 'failed') {
         _state = _BgUtilsSetupState.failed;
         _errorMessage = serviceFailure ?? 'BgUtils service failed to start. Tap Retry.';
@@ -183,7 +186,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     } on TimeoutException {
       if (mounted) setState(() {
         _state = _cancelRequested ? _BgUtilsSetupState.cancelled : _BgUtilsSetupState.failed;
-        _errorMessage = 'Setup exceeded the 18-minute limit. Check your connection and retry.';
+        _errorMessage = 'Setup exceeded the 22-minute limit. Check your connection and retry.';
       });
     } on PlatformException catch (error) {
       if (mounted) setState(() {
