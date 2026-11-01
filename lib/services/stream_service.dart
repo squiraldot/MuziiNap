@@ -737,9 +737,9 @@ class StreamProvider {
         'videoId': videoId,
         'contentCheckOk': true,
         'racyCheckOk': true,
-        if (poToken != null)
-          'serviceIntegrityDimensions': {'poToken': poToken},
       };
+      final bodyWithToken =
+          _poTokenPolicy.attachPlayerToken(requestBody, poToken);
       final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
         cancelToken: requestCancelToken,
@@ -748,7 +748,7 @@ class StreamProvider {
           sendTimeout: requestTimeout,
           receiveTimeout: requestTimeout,
         ),
-        data: requestBody,
+        data: bodyWithToken,
       );
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(

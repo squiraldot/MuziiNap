@@ -42,7 +42,8 @@ class PoTokenManager {
     try {
       final result = await _provider.getToken(request);
       if (result == null) return null;
-      if (!result.isValidFor(request)) return null;
+      if (result.providerId != _provider.id ||
+          !result.isValidFor(request)) return null;
       _cache.put(request, result);
       return result;
     } catch (_) {

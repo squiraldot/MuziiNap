@@ -5,6 +5,18 @@ import 'po_token_request.dart';
 class PoTokenPolicy {
   const PoTokenPolicy();
 
+  /// Attaches a Player token only at YouTube's documented request-body field.
+  Map<String, dynamic> attachPlayerToken(
+    Map<String, dynamic> body,
+    String? token,
+  ) {
+    if (token == null || token.isEmpty) return body;
+    return {
+      ...body,
+      'serviceIntegrityDimensions': {'poToken': token},
+    };
+  }
+
   PoTokenPurpose? purposeRequiredByPlayerReason(Object? reason) {
     if (reason is! String) return null;
     final normalized = reason.toLowerCase();

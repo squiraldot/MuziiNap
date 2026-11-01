@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/services/youtube/po_token/bgutil_http_po_token_provider.dart';
 import 'package:muziinap/services/youtube/po_token/po_token_cache.dart';
@@ -109,6 +107,14 @@ void main() {
       expect(provider.calls, 2);
     });
 
+    test('isolates tokens by visitor session identity', () async {
+      final provider = FakeProvider();
+      final manager = PoTokenManager(provider: provider);
+      await manager.getToken(request(visitorData: 'visitor-one'));
+      await manager.getToken(request(visitorData: 'visitor-two'));
+      expect(provider.calls, 2);
+    });
+
     test('isolates tokens by client identity', () async {
       final provider = FakeProvider();
       final manager = PoTokenManager(provider: provider);
@@ -158,6 +164,15 @@ void main() {
         provider.supports(request(purpose: PoTokenPurpose.sabr)),
         isFalse,
       );
+    });
+
+    test('places a Player token only in serviceIntegrityDimensions', () {
+      const policy = PoTokenPolicy();
+      final body = policy.attachPlayerToken({'videoId': 'video-a'}, 'real-token');
+      expect(body['serviceIntegrityDimensions'], {'poToken': 'real-token'});
+      expect(body.containsKey('poToken'), isFalse);
+      expect(policy.attachPlayerToken({'videoId': 'video-a'}, null),
+          {'videoId': 'video-a'});
     });
 
     test('does not classify a generic HTTP 403 as a PO Token error', () {

@@ -42,6 +42,8 @@ class PoTokenRequest {
         purpose.name,
         binding.name,
         bindingValue ?? '',
+        visitorData,
+        sessionId ?? '',
       ].join('|');
 
   Map<String, dynamic> get innertubeContext => {
