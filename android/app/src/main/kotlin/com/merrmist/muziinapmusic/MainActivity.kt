@@ -95,7 +95,9 @@ class MainActivity : AudioServiceActivity() {
                         val setupThread = Thread({
                             try {
                                 android.util.Log.i("MuziiNap-BgUtils", "Setup requested")
-                                if (!BgUtilsRuntimeManager.isRuntimeInstalled(applicationContext)) {
+                                val runtimeInstalled = BgUtilsRuntimeManager.isRuntimeInstalled(applicationContext)
+                                android.util.Log.i("MuziiNap-BgUtils", "Runtime package detection result=" + runtimeInstalled)
+                                if (!runtimeInstalled) {
                                     BgUtilsDownloadNotifications.begin(applicationContext)
                                     val apk = BgUtilsRuntimeManager.prepareInstaller(applicationContext) { downloaded, total ->
                                         BgUtilsDownloadNotifications.update(applicationContext, downloaded, total)
