@@ -774,10 +774,8 @@ class StreamProvider {
         final reasonText = reason?.toString() ?? 'No streaming data';
         final requiredPurpose =
             _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
-        if (requiredPurpose == PoTokenPurpose.player &&
-            poToken == null &&
-            !poTokenRetried) {
-          final tokenResult = await _poTokenManager.getToken(PoTokenRequest(
+        if (requiredPurpose == PoTokenPurpose.player) {
+          final tokenRequest = PoTokenRequest(
             clientName: clientName,
             clientVersion: clientVersion,
             videoId: videoId,
@@ -785,26 +783,34 @@ class StreamProvider {
             purpose: PoTokenPurpose.player,
             binding: PoTokenBinding.video,
             userAgent: userAgent,
-          ));
-          if (tokenResult != null) {
-            // YouTube.js places Player PO Tokens in serviceIntegrityDimensions,
-            // not in the URL or an unrelated request header.
-            return _fetchInnerTube(
-              videoId: videoId,
-              clientName: clientName,
-              clientVersion: clientVersion,
-              userAgent: userAgent,
-              clientId: clientId,
-              visitorId: visitorId,
-              authenticatedHeaders: authenticatedHeaders,
-              requestTimeout: requestTimeout,
-              deviceProfile: deviceProfile,
-              language: language,
-              country: country,
-              cancelToken: cancelToken,
-              poToken: tokenResult.token,
-              poTokenRetried: true,
-            );
+          );
+          if (poToken != null) {
+            // The upstream explicitly rejected this token; do not keep serving
+            // it from cache on the next playback attempt.
+            _poTokenManager.invalidate(tokenRequest);
+          } else if (!poTokenRetried) {
+            final tokenResult =
+                await _poTokenManager.getToken(tokenRequest);
+            if (tokenResult != null) {
+              // YouTube.js places Player PO Tokens in serviceIntegrityDimensions,
+              // not in the URL or an unrelated request header.
+              return _fetchInnerTube(
+                videoId: videoId,
+                clientName: clientName,
+                clientVersion: clientVersion,
+                userAgent: userAgent,
+                clientId: clientId,
+                visitorId: visitorId,
+                authenticatedHeaders: authenticatedHeaders,
+                requestTimeout: requestTimeout,
+                deviceProfile: deviceProfile,
+                language: language,
+                country: country,
+                cancelToken: cancelToken,
+                poToken: tokenResult.token,
+                poTokenRetried: true,
+              );
+            }
           }
         }
         final diagnostic = requiredPurpose == PoTokenPurpose.player
