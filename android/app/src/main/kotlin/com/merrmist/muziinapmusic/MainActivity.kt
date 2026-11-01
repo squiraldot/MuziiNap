@@ -35,6 +35,64 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/bgutils")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setup" -> {
+                        Thread({
+                            try {
+                                if (!BgUtilsRuntimeManager.isRuntimeInstalled(this)) {
+                                    val apk = BgUtilsRuntimeManager.prepareInstaller(this)
+                                    runOnUiThread {
+                                        try {
+                                            result.success(BgUtilsRuntimeManager.launchInstaller(this, apk))
+                                        } catch (error: Exception) {
+                                            result.error("installer_failed", error.message, null)
+                                        }
+                                    }
+                                } else {
+                                    runOnUiThread {
+                                        try {
+                                            BgUtilsRuntimeManager.startService(this)
+                                            var ready = false
+                                            for (attempt in 0 until 600) {
+                                                if (BgUtilsRuntimeManager.isServerReady()) {
+                                                    ready = true
+                                                    break
+                                                }
+                                                Thread.sleep(500)
+                                            }
+                                            runOnUiThread {
+                                                if (ready) {
+                                                    result.success("server_started")
+                                                } else {
+                                                    result.error("server_not_ready", "BgUtils did not become ready within five minutes. Check the provider notification and retry.", null)
+                                                }
+                                            }
+                                        } catch (error: Exception) {
+                                            result.error("server_start_failed", error.message, null)
+                                        }
+                                    }
+                                }
+                            } catch (error: Exception) {
+                                runOnUiThread { result.error("bgutils_setup_failed", error.message, null) }
+                            }
+                        }, "MuziiNap-BgUtils-installer").start()
+                    }
+                    "stop" -> {
+                        BgUtilsRuntimeManager.stopService(this)
+                        result.success(true)
+                    }
+                    "status" -> result.success(
+                        mapOf(
+                            "runtimeInstalled" to BgUtilsRuntimeManager.isRuntimeInstalled(this),
+                            "serverReady" to BgUtilsRuntimeManager.isServerReady()
+                        )
+                    )
+                    else -> result.notImplemented()
+                }
+            }
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, presetShareChannel)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {

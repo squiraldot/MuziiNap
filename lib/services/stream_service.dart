@@ -247,8 +247,14 @@ class StreamProvider {
 
       pipedInstances = _getPipedInstances(prefs);
       if (!_poTokenProviderOverridden) {
-        final poTokenProviderUrl =
+        final configuredProviderUrl =
             prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
+        final localProviderEnabled =
+            prefs.get('bgutilLocalEnabled', defaultValue: false) == true;
+        final poTokenProviderUrl = (configuredProviderUrl != null &&
+                configuredProviderUrl.isNotEmpty)
+            ? configuredProviderUrl
+            : (localProviderEnabled ? 'http://localhost:4416' : null);
         if (poTokenProviderUrl != _configuredPoTokenProviderUrl) {
           _configuredPoTokenProviderUrl = poTokenProviderUrl;
           if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
