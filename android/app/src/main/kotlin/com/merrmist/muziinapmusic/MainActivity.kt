@@ -1,9 +1,13 @@
 package com.merrmist.muziinapmusic
 
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.media.audiofx.Visualizer
 import android.util.Base64
@@ -32,6 +36,39 @@ class MainActivity : AudioServiceActivity() {
     private var presetEventSink: EventChannel.EventSink? = null
     private var initialPreset: String? = null
     private val visualizers = ConcurrentHashMap<Int, Visualizer>()
+    private var notificationPermissionRequestScheduled = false
+
+    /**
+     * Ask once on the first app launch on Android 13+. Notification denial
+     * must not block app startup or music playback.
+     */
+    override fun onPostResume() {
+        super.onPostResume()
+        if (notificationPermissionRequestScheduled ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        ) return
+
+        val preferences = getSharedPreferences("muziinap_runtime_permissions", MODE_PRIVATE)
+        if (preferences.getBoolean("NOTIFICATION_PERMISSION_REQUESTED", false)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            preferences.edit().putBoolean("NOTIFICATION_PERMISSION_REQUESTED", true).apply()
+            return
+        }
+
+        notificationPermissionRequestScheduled = true
+        Handler(Looper.getMainLooper()).post {
+            // Persist before displaying the system prompt so Activity recreation
+            // cannot trigger repeated permission dialogs.
+            preferences.edit().putBoolean("NOTIFICATION_PERMISSION_REQUESTED", true).apply()
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQUEST_POST_NOTIFICATIONS
+            )
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -356,5 +393,9 @@ class MainActivity : AudioServiceActivity() {
     override fun onDestroy() {
         stopVisualizer()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val REQUEST_POST_NOTIFICATIONS = 73045
     }
 }
