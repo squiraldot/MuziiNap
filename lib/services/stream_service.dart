@@ -67,10 +67,12 @@ class StreamProvider {
   static PoTokenManager _poTokenManager = PoTokenManager(
     provider: const UnavailablePoTokenProvider(),
   );
+  static bool _poTokenProviderOverridden = false;
 
   /// Allows the host application or tests to replace the attestation provider.
   /// The provider is never assumed to exist and unsupported requests fail closed.
   static void configurePoTokenProvider(PoTokenProvider provider) {
+    _poTokenProviderOverridden = true;
     _poTokenManager.clear();
     _poTokenManager = PoTokenManager(provider: provider);
   }
@@ -243,18 +245,24 @@ class StreamProvider {
       }
 
       pipedInstances = _getPipedInstances(prefs);
-      final poTokenProviderUrl =
-          prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
-      if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
-        try {
-          configurePoTokenProvider(
-            BgutilHttpPoTokenProvider(baseUrl: poTokenProviderUrl),
+      if (!_poTokenProviderOverridden) {
+        final poTokenProviderUrl =
+            prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
+        if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
+          try {
+            _poTokenManager = PoTokenManager(
+              provider: BgutilHttpPoTokenProvider(baseUrl: poTokenProviderUrl),
+            );
+          } catch (_) {
+            _poTokenManager = PoTokenManager(
+              provider: const UnavailablePoTokenProvider(),
+            );
+          }
+        } else {
+          _poTokenManager = PoTokenManager(
+            provider: const UnavailablePoTokenProvider(),
           );
-        } catch (_) {
-          configurePoTokenProvider(const UnavailablePoTokenProvider());
         }
-      } else {
-        configurePoTokenProvider(const UnavailablePoTokenProvider());
       }
       // VISIONOS needs a visitorData value. If startup could not obtain one,
       // make one bounded refresh attempt before asking the player endpoint.
