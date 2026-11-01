@@ -452,6 +452,9 @@ internal object BgUtilsRuntimeManager {
             val valid = verifySha256(part, expectedSha256)
             logInfo("Runtime SHA-256 verification result=" + valid)
             check(valid) { "Downloaded runtime failed SHA-256 verification." }
+            if (expired.get() || System.currentTimeMillis() - startedAt >= overallTimeoutMillis) {
+                throw SocketTimeoutException("Runtime download and verification exceeded the overall deadline.")
+            }
             // Same-directory rename maps to the filesystem rename operation and atomically replaces an existing target on Android/Linux.
             check(part.renameTo(target)) { "Could not atomically publish the verified runtime APK." }
         } catch (error: Exception) {
