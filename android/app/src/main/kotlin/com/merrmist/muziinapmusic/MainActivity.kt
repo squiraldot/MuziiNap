@@ -38,6 +38,7 @@ class MainActivity : AudioServiceActivity() {
     private var initialPreset: String? = null
     private val visualizers = ConcurrentHashMap<Int, Visualizer>()
     private val bgutilsSetupInProgress = AtomicBoolean(false)
+    @Volatile private var bgutilsSetupThread: Thread? = null
     private var notificationPermissionRequestScheduled = false
 
     /**
@@ -91,7 +92,7 @@ class MainActivity : AudioServiceActivity() {
                             if (error != null) android.util.Log.e("MuziiNap-BgUtils", message, error)
                             if (responded.compareAndSet(false, true)) runOnUiThread { result.error(code, message, error?.stackTraceToString()) }
                         }
-                        Thread({
+                        val setupThread = Thread({
                             try {
                                 android.util.Log.i("MuziiNap-BgUtils", "Setup requested")
                                 if (!BgUtilsRuntimeManager.isRuntimeInstalled(applicationContext)) {
@@ -135,8 +136,22 @@ class MainActivity : AudioServiceActivity() {
                                 replyError("bgutils_setup_failed", error.message ?: "BgUtils setup failed.", error)
                             } finally {
                                 bgutilsSetupInProgress.set(false)
+                                bgutilsSetupThread = null
                             }
-                        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true; start() }
+                        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true }
+                        bgutilsSetupThread = setupThread
+                        setupThread.start()
+                    }
+                    "cancel" -> {
+                        val worker = bgutilsSetupThread
+                        if (worker == null) {
+                            result.success(false)
+                        } else {
+                            worker.interrupt()
+                            BgUtilsRuntimeManager.cancelActiveDownload()
+                            BgUtilsRuntimeManager.stopService(applicationContext)
+                            result.success(true)
+                        }
                     }
                     "stop" -> {
                         BgUtilsRuntimeManager.stopService(this)
