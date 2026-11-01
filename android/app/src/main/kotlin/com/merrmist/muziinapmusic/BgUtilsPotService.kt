@@ -15,6 +15,10 @@ class BgUtilsPotService : Service() {
     companion object {
         @Volatile var isRunning: Boolean = false
             private set
+        @Volatile var setupState: String = "idle"
+            private set
+        @Volatile var lastFailure: String? = null
+            private set
         const val ACTION_STOP = "com.merrmist.muziinapmusic.BGUTILS_STOP"
     }
 
@@ -26,7 +30,10 @@ class BgUtilsPotService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        isRunning = true\n        setupState = "starting_service"\n        lastFailure = null\n        android.util.Log.i("MuziiNap-BgUtils", "Foreground service created")
+        isRunning = true
+        setupState = "starting_service"
+        lastFailure = null
+        android.util.Log.i("MuziiNap-BgUtils", "Foreground service created")
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
@@ -59,14 +66,22 @@ class BgUtilsPotService : Service() {
         setupRunning = true
         Thread({
             try {
-                BgUtilsRuntimeManager.prepareServer(this) { message ->\n                    setupState = message\n                    android.util.Log.i("MuziiNap-BgUtils", "Setup stage: " + message)\n                    updateNotification(message)\n                }
+                BgUtilsRuntimeManager.prepareServer(this) { message ->
+                    setupState = message
+                    android.util.Log.i("MuziiNap-BgUtils", "Setup stage: " + message)
+                    updateNotification(message)
+                }
                 if (stopping.get()) return@Thread
                 serverProcess?.destroy()
-                setupState = "checking_health"\n                serverProcess = BgUtilsRuntimeManager.launchServer(this)\n                android.util.Log.i("MuziiNap-BgUtils", "Node process started pid=" + serverProcess?.pid())
+                setupState = "checking_health"
+                serverProcess = BgUtilsRuntimeManager.launchServer(this)
+                android.util.Log.i("MuziiNap-BgUtils", "Node process started pid=" + serverProcess?.pid())
                 val deadline = System.currentTimeMillis() + 30_000
                 while (!stopping.get() && System.currentTimeMillis() < deadline) {
                     if (BgUtilsRuntimeManager.isServerReady()) {
-                        setupState = "running"\n                        android.util.Log.i("MuziiNap-BgUtils", "Health check passed at " + BgUtilsRuntimeManager.HEALTH_CHECK_URL)\n                        updateNotification("Ready • localhost:${BgUtilsRuntimeManager.PORT}")
+                        setupState = "running"
+                        android.util.Log.i("MuziiNap-BgUtils", "Health check passed at " + BgUtilsRuntimeManager.HEALTH_CHECK_URL)
+                        updateNotification("Ready • localhost:${BgUtilsRuntimeManager.PORT}")
                         while (!stopping.get() && serverProcess?.isAlive == true) Thread.sleep(1000)
                         break
                     }
@@ -77,7 +92,9 @@ class BgUtilsPotService : Service() {
                 }
                 check(BgUtilsRuntimeManager.isServerReady()) { "BgUtils server did not become ready." }
             } catch (error: Exception) {
-                setupState = "failed"\n                lastFailure = error.message ?: error.javaClass.simpleName\n                android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
+                setupState = "failed"
+                lastFailure = error.message ?: error.javaClass.simpleName
+                android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
                 updateNotification("Setup failed • open Settings to retry")
                 stopSelf()
             } finally {
@@ -102,10 +119,12 @@ class BgUtilsPotService : Service() {
         serverProcess?.destroy()
         if (serverProcess?.isAlive == true) serverProcess?.destroyForcibly()
         serverProcess = null
+        if (setupState != "failed") setupState = "idle"
     }
 
     override fun onDestroy() {
-        isRunning = false\n        android.util.Log.i("MuziiNap-BgUtils", "Foreground service destroyed; final state=" + setupState)
+        isRunning = false
+        android.util.Log.i("MuziiNap-BgUtils", "Foreground service destroyed; final state=" + setupState)
         stopServer()
         super.onDestroy()
     }
