@@ -22,6 +22,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.hypot
 
 class MainActivity : AudioServiceActivity() {
@@ -36,6 +37,7 @@ class MainActivity : AudioServiceActivity() {
     private var presetEventSink: EventChannel.EventSink? = null
     private var initialPreset: String? = null
     private val visualizers = ConcurrentHashMap<Int, Visualizer>()
+    private val bgutilsSetupInProgress = AtomicBoolean(false)
     private var notificationPermissionRequestScheduled = false
 
     /**
@@ -77,49 +79,61 @@ class MainActivity : AudioServiceActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setup" -> {
+                        if (!bgutilsSetupInProgress.compareAndSet(false, true)) {
+                            result.error("setup_in_progress", "BgUtils setup is already running.", null)
+                            return@setMethodCallHandler
+                        }
+                        val responded = AtomicBoolean(false)
+                        val replySuccess: (Any?) -> Unit = { value ->
+                            if (responded.compareAndSet(false, true)) runOnUiThread { result.success(value) }
+                        }
+                        val replyError: (String, String, Throwable?) -> Unit = { code, message, error ->
+                            if (error != null) android.util.Log.e("MuziiNap-BgUtils", message, error)
+                            if (responded.compareAndSet(false, true)) runOnUiThread { result.error(code, message, error?.stackTraceToString()) }
+                        }
                         Thread({
                             try {
-                                if (!BgUtilsRuntimeManager.isRuntimeInstalled(this)) {
-                                    BgUtilsDownloadNotifications.begin(this)
-                                    val apk = BgUtilsRuntimeManager.prepareInstaller(this) { downloaded, total ->
-                                        BgUtilsDownloadNotifications.update(this, downloaded, total)
+                                android.util.Log.i("MuziiNap-BgUtils", "Setup requested")
+                                if (!BgUtilsRuntimeManager.isRuntimeInstalled(applicationContext)) {
+                                    BgUtilsDownloadNotifications.begin(applicationContext)
+                                    val apk = BgUtilsRuntimeManager.prepareInstaller(applicationContext) { downloaded, total ->
+                                        BgUtilsDownloadNotifications.update(applicationContext, downloaded, total)
                                     }
                                     runOnUiThread {
-                                        BgUtilsDownloadNotifications.success(this)
                                         try {
-                                            result.success(BgUtilsRuntimeManager.launchInstaller(this, apk))
+                                            BgUtilsDownloadNotifications.success(applicationContext)
+                                            replySuccess(BgUtilsRuntimeManager.launchInstaller(this, apk))
                                         } catch (error: Exception) {
-                                            result.error("installer_failed", error.message, null)
+                                            replyError("installer_failed", error.message ?: "Could not launch Android package installer.", error)
                                         }
                                     }
                                 } else {
-                                    // Starting the service and waiting for its HTTP health check must
-                                    // stay off the Activity/UI thread to avoid an ANR after app restart.
-                                    BgUtilsRuntimeManager.startService(this)
-                                    var ready = false
+                                    android.util.Log.i("MuziiNap-BgUtils", "Node.js runtime package detected; starting provider service")
+                                    BgUtilsRuntimeManager.startService(applicationContext)
                                     val deadline = System.currentTimeMillis() + 5 * 60 * 1000L
+                                    var ready = false
                                     while (System.currentTimeMillis() < deadline) {
-                                        if (BgUtilsRuntimeManager.isServerReady()) {
-                                            ready = true
-                                            break
+                                        if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils setup cancelled.")
+                                        if (BgUtilsRuntimeManager.isServerReady()) { ready = true; break }
+                                        if (!BgUtilsPotService.isRunning) {
+                                            // Service may still be entering foreground startup; continue bounded polling.
                                         }
                                         Thread.sleep(500)
                                     }
-                                    runOnUiThread {
-                                        if (ready) {
-                                            result.success("server_started")
-                                        } else {
-                                            result.error("server_not_ready", "BgUtils did not become ready within five minutes. Check the provider notification and retry.", null)
-                                        }
+                                    if (ready) {
+                                        android.util.Log.i("MuziiNap-BgUtils", "Provider health check succeeded")
+                                        replySuccess("server_started")
+                                    } else {
+                                        throw IllegalStateException("BgUtils did not become healthy within five minutes. Check Node.js runtime installation and provider startup logs, then retry.")
                                     }
                                 }
                             } catch (error: Exception) {
-                                runOnUiThread {
-                                    BgUtilsDownloadNotifications.failure(this)
-                                    result.error("bgutils_setup_failed", error.message, null)
-                                }
+                                BgUtilsDownloadNotifications.failure(applicationContext)
+                                replyError("bgutils_setup_failed", error.message ?: "BgUtils setup failed.", error)
+                            } finally {
+                                bgutilsSetupInProgress.set(false)
                             }
-                        }, "MuziiNap-BgUtils-setup").start()
+                        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true; start() }
                     }
                     "stop" -> {
                         BgUtilsRuntimeManager.stopService(this)
@@ -132,7 +146,8 @@ class MainActivity : AudioServiceActivity() {
                             "serviceRunning" to BgUtilsPotService.isRunning,
                             "runtimeDownloadInProgress" to BgUtilsRuntimeManager.runtimeDownloadInProgress,
                             "runtimeDownloadBytes" to BgUtilsRuntimeManager.runtimeDownloadBytes,
-                            "runtimeDownloadTotalBytes" to BgUtilsRuntimeManager.runtimeDownloadTotalBytes
+                            "runtimeDownloadTotalBytes" to BgUtilsRuntimeManager.runtimeDownloadTotalBytes,
+                            "runtimeInstallState" to BgUtilsRuntimeManager.runtimeInstallState
                         )
                     )
                     else -> result.notImplemented()
