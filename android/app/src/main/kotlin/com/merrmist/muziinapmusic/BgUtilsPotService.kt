@@ -93,11 +93,15 @@ class BgUtilsPotService : Service() {
                 }
                 if (!stopping.get()) check(BgUtilsRuntimeManager.isServerReady()) { "BgUtils server did not become ready." }
             } catch (error: Exception) {
-                setupState = "failed"
-                lastFailure = error.message ?: error.javaClass.simpleName
-                android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
-                updateNotification("Setup failed • open Settings to retry")
-                stopSelf()
+                if (stopping.get() && error is InterruptedException) {
+                    android.util.Log.i("MuziiNap-BgUtils", "Provider preparation cancelled")
+                } else {
+                    setupState = "failed"
+                    lastFailure = error.message ?: error.javaClass.simpleName
+                    android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
+                    updateNotification("Setup failed • open Settings to retry")
+                    stopSelf()
+                }
             } finally {
                 setupRunning = false
                 setupThread = null
