@@ -11,10 +11,15 @@ internal object BgUtilsDownloadNotifications {
     private const val CHANNEL_ID = "muziinap_node_runtime_download"
     private const val NOTIFICATION_ID = 73044
 
+    internal fun notificationsAllowed(apiLevel: Int, permissionGranted: Boolean): Boolean =
+        apiLevel < 33 || permissionGranted
+
     private fun canPostNotifications(context: Context): Boolean =
-        Build.VERSION.SDK_INT < 33 ||
+        notificationsAllowed(
+            Build.VERSION.SDK_INT,
             context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
 
     private fun manager(context: Context): NotificationManager {
         val manager = context.getSystemService(NotificationManager::class.java)
