@@ -60,6 +60,7 @@ void main() {
       final cacheEntry = {
         'playable': true,
         'statusMSG': 'OK',
+        'streamResolverVersion': StreamProvider.streamResolverVersion,
         'resolvedAt': now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
         'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-low'},
         'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-high'},
