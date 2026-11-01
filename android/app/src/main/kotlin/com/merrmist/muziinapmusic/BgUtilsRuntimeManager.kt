@@ -264,8 +264,7 @@ internal object BgUtilsRuntimeManager {
                 false
             } else {
                 val body = connection.inputStream.bufferedReader().use { it.readText() }
-                val healthy = Regex("\\\"version\\\"\\s*:\\s*\\\"$PROVIDER_VERSION\\\"").containsMatchIn(body) &&
-                    Regex("\\\"server_uptime\\\"\\s*:\\s*[0-9]+(\\.[0-9]+)?").containsMatchIn(body)
+                val healthy = isHealthyPingResponse(body)
                 if (!healthy) logInfo("BgUtils /ping returned unexpected response: " + body.take(300))
                 healthy
             }
@@ -276,6 +275,10 @@ internal object BgUtilsRuntimeManager {
         logInfo("BgUtils health check failed: " + error.message)
         false
     }
+
+    internal fun isHealthyPingResponse(body: String): Boolean =
+        Regex("\\\"version\\\"\\s*:\\s*\\\"$PROVIDER_VERSION\\\"").containsMatchIn(body) &&
+            Regex("\\\"server_uptime\\\"\\s*:\\s*[0-9]+(\\.[0-9]+)?").containsMatchIn(body)
 
     private fun nodeEnvironment(nativeDir: File, runtimeDir: File, context: Context): Map<String, String> {
         val home = File(context.filesDir, "bgutils/node-home").apply { mkdirs() }
