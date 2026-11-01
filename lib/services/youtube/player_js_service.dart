@@ -50,13 +50,24 @@ class PlayerJsService implements PlayerJavaScriptExecutor {
     }
   }
 
+  Future<String> _loadModules() async {
+    try {
+      return await (_modulesFuture ??= EJSBuilder.getJSModules())
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {
+      // Do not permanently cache a transient network/module initialization
+      // failure; the next track can retry the EJS bootstrap.
+      _modulesFuture = null;
+      rethrow;
+    }
+  }
+
   Future<String?> _solveUncached(
     CachedPlayerScript player,
     JSChallengeType type,
     String challenge,
   ) async {
-    final modules = await (_modulesFuture ??= EJSBuilder.getJSModules())
-        .timeout(const Duration(seconds: 12));
+    final modules = await _loadModules();
     final playerKey = player.url.toString();
     final preprocessed = _preprocessedPlayers[playerKey];
     final call = EJSBuilder.buildJSCall(

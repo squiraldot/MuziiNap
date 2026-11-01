@@ -847,9 +847,9 @@ class StreamProvider {
             allowDecipheredN: allowDecipheredN,
           ) ||
           _isSpatialOrWrappedAudio(item)) {
-        // Cipher-only formats and URLs with an undeciphered YouTube "n"
-        // throttling parameter are not playable as-is. Let YouTubeExplode,
-        // the next extractor, perform the required player-JS deciphering.
+        // Raw parser callers fail closed for undeciphered n values.
+        // The primary InnerTube path opts in only after StreamUrlDecipherer
+        // has successfully transformed every required challenge.
         continue;
       }
 

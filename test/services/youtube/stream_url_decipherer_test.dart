@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:youtube_explode_dart/js_challenge.dart';
-
 import 'package:muziinap/services/youtube/nsig_decipher_service.dart';
 import 'package:muziinap/services/youtube/player_js_service.dart';
 import 'package:muziinap/services/youtube/player_script_cache.dart';
 import 'package:muziinap/services/youtube/signature_decipher_service.dart';
 import 'package:muziinap/services/youtube/stream_url_decipherer.dart';
+import 'package:youtube_explode_dart/js_challenge.dart';
 
 class _FakeExecutor implements PlayerJavaScriptExecutor {
   _FakeExecutor(this.values);
