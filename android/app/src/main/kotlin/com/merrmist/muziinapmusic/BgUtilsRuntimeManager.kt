@@ -315,8 +315,7 @@ internal object BgUtilsRuntimeManager {
         val reader = Thread {
             process.inputStream.bufferedReader().useLines { lines ->
                 lines.forEach { line ->
-                    output.append(line).append('
-')
+                    output.append(line).append('\n')
                     android.util.Log.i("MuziiNap-BgUtils-Setup", line)
                 }
             }
