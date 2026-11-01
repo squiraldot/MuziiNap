@@ -310,6 +310,7 @@ internal object BgUtilsRuntimeManager {
         val part = File(target.parentFile, target.name + ".part")
         part.delete()
         val connection = URL(url).openConnection() as HttpURLConnection
+        activeDownloadConnection = connection
         connection.connectTimeout = 20_000
         connection.readTimeout = 20_000
         connection.instanceFollowRedirects = true
@@ -354,12 +355,14 @@ internal object BgUtilsRuntimeManager {
         } catch (error: Exception) {
             part.delete()
             if (expired.get()) throw SocketTimeoutException("BgUtils source download timed out.")
+            if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils source download cancelled.")
             logError("BgUtils source archive download failed", error)
             throw error
         } finally {
             finished.set(true)
             watchdog.interrupt()
             connection.disconnect()
+            if (activeDownloadConnection === connection) activeDownloadConnection = null
             if (part.exists()) part.delete()
         }
     }
@@ -418,6 +421,7 @@ internal object BgUtilsRuntimeManager {
         } catch (error: Exception) {
             part.delete()
             if (expired.get()) throw SocketTimeoutException("Runtime download timed out after " + (overallTimeoutMillis / 1000) + " seconds.")
+            if (Thread.currentThread().isInterrupted) throw InterruptedException("Runtime download cancelled.")
             logError("Runtime download failed", error)
             throw error
         } finally {
