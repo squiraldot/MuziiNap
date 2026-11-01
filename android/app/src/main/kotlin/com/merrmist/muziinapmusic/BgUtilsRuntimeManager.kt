@@ -45,7 +45,7 @@ internal object BgUtilsRuntimeManager {
     )
     private const val PROVIDER_URL = "https://codeload.github.com/Brainicism/bgutil-ytdlp-pot-provider/zip/26475e9d3665b972c4aeb83b4dbaafcf64b88438"
 
-    fun isRuntimeInstalled(context: Context): Boolean = try {
+    internal fun runtimeAssetForAbi(abi: String): Pair<String, String>? = runtimeAssets[abi]\n\n    internal fun runtimeUrlForAbi(abi: String): String? {\n        val asset = runtimeAssets[abi]?.first ?: return null\n        return "https://github.com/deniscerri/ytdlnis-packages/releases/download/nodejs-$RUNTIME_VERSION/$asset"\n    }\n\n    fun isRuntimeInstalled(context: Context): Boolean = try {
         if (Build.VERSION.SDK_INT >= 33) {
             context.packageManager.getApplicationInfo(HELPER_PACKAGE, PackageManager.ApplicationInfoFlags.of(0))
         } else {
@@ -328,14 +328,14 @@ internal object BgUtilsRuntimeManager {
                 Thread.sleep(overallTimeoutMillis)
                 if (finished.compareAndSet(false, true)) {
                     expired.set(true)
-                    android.util.Log.e("MuziiNap-BgUtils", "Runtime download exceeded overall deadline " + overallTimeoutMillis + "ms")
+                    logError("Runtime download exceeded overall deadline " + overallTimeoutMillis + "ms", null)
                     connection.disconnect()
                 }
             } catch (_: InterruptedException) { }
         }, "BgUtils-download-deadline").apply { isDaemon = true; start() }
         try {
             val response = connection.responseCode
-            android.util.Log.i("MuziiNap-BgUtils", "Runtime download HTTP " + response + " host=" + connection.url.host)
+            logInfo("Runtime download HTTP " + response + " host=" + connection.url.host)
             check(response in 200..299) { "Runtime download failed: HTTP " + response }
             val declared = connection.contentLength.toLong()
             check(declared <= maxBytes || declared < 0) { "Runtime download exceeds the allowed size." }
@@ -359,14 +359,14 @@ internal object BgUtilsRuntimeManager {
             check(part.isFile && part.length() > 0L) { "Runtime download returned an empty file." }
             if (declared >= 0L) check(total == declared) { "Runtime download was incomplete: received " + total + " of " + declared + " bytes." }
             val valid = verifySha256(part, expectedSha256)
-            android.util.Log.i("MuziiNap-BgUtils", "Runtime SHA-256 verification result=" + valid)
+            logInfo("Runtime SHA-256 verification result=" + valid)
             check(valid) { "Downloaded runtime failed SHA-256 verification." }
             if (target.exists() && !target.delete()) throw IllegalStateException("Could not replace the previous runtime APK.")
             check(part.renameTo(target)) { "Could not atomically publish the verified runtime APK." }
         } catch (error: Exception) {
             part.delete()
             if (expired.get()) throw SocketTimeoutException("Runtime download timed out after " + (overallTimeoutMillis / 1000) + " seconds.")
-            android.util.Log.e("MuziiNap-BgUtils", "Runtime download failed", error)
+            logError("Runtime download failed", error)
             throw error
         } finally {
             finished.set(true)
@@ -376,7 +376,7 @@ internal object BgUtilsRuntimeManager {
         }
     }
 
-    internal fun verifySha256(file: File, expected: String): Boolean {
+    private fun logInfo(message: String) { try { android.util.Log.i("MuziiNap-BgUtils", message) } catch (_: RuntimeException) { } }\n    private fun logError(message: String, error: Throwable?) { try { android.util.Log.e("MuziiNap-BgUtils", message, error) } catch (_: RuntimeException) { } }\n\n    internal fun verifySha256(file: File, expected: String): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().buffered().use { input ->
             val buffer = ByteArray(32 * 1024)
