@@ -4,7 +4,6 @@ import com.sun.net.httpserver.HttpServer
 import java.io.File
 import java.net.InetSocketAddress
 import java.security.MessageDigest
-import java.util.concurrent.Executors
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -98,7 +97,6 @@ class BgUtilsRuntimeManagerTest {
     @Test
     fun overallDeadlineClosesSlowTricklingResponseAndCleansPartialFile() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.executor = Executors.newSingleThreadExecutor()
         server.createContext("/runtime") { exchange ->
             exchange.sendResponseHeaders(200, 0)
             try {
