@@ -16,6 +16,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> {
   Timer? _statusTimer;
   bool _running = false;
   bool _busy = false;
+  bool _statusInitialized = false;
 
   @override
   void initState() {
@@ -34,9 +35,14 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> {
     try {
       final status = await _channel.invokeMapMethod<String, dynamic>('status');
       final running = status?['serverReady'] == true && status?['serviceRunning'] == true;
-      if (!mounted || running == _running) return;
-      setState(() => _running = running);
-      await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', running);
+      if (!mounted) return;
+      if (!_statusInitialized || running != _running) {
+        setState(() {
+          _running = running;
+          _statusInitialized = true;
+        });
+        await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', running);
+      }
     } on PlatformException {
       // Keep the last known UI state; a later poll can recover transient channel errors.
     }
