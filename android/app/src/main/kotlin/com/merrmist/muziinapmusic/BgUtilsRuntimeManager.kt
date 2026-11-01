@@ -13,6 +13,7 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.util.zip.ZipInputStream
 import org.apache.commons.compress.archivers.zip.ZipFile
 import android.system.Os
 import java.nio.charset.StandardCharsets
