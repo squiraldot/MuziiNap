@@ -147,6 +147,27 @@ void main() {
       expect(provider.calls, 1);
     });
 
+    test('clear prevents an in-flight token from repopulating the cache', () async {
+      final provider = FakeProvider(delay: const Duration(milliseconds: 20));
+      final manager = PoTokenManager(provider: provider);
+      final pending = manager.getToken(request());
+      manager.clear();
+      await pending;
+      await manager.getToken(request());
+      expect(provider.calls, 2);
+    });
+
+    test('invalidate prevents an in-flight token from repopulating the cache', () async {
+      final provider = FakeProvider(delay: const Duration(milliseconds: 20));
+      final manager = PoTokenManager(provider: provider);
+      final req = request();
+      final pending = manager.getToken(req);
+      manager.invalidate(req);
+      await pending;
+      await manager.getToken(req);
+      expect(provider.calls, 2);
+    });
+
     test('deduplicates concurrent generation for the same key', () async {
       final provider = FakeProvider(delay: const Duration(milliseconds: 10));
       final manager = PoTokenManager(provider: provider);
