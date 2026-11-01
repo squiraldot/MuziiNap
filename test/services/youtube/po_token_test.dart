@@ -44,15 +44,18 @@ class FakeProvider implements PoTokenProvider {
 PoTokenRequest request({
   String videoId = 'video-a',
   String clientName = 'WEB_REMIX',
+  String clientVersion = '1.0',
+  String visitorData = 'visitor-a',
+  String? sessionId,
   PoTokenPurpose purpose = PoTokenPurpose.player,
   PoTokenBinding binding = PoTokenBinding.video,
-  String visitorData = 'visitor-a',
 }) =>
     PoTokenRequest(
       clientName: clientName,
-      clientVersion: '1.0',
+      clientVersion: clientVersion,
       videoId: videoId,
       visitorData: visitorData,
+      sessionId: sessionId,
       purpose: purpose,
       binding: binding,
     );
@@ -81,7 +84,10 @@ void main() {
         token: 'expired',
         providerId: 'fake',
         clientName: req.clientName,
+        clientVersion: req.clientVersion,
         videoId: req.videoId,
+        visitorData: req.visitorData,
+        sessionId: req.sessionId,
         binding: req.binding,
         bindingValue: req.bindingValue!,
         purpose: req.purpose,
