@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/utils/house_keeping.dart';
+import '../lib/services/stream_service.dart';
 
 void main() {
   group('shouldRemoveSongUrlCacheEntry', () {
@@ -24,6 +25,7 @@ void main() {
       final cacheEntry = {
         'playable': true,
         'statusMSG': 'OK',
+        'streamResolverVersion': StreamProvider.streamResolverVersion,
         'resolvedAt': now.millisecondsSinceEpoch,
         'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-low'},
         'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://piped.example/audio-high'},
@@ -41,6 +43,7 @@ void main() {
       final cacheEntry = {
         'playable': true,
         'statusMSG': 'OK',
+        'streamResolverVersion': StreamProvider.streamResolverVersion,
         'resolvedAt': now.subtract(const Duration(minutes: 20)).millisecondsSinceEpoch,
         'lowQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://media.example/audio-low?expire=1700000000'},
         'highQualityAudio': {'audioCodec': 'Codec.mp4a', 'url': 'https://media.example/audio-high?expire=$expiry'},
