@@ -59,8 +59,12 @@ internal object BgUtilsRuntimeManager {
             @Suppress("DEPRECATION")
             context.packageManager.getApplicationInfo(HELPER_PACKAGE, 0)
         }
+        runtimeInstallState = "installed"
+        android.util.Log.i("MuziiNap-BgUtils", "Node.js runtime package is installed")
         true
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        runtimeInstallState = "missing"
+        android.util.Log.w("MuziiNap-BgUtils", "Node.js runtime package is not installed", error)
         false
     }
 
@@ -87,6 +91,10 @@ internal object BgUtilsRuntimeManager {
                     onProgress(downloaded, total)
                     android.util.Log.d("MuziiNap-BgUtils", "Runtime download bytes=" + downloaded + " total=" + total)
                 }
+            } catch (error: Exception) {
+                runtimeInstallState = "failed"
+                android.util.Log.e("MuziiNap-BgUtils", "Runtime APK download/verification failed", error)
+                throw error
             } finally {
                 runtimeDownloadInProgress = false
             }
