@@ -311,6 +311,7 @@ internal object BgUtilsRuntimeManager {
         part.delete()
         val connection = URL(url).openConnection() as HttpURLConnection
         activeDownloadConnection = connection
+        activeDownloadConnection = connection
         connection.connectTimeout = 20_000
         connection.readTimeout = 20_000
         connection.instanceFollowRedirects = true
