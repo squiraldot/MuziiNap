@@ -17,6 +17,14 @@ class BgUtilsRuntimeManagerTest {
     }
 
     @Test
+    fun healthCheckRequiresExpectedProviderVersionAndUptime() {
+        assertTrue(BgUtilsRuntimeManager.isHealthyPingResponse("""{"server_uptime":12.34,"version":"2.0.2"}"""))
+        assertFalse(BgUtilsRuntimeManager.isHealthyPingResponse("""{"server_uptime":12.34,"version":"2.0.1"}"""))
+        assertFalse(BgUtilsRuntimeManager.isHealthyPingResponse("""{"version":"2.0.2"}"""))
+        assertFalse(BgUtilsRuntimeManager.isHealthyPingResponse("not json"))
+    }
+
+    @Test
     fun selectsCorrectPublishedRuntimeAssetForSupportedAbis() {
         assertEquals("app-nodejs-arm64-v8a-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("arm64-v8a")?.first)
         assertEquals("app-nodejs-armeabi-v7a-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("armeabi-v7a")?.first)
