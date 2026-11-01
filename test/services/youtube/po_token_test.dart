@@ -203,7 +203,11 @@ void main() {
       final provider = BgutilHttpPoTokenProvider(
         baseUrl: 'https://pot.example.test',
       );
-      expect(provider.supports(request()), isTrue);
+      expect(
+        provider.supports(request(binding: PoTokenBinding.visitor)),
+        isTrue,
+      );
+      expect(provider.supports(request()), isFalse);
       expect(provider.supports(request(clientName: 'ANDROID')), isFalse);
       expect(
         provider.supports(request(purpose: PoTokenPurpose.sabr)),

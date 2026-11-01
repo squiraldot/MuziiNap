@@ -16,7 +16,12 @@ class BgutilHttpPoTokenProvider implements PoTokenProvider {
     Dio? dio,
     this.timeout = const Duration(seconds: 15),
   })  : _baseUri = _validateBaseUrl(baseUrl),
-        _dio = dio ?? Dio();
+        _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: timeout,
+              sendTimeout: timeout,
+              receiveTimeout: timeout,
+            ));
 
   final Uri _baseUri;
   final Dio _dio;
@@ -46,6 +51,8 @@ class BgutilHttpPoTokenProvider implements PoTokenProvider {
       request.clientName == 'WEB_REMIX' &&
       (request.purpose == PoTokenPurpose.player ||
           request.purpose == PoTokenPurpose.gvs) &&
+      (request.binding == PoTokenBinding.visitor ||
+          request.binding == PoTokenBinding.session) &&
       request.bindingValue != null;
 
   @override
