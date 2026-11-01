@@ -79,7 +79,8 @@ class BgUtilsRuntimeManagerTest {
             val directory = createTempDir(prefix = "bgutils-http")
             val target = File(directory, "runtime.apk")
             try {
-                assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+                val error = assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+                assertTrue(error.message?.contains("403") == true)
                 assertFalse(target.exists())
                 assertFalse(File(directory, "runtime.apk.part").exists())
             } finally {
@@ -98,6 +99,11 @@ class BgUtilsRuntimeManagerTest {
                 assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
                 assertEquals("previous", target.readText())
                 assertFalse(File(directory, "runtime.apk.part").exists())
+                val recovered = "valid retry payload".toByteArray()
+                withServer(recovered) { retryUrl ->
+                    BgUtilsRuntimeManager.downloadVerified(retryUrl, target, sha256(recovered), 1024, 2_000) { _, _ -> }
+                }
+                assertArrayEquals(recovered, target.readBytes())
             } finally {
                 directory.deleteRecursively()
             }
