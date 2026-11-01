@@ -376,7 +376,7 @@ internal object BgUtilsRuntimeManager {
             val valid = verifySha256(part, expectedSha256)
             logInfo("Runtime SHA-256 verification result=" + valid)
             check(valid) { "Downloaded runtime failed SHA-256 verification." }
-            if (target.exists() && !target.delete()) throw IllegalStateException("Could not replace the previous runtime APK.")
+            // Same-directory rename maps to the filesystem rename operation and atomically replaces an existing target on Android/Linux.
             check(part.renameTo(target)) { "Could not atomically publish the verified runtime APK." }
         } catch (error: Exception) {
             part.delete()
