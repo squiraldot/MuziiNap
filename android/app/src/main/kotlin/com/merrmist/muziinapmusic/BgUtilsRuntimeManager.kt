@@ -27,6 +27,7 @@ internal object BgUtilsRuntimeManager {
     const val PORT = 4416
     // Android network security config permits cleartext localhost, not the 127.0.0.1 literal.
     internal const val HEALTH_CHECK_URL = "http://localhost:4416/ping"
+    @Volatile private var activeDownloadConnection: HttpURLConnection? = null
     private const val PROVIDER_VERSION = "2.0.2"
     private const val RUNTIME_VERSION = "26.12.1"
     @Volatile var runtimeInstallState: String = "missing"
@@ -44,6 +45,10 @@ internal object BgUtilsRuntimeManager {
         "x86_64" to ("app-nodejs-x86_64-release.apk" to "59732f645404da8eab408bd1c9a9502acf450155bda125ff598cbc5ad095c596")
     )
     private const val PROVIDER_URL = "https://codeload.github.com/Brainicism/bgutil-ytdlp-pot-provider/zip/26475e9d3665b972c4aeb83b4dbaafcf64b88438"
+
+    internal fun cancelActiveDownload() {
+        activeDownloadConnection?.disconnect()
+    }
 
     internal fun runtimeAssetForAbi(abi: String): Pair<String, String>? = runtimeAssets[abi]
 
@@ -284,7 +289,8 @@ internal object BgUtilsRuntimeManager {
         val reader = Thread {
             process.inputStream.bufferedReader().useLines { lines ->
                 lines.forEach { line ->
-                    output.append(line).append('\n')
+                    output.append(line).append('
+')
                     android.util.Log.i("MuziiNap-BgUtils-Setup", line)
                 }
             }
