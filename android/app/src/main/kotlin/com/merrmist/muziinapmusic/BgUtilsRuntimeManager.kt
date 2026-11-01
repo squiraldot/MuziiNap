@@ -257,8 +257,23 @@ internal object BgUtilsRuntimeManager {
         connection.connectTimeout = 800
         connection.readTimeout = 800
         connection.useCaches = false
-        try { connection.responseCode == 200 } finally { connection.disconnect() }
-    } catch (_: Exception) {
+        try {
+            val response = connection.responseCode
+            if (response != 200) {
+                logInfo("BgUtils health check returned HTTP " + response)
+                false
+            } else {
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                val healthy = Regex("\\\"version\\\"\\s*:\\s*\\\"$PROVIDER_VERSION\\\"").containsMatchIn(body) &&
+                    Regex("\\\"server_uptime\\\"\\s*:\\s*[0-9]+(\\.[0-9]+)?").containsMatchIn(body)
+                if (!healthy) logInfo("BgUtils /ping returned unexpected response: " + body.take(300))
+                healthy
+            }
+        } finally {
+            connection.disconnect()
+        }
+    } catch (error: Exception) {
+        logInfo("BgUtils health check failed: " + error.message)
         false
     }
 
