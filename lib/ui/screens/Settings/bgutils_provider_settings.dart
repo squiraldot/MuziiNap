@@ -83,7 +83,9 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
 
   Future<Map<String, dynamic>?> _readStatus() async {
     try {
-      return await _channel.invokeMapMethod<String, dynamic>('status').timeout(const Duration(seconds: 5));
+      final status = await _channel.invokeMapMethod<String, dynamic>('status').timeout(const Duration(seconds: 5));
+      if (status == null) throw StateError('Native provider status response was empty.');
+      return status;
     } on PlatformException catch (error) {
       _showPollingError(error.message ?? error.code);
     } on TimeoutException {
