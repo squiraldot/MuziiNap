@@ -110,7 +110,7 @@ class MainActivity : AudioServiceActivity() {
                                 } else {
                                     android.util.Log.i("MuziiNap-BgUtils", "Node.js runtime package detected; starting provider service")
                                     BgUtilsRuntimeManager.startService(applicationContext)
-                                    val deadline = System.currentTimeMillis() + 5 * 60 * 1000L
+                                    val deadline = System.currentTimeMillis() + 16 * 60 * 1000L
                                     var ready = false
                                     while (System.currentTimeMillis() < deadline) {
                                         if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils setup cancelled.")
@@ -124,7 +124,7 @@ class MainActivity : AudioServiceActivity() {
                                         android.util.Log.i("MuziiNap-BgUtils", "Provider health check succeeded")
                                         replySuccess("server_started")
                                     } else {
-                                        throw IllegalStateException("BgUtils did not become healthy within five minutes. Check Node.js runtime installation and provider startup logs, then retry.")
+                                        throw IllegalStateException("BgUtils did not become healthy within sixteen minutes. Check Node.js runtime installation and provider startup logs, then retry.")
                                     }
                                 }
                             } catch (error: Exception) {
