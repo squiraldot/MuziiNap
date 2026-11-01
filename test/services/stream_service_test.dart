@@ -31,6 +31,26 @@ void main() {
       expect(formats, isEmpty);
     });
 
+    test('accepts an n URL only after the deciphering pipeline marks it resolved', () {
+      final formats = StreamProvider.parseInnerTubeAudioFormats(
+        [
+          {
+            'itag': 140,
+            'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+            'url': 'https://media.example.com/audio?n=decipheredToken',
+            'bitrate': 128000,
+          },
+        ],
+        allowDecipheredN: true,
+      );
+
+      expect(formats, hasLength(1));
+      expect(
+        Uri.parse(formats.single.url).queryParameters['n'],
+        'decipheredToken',
+      );
+    });
+
     test('accepts a direct HTTPS audio URL', () {
       final formats = StreamProvider.parseInnerTubeAudioFormats([
         {

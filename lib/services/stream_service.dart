@@ -765,6 +765,7 @@ class StreamProvider {
       final audioFormats = parseInnerTubeAudioFormats(
         decipheredFormats,
         profile: deviceProfile,
+        allowDecipheredN: true,
       );
       if (audioFormats.isEmpty) {
         final hasCipherOnlyAudio = formats.any((item) =>
@@ -832,6 +833,7 @@ class StreamProvider {
   static List<Audio> parseInnerTubeAudioFormats(
     List<dynamic> formats, {
     DeviceStreamProfile? profile,
+    bool allowDecipheredN = false,
   }) {
     final parsed = <Audio>[];
     for (final item in formats) {
@@ -840,7 +842,10 @@ class StreamProvider {
       final rawUrl = item['url']?.toString();
       if (!isAudioMimeType(mimeType) ||
           !isValidAudioFormatUrl(rawUrl) ||
-          !_isDirectlyPlayableInnerTubeUrl(rawUrl) ||
+          !_isDirectlyPlayableInnerTubeUrl(
+            rawUrl,
+            allowDecipheredN: allowDecipheredN,
+          ) ||
           _isSpatialOrWrappedAudio(item)) {
         // Cipher-only formats and URLs with an undeciphered YouTube "n"
         // throttling parameter are not playable as-is. Let YouTubeExplode,
@@ -866,10 +871,14 @@ class StreamProvider {
 
   /// Raw InnerTube URLs may contain an undeciphered "n" throttling token.
   /// Such URLs pass HTTPS validation but are not ready for media playback.
-  static bool _isDirectlyPlayableInnerTubeUrl(String? rawUrl) {
+  static bool _isDirectlyPlayableInnerTubeUrl(
+    String? rawUrl, {
+    bool allowDecipheredN = false,
+  }) {
     if (!isValidAudioFormatUrl(rawUrl)) return false;
     final uri = Uri.tryParse(rawUrl!.trim());
-    return uri != null && !uri.queryParameters.containsKey('n');
+    return uri != null &&
+        (allowDecipheredN || !uri.queryParameters.containsKey('n'));
   }
 
   static bool _isSpatialOrWrappedAudio(Map item) {
