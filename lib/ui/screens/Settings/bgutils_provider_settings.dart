@@ -22,7 +22,8 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
   bool _statusInitialized = false;
   bool _running = false;
   bool _setupInFlight = false;
-  bool _waitingForInstaller = false;\n  bool _awaitingInstallPermission = false;
+  bool _waitingForInstaller = false;
+  bool _awaitingInstallPermission = false;
   int _downloadedBytes = 0;
   int _downloadTotalBytes = 0;
   int _pollGeneration = 0;
@@ -109,7 +110,9 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     final downloading = status['runtimeDownloadInProgress'] == true;
     final downloaded = (status['runtimeDownloadBytes'] as num?)?.toInt() ?? 0;
     final total = (status['runtimeDownloadTotalBytes'] as num?)?.toInt() ?? 0;
-    final runtimeState = status['runtimeInstallState'] as String?;\n    final serviceState = status['serviceState'] as String?;\n    final serviceFailure = status['serviceFailure'] as String?;
+    final runtimeState = status['runtimeInstallState'] as String?;
+    final serviceState = status['serviceState'] as String?;
+    final serviceFailure = status['serviceFailure'] as String?;
     if (!mounted || generation != _pollGeneration) return;
     setState(() {
       _running = running;
@@ -123,7 +126,10 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (downloading) {
         _state = _BgUtilsSetupState.downloadingRuntime;
         _stageMessage = 'Downloading Node.js runtime...';
-      } else if (serviceState == 'failed') {\n        _state = _BgUtilsSetupState.failed;\n        _errorMessage = serviceFailure ?? 'BgUtils service failed to start. Tap Retry.';\n      } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
+      } else if (serviceState == 'failed') {
+        _state = _BgUtilsSetupState.failed;
+        _errorMessage = serviceFailure ?? 'BgUtils service failed to start. Tap Retry.';
+      } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
         _state = _BgUtilsSetupState.awaitingInstallation;
         _stageMessage = 'Waiting for Android installation...';
       } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && !_waitingForInstaller) {
