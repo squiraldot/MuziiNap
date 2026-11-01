@@ -31,8 +31,7 @@ internal object BgUtilsRuntimeManager {
         "x86" to ("app-nodejs-x86-release.apk" to "83590a4b1becacad92bad14816a854738f2bbb01b9ffdf0b655a4a29a83be3aa"),
         "x86_64" to ("app-nodejs-x86_64-release.apk" to "59732f645404da8eab408bd1c9a9502acf450155bda125ff598cbc5ad095c596")
     )
-    private const val PROVIDER_ARCHIVE_SHA256 = "a26b980bf6d8e8400d8f21445daa4d8381bf6183d20f0be309391f86b31e27ef"
-    private const val PROVIDER_URL = "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/$PROVIDER_VERSION/bgutil-ytdlp-pot-provider.zip"
+    private const val PROVIDER_URL = "https://codeload.github.com/Brainicism/bgutil-ytdlp-pot-provider/zip/26475e9d3665b972c4aeb83b4dbaafcf64b88438"
 
     fun isRuntimeInstalled(context: Context): Boolean = try {
         if (Build.VERSION.SDK_INT >= 33) {
@@ -128,7 +127,7 @@ internal object BgUtilsRuntimeManager {
         if (!ready.isFile || !File(serverDir, "build/main.js").isFile) {
             status("Downloading BgUtils provider $PROVIDER_VERSION")
             val archive = File(root, "provider-$PROVIDER_VERSION.zip")
-            downloadVerified(PROVIDER_URL, archive, PROVIDER_ARCHIVE_SHA256, 30L * 1024L * 1024L)
+            downloadPinnedArchive(PROVIDER_URL, archive, 30L * 1024L * 1024L)
             val sourceRoot = File(root, "provider-$PROVIDER_VERSION").apply {
                 deleteRecursively()
                 mkdirs()
@@ -148,7 +147,10 @@ internal object BgUtilsRuntimeManager {
                 }
             }
             archive.delete()
-            check(File(serverDir, "package.json").isFile) { "BgUtils server package is missing from the pinned archive." }
+            val packageJson = File(serverDir, "package.json")
+            check(packageJson.isFile && packageJson.readText().contains("\\"version\\": \\"$PROVIDER_VERSION\\"")) {
+                "Pinned BgUtils server package/version is missing from the source archive."
+            }
 
             status("Installing BgUtils dependencies")
             val env = nodeEnvironment(nativeDir, runtimeDir, context)
@@ -246,6 +248,33 @@ internal object BgUtilsRuntimeManager {
         }
     }
 
+    private fun downloadPinnedArchive(url: String, target: File, maxBytes: Long) {
+        target.parentFile?.mkdirs()
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 60_000
+        connection.instanceFollowRedirects = true
+        try {
+            check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
+            val declared = connection.contentLength.toLong()
+            check(declared <= maxBytes || declared < 0) { "BgUtils source archive exceeds the allowed size." }
+            var total = 0L
+            FileOutputStream(target).use { output ->
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(32 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        check(total <= maxBytes) { "BgUtils source archive exceeds the allowed size." }
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
     private fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long) {
         target.parentFile?.mkdirs()
         val connection = URL(url).openConnection() as HttpURLConnection
