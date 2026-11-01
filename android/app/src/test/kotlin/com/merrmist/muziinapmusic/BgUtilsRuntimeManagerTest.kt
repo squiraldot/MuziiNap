@@ -4,6 +4,8 @@ import com.sun.net.httpserver.HttpServer
 import java.io.File
 import java.net.InetSocketAddress
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -130,6 +132,56 @@ class BgUtilsRuntimeManagerTest {
             assertFalse(target.exists())
             assertFalse(File(directory, "runtime.apk.part").exists())
         } finally {
+            server.stop(0)
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun explicitCancellationDisconnectsActiveHttpRequestAndCleansPartFile() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val firstChunkSent = CountDownLatch(1)
+        server.createContext("/slow") { exchange ->
+            exchange.sendResponseHeaders(200, 0)
+            try {
+                exchange.responseBody.write(byteArrayOf(1))
+                exchange.responseBody.flush()
+                firstChunkSent.countDown()
+                Thread.sleep(2_000)
+                exchange.responseBody.write(byteArrayOf(2))
+            } catch (_: Exception) {
+            } finally {
+                exchange.close()
+            }
+        }
+        server.start()
+        val directory = createTempDir(prefix = "bgutils-cancel-active")
+        val target = File(directory, "runtime.apk")
+        var failure: Throwable? = null
+        val worker = Thread {
+            try {
+                BgUtilsRuntimeManager.downloadVerified(
+                    "http://127.0.0.1:${server.address.port}/slow",
+                    target,
+                    "0".repeat(64),
+                    1024,
+                    5_000
+                ) { _, _ -> }
+            } catch (error: Throwable) {
+                failure = error
+            }
+        }
+        try {
+            worker.start()
+            assertTrue(firstChunkSent.await(2, TimeUnit.SECONDS))
+            BgUtilsRuntimeManager.cancelActiveDownload()
+            worker.join(2_000)
+            assertFalse("cancelled download should exit promptly", worker.isAlive)
+            assertNotNull(failure)
+            assertFalse(target.exists())
+            assertFalse(File(directory, "runtime.apk.part").exists())
+        } finally {
+            BgUtilsRuntimeManager.cancelActiveDownload()
             server.stop(0)
             directory.deleteRecursively()
         }
