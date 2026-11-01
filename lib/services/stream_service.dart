@@ -788,8 +788,7 @@ class StreamProvider {
             _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
         if (requiredPurpose == PoTokenPurpose.player) {
           final sessionId = _poTokenPolicy.extractSessionId(decoded);
-          final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
-          final tokenRequest = PoTokenRequest(
+            final tokenRequest = PoTokenRequest(
             clientName: clientName,
             clientVersion: clientVersion,
             videoId: videoId,
