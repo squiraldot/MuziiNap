@@ -111,6 +111,43 @@ class BgUtilsRuntimeManagerTest {
     }
 
     @Test
+    fun readTimeoutRejectsAResponseThatStopsSendingData() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/stall") { exchange ->
+            try {
+                Thread.sleep(500)
+                exchange.sendResponseHeaders(200, 1)
+                exchange.responseBody.write(byteArrayOf(1))
+            } catch (_: Exception) {
+            } finally {
+                exchange.close()
+            }
+        }
+        server.start()
+        val directory = createTempDir(prefix = "bgutils-read-timeout")
+        val target = File(directory, "runtime.apk")
+        try {
+            val url = "http://127.0.0.1:${server.address.port}/stall"
+            val error = assertFails {
+                BgUtilsRuntimeManager.downloadVerified(
+                    url,
+                    target,
+                    "0".repeat(64),
+                    1024,
+                    overallTimeoutMillis = 3_000,
+                    readTimeoutMillis = 100
+                ) { _, _ -> }
+            }
+            assertTrue(error is java.net.SocketTimeoutException)
+            assertFalse(target.exists())
+            assertFalse(File(directory, "runtime.apk.part").exists())
+        } finally {
+            server.stop(0)
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun overallDeadlineClosesSlowTricklingResponseAndCleansPartialFile() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/runtime") { exchange ->
