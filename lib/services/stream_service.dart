@@ -858,15 +858,15 @@ class StreamProvider {
           visitorData: visitorId,
           sessionId: sessionId,
           purpose: PoTokenPurpose.gvs,
-          binding: sessionId != null || isAuthenticated
-              ? PoTokenBinding.session
-              : PoTokenBinding.visitor,
+          // Current Web GVS PO tokens are video-ID-bound. Player tokens
+          // retain their separate WEB_REMIX session/visitor binding policy.
+          binding: PoTokenBinding.video,
           userAgent: userAgent,
         );
         if (!_poTokenManager.supports(gvsRequest)) {
           return StreamProvider(
             playable: false,
-            statusMSG: 'WEB_REMIX requires a compatible session-bound GVS PO Token provider.',
+            statusMSG: 'WEB_REMIX requires a compatible video-bound GVS PO Token provider.',
           );
         }
         final gvsResult = await _poTokenManager.getToken(gvsRequest);

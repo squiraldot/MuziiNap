@@ -4,7 +4,7 @@ import 'po_token_provider.dart';
 import 'po_token_request.dart';
 import 'po_token_result.dart';
 
-/// Adapter for a separately hosted bgutil-ytdlp-pot-provider server.
+/// Adapter for a BgUtils HTTP server, either loopback-hosted or remote HTTPS.
 ///
 /// BgUtils performs Web/BotGuard attestation. It is not an Android DroidGuard
 /// or iOSGuard implementation, so this adapter only accepts the app's
@@ -31,7 +31,7 @@ class BgutilHttpPoTokenProvider implements PoTokenProvider {
     final uri = Uri.tryParse(value.trim());
     final localHttp = uri != null &&
         uri.scheme == 'http' &&
-        (uri.host == '127.0.0.1' || uri.host == 'localhost');
+        (uri.host == '127.0.0.1' || uri.host == 'localhost' || uri.host == '::1');
     if (uri == null ||
         (uri.scheme != 'https' && !localHttp) ||
         uri.host.isEmpty ||
@@ -51,7 +51,8 @@ class BgutilHttpPoTokenProvider implements PoTokenProvider {
       request.clientName == 'WEB_REMIX' &&
       (request.purpose == PoTokenPurpose.player ||
           request.purpose == PoTokenPurpose.gvs) &&
-      (request.binding == PoTokenBinding.visitor ||
+      (request.binding == PoTokenBinding.video ||
+          request.binding == PoTokenBinding.visitor ||
           request.binding == PoTokenBinding.session) &&
       request.bindingValue != null;
 

@@ -210,10 +210,17 @@ void main() {
         baseUrl: 'https://pot.example.test',
       );
       expect(
+        provider.supports(request(binding: PoTokenBinding.video)),
+        isTrue,
+      );
+      expect(
         provider.supports(request(binding: PoTokenBinding.visitor)),
         isTrue,
       );
-      expect(provider.supports(request()), isFalse);
+      expect(
+        provider.supports(request(binding: PoTokenBinding.session, sessionId: 'session-a')),
+        isTrue,
+      );
       expect(provider.supports(request(clientName: 'ANDROID')), isFalse);
       expect(
         provider.supports(request(purpose: PoTokenPurpose.sabr)),
