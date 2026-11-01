@@ -68,8 +68,10 @@ internal object BgUtilsRuntimeManager {
         android.util.Log.i("MuziiNap-BgUtils", "Node.js runtime package is installed")
         true
     } catch (error: Exception) {
+        if (runtimeInstallState != "missing") {
+            android.util.Log.w("MuziiNap-BgUtils", "Node.js runtime package is no longer installed", error)
+        }
         runtimeInstallState = "missing"
-        android.util.Log.w("MuziiNap-BgUtils", "Node.js runtime package is not installed", error)
         false
     }
 
