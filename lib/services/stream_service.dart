@@ -787,13 +787,18 @@ class StreamProvider {
         final requiredPurpose =
             _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
         if (requiredPurpose == PoTokenPurpose.player) {
+          final sessionId = _poTokenPolicy.extractSessionId(decoded);
+          final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
           final tokenRequest = PoTokenRequest(
             clientName: clientName,
             clientVersion: clientVersion,
             videoId: videoId,
             visitorData: visitorId,
+            sessionId: sessionId,
             purpose: PoTokenPurpose.player,
-            binding: PoTokenBinding.visitor,
+            binding: sessionId != null || isAuthenticated
+                ? PoTokenBinding.session
+                : PoTokenBinding.visitor,
             userAgent: userAgent,
           );
           if (poToken != null) {
@@ -842,13 +847,49 @@ class StreamProvider {
         );
       }
 
+      String? gvsPoToken;
+      if (clientName == 'WEB_REMIX') {
+        final sessionId = _poTokenPolicy.extractSessionId(decoded);
+        final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
+        final gvsRequest = PoTokenRequest(
+          clientName: clientName,
+          clientVersion: clientVersion,
+          videoId: videoId,
+          visitorData: visitorId,
+          sessionId: sessionId,
+          purpose: PoTokenPurpose.gvs,
+          binding: sessionId != null || isAuthenticated
+              ? PoTokenBinding.session
+              : PoTokenBinding.visitor,
+          userAgent: userAgent,
+        );
+        if (!_poTokenManager.supports(gvsRequest)) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'WEB_REMIX requires a compatible session-bound GVS PO Token provider.',
+          );
+        }
+        final gvsResult = await _poTokenManager.getToken(gvsRequest);
+        if (gvsResult == null) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'Unable to generate a valid WEB_REMIX GVS PO Token.',
+          );
+        }
+        gvsPoToken = gvsResult.token;
+      }
+
       final playerJsUrl = _extractPlayerJsUrl(decoded);
       final decipheredFormats = await _streamUrlDecipherer.decipherFormats(
         formats,
         playerUrl: playerJsUrl,
       );
-      final audioFormats = parseInnerTubeAudioFormats(
+      final tokenizedFormats = _poTokenPolicy.attachGvsTokenToFormats(
         decipheredFormats,
+        gvsPoToken,
+      );
+      final audioFormats = parseInnerTubeAudioFormats(
+        tokenizedFormats,
         profile: deviceProfile,
         allowDecipheredN: true,
       );

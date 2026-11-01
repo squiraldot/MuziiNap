@@ -198,6 +198,47 @@ void main() {
       );
     });
 
+    test('attaches GVS tokens only to direct googlevideo media URLs', () {
+      const policy = PoTokenPolicy();
+      final mediaUrl = policy.attachGvsTokenToUrl(
+        'https://rr1---sn.googlevideo.com/videoplayback?id=abc&itag=140',
+        'gvs-token',
+      );
+      final parsed = Uri.parse(mediaUrl);
+      expect(parsed.queryParameters['pot'], 'gvs-token');
+      expect(parsed.queryParameters['id'], 'abc');
+      expect(parsed.queryParameters['itag'], '140');
+      expect(
+        policy.attachGvsTokenToUrl(
+          'https://media.example.test/audio.mp3',
+          'gvs-token',
+        ),
+        'https://media.example.test/audio.mp3',
+      );
+    });
+
+    test('does not rewrite SABR URLs with a GVS query token', () {
+      const policy = PoTokenPolicy();
+      const sabrUrl =
+          'https://rr1---sn.googlevideo.com/videoplayback?sabr=1&id=abc';
+      expect(policy.attachGvsTokenToUrl(sabrUrl, 'gvs-token'), sabrUrl);
+    });
+
+    test('extracts the first account session identifier from dataSyncId', () {
+      const policy = PoTokenPolicy();
+      expect(
+        policy.extractSessionId({
+          'responseContext': {
+            'mainAppWebResponseContext': {
+              'dataSyncId': 'account-session||secondary-value',
+            },
+          },
+        }),
+        'account-session',
+      );
+      expect(policy.extractSessionId({}), isNull);
+    });
+
     test('places a Player token only in serviceIntegrityDimensions', () {
       const policy = PoTokenPolicy();
       final body = policy.attachPlayerToken({'videoId': 'video-a'}, 'real-token');

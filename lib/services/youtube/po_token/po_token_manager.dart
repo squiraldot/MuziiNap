@@ -18,9 +18,11 @@ class PoTokenManager {
 
   String get providerId => _provider.id;
 
+  bool supports(PoTokenRequest request) =>
+      request.bindingValue != null && _provider.supports(request);
+
   Future<PoTokenResult?> getToken(PoTokenRequest request) async {
-    final bindingValue = request.bindingValue;
-    if (bindingValue == null || !_provider.supports(request)) return null;
+    if (!supports(request)) return null;
 
     final cached = _cache.get(request);
     if (cached != null) return cached;
