@@ -321,9 +321,18 @@ internal object BgUtilsRuntimeManager {
                 }
             }
         }.apply { isDaemon = true; start() }
-        if (!process.waitFor(timeoutMinutes, TimeUnit.MINUTES)) {
+        val completed = try {
+            process.waitFor(timeoutMinutes, TimeUnit.MINUTES)
+        } catch (interrupted: InterruptedException) {
             process.destroyForcibly()
-            throw IllegalStateException("BgUtils setup command timed out.")
+            process.waitFor(2, TimeUnit.SECONDS)
+            Thread.currentThread().interrupt()
+            throw interrupted
+        }
+        if (!completed) {
+            process.destroyForcibly()
+            process.waitFor(2, TimeUnit.SECONDS)
+            throw IllegalStateException("BgUtils setup command timed out after " + timeoutMinutes + " minutes.")
         }
         reader.join(2_000)
         check(process.exitValue() == 0) {
