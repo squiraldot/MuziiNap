@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class BgUtilsPotService : Service() {
     @Volatile private var serverProcess: Process? = null
     private val stopping = AtomicBoolean(false)
+    @Volatile private var setupRunning = false
     private val channelId = "muziinap_bgutils_provider"
     private val notificationId = 73043
 
@@ -47,6 +48,8 @@ class BgUtilsPotService : Service() {
         if (serverProcess?.isAlive == true && BgUtilsRuntimeManager.isServerReady()) {
             return START_STICKY
         }
+        if (setupRunning) return START_STICKY
+        setupRunning = true
         Thread({
             try {
                 BgUtilsRuntimeManager.prepareServer(this) { message -> updateNotification(message) }
@@ -70,6 +73,8 @@ class BgUtilsPotService : Service() {
                 android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
                 updateNotification("Setup failed • open Settings to retry")
                 stopSelf()
+            } finally {
+                setupRunning = false
             }
         }, "MuziiNap-BgUtils-setup").start()
         return START_STICKY
