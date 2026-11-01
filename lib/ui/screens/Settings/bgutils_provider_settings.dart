@@ -19,7 +19,6 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
   static const _setupTimeout = Duration(minutes: 18);
   Timer? _statusTimer;
   _BgUtilsSetupState _state = _BgUtilsSetupState.idle;
-  bool _statusInitialized = false;
   bool _running = false;
   bool _setupInFlight = false;
   bool _waitingForInstaller = false;
@@ -118,7 +117,6 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       _running = running;
       _downloadedBytes = downloaded;
       _downloadTotalBytes = total;
-      _statusInitialized = true;
       if (running) {
         _state = _BgUtilsSetupState.running;
         _errorMessage = null;
