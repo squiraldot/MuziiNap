@@ -15,6 +15,8 @@ import java.net.URL
 import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 import java.util.concurrent.TimeUnit
+import java.net.SocketTimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Local BgUtils runtime bootstrap. The Node runtime is an independently installed,
@@ -27,6 +29,8 @@ internal object BgUtilsRuntimeManager {
     internal const val HEALTH_CHECK_URL = "http://localhost:4416/ping"
     private const val PROVIDER_VERSION = "2.0.2"
     private const val RUNTIME_VERSION = "26.12.1"
+    @Volatile var runtimeInstallState: String = "missing"
+        private set
     @Volatile var runtimeDownloadInProgress: Boolean = false
         private set
     @Volatile var runtimeDownloadBytes: Long = 0L
@@ -54,13 +58,17 @@ internal object BgUtilsRuntimeManager {
     }
 
     fun prepareInstaller(context: Context, onProgress: (Long, Long) -> Unit = { _, _ -> }): File {
+        android.util.Log.i("MuziiNap-BgUtils", "Runtime setup requested; supported ABIs=" + Build.SUPPORTED_ABIS.joinToString())
         val abi = Build.SUPPORTED_ABIS.firstOrNull { runtimeAssets.containsKey(it) }
             ?: throw IllegalStateException("No compatible Node runtime is published for this device ABI.")
+        android.util.Log.i("MuziiNap-BgUtils", "Selected runtime ABI=" + abi)
         val (assetName, digest) = runtimeAssets.getValue(abi)
         val url = "https://github.com/deniscerri/ytdlnis-packages/releases/download/nodejs-$RUNTIME_VERSION/$assetName"
         val dir = File(context.filesDir, "bgutils").apply { mkdirs() }
         val apk = File(dir, "nodejs-$RUNTIME_VERSION-$abi.apk")
         if (!apk.exists() || !verifySha256(apk, digest)) {
+            android.util.Log.i("MuziiNap-BgUtils", "Runtime APK missing or invalid; downloading asset=" + assetName + " host=" + URL(url).host)
+            runtimeInstallState = "downloading"
             apk.delete()
             runtimeDownloadBytes = 0L
             runtimeDownloadTotalBytes = 0L
@@ -70,10 +78,15 @@ internal object BgUtilsRuntimeManager {
                     runtimeDownloadBytes = downloaded
                     runtimeDownloadTotalBytes = total
                     onProgress(downloaded, total)
+                    android.util.Log.d("MuziiNap-BgUtils", "Runtime download bytes=" + downloaded + " total=" + total)
                 }
             } finally {
                 runtimeDownloadInProgress = false
             }
+            runtimeInstallState = "verified"
+            android.util.Log.i("MuziiNap-BgUtils", "Runtime APK verified: " + apk.length() + " bytes")
+        } else {
+            runtimeInstallState = "verified"
         }
         return apk
     }
@@ -83,6 +96,8 @@ internal object BgUtilsRuntimeManager {
             val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
                 .setData(Uri.parse("package:${activity.packageName}"))
             activity.startActivity(settingsIntent)
+            runtimeInstallState = "awaiting_install_permission"
+            android.util.Log.i("MuziiNap-BgUtils", "Waiting for unknown-app installation permission")
             return "allow_install_from_this_source"
         }
         val uri = FileProvider.getUriForFile(
@@ -95,6 +110,8 @@ internal object BgUtilsRuntimeManager {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         activity.startActivity(intent)
+        runtimeInstallState = "awaiting_installation"
+        android.util.Log.i("MuziiNap-BgUtils", "Android package installer launched")
         return "installer_opened"
     }
 
@@ -294,33 +311,68 @@ internal object BgUtilsRuntimeManager {
             connection.disconnect()
         }
     }
-    private fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long, onProgress: (Long, Long) -> Unit) {
+    /** Downloads to a sibling .part file and publishes only after size and SHA-256 verification. */
+    internal fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long, overallTimeoutMillis: Long = 180_000L, onProgress: (Long, Long) -> Unit) {
         target.parentFile?.mkdirs()
+        val part = File(target.parentFile, target.name + ".part")
+        part.delete()
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 60_000
+        connection.connectTimeout = 20_000
+        connection.readTimeout = 20_000
         connection.instanceFollowRedirects = true
+        val expired = AtomicBoolean(false)
+        val finished = AtomicBoolean(false)
+        val startedAt = System.currentTimeMillis()
+        val watchdog = Thread({
+            try {
+                Thread.sleep(overallTimeoutMillis)
+                if (finished.compareAndSet(false, true)) {
+                    expired.set(true)
+                    android.util.Log.e("MuziiNap-BgUtils", "Runtime download exceeded overall deadline " + overallTimeoutMillis + "ms")
+                    connection.disconnect()
+                }
+            } catch (_: InterruptedException) { }
+        }, "BgUtils-download-deadline").apply { isDaemon = true; start() }
         try {
-            check(connection.responseCode in 200..299) { "Download failed: HTTP ${connection.responseCode}" }
+            val response = connection.responseCode
+            android.util.Log.i("MuziiNap-BgUtils", "Runtime download HTTP " + response + " host=" + connection.url.host)
+            check(response in 200..299) { "Runtime download failed: HTTP " + response }
             val declared = connection.contentLength.toLong()
-            check(declared <= maxBytes || declared < 0) { "Download exceeds the allowed size." }
+            check(declared <= maxBytes || declared < 0) { "Runtime download exceeds the allowed size." }
             var total = 0L
-            FileOutputStream(target).use { output ->
+            FileOutputStream(part).use { output ->
                 connection.inputStream.use { input ->
                     val buffer = ByteArray(32 * 1024)
                     while (true) {
+                        if (expired.get() || System.currentTimeMillis() - startedAt >= overallTimeoutMillis) throw SocketTimeoutException("Runtime download timed out after " + (overallTimeoutMillis / 1000) + " seconds.")
+                        if (Thread.currentThread().isInterrupted) throw InterruptedException("Runtime download cancelled.")
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
-                        check(total <= maxBytes) { "Download exceeds the allowed size." }
+                        check(total <= maxBytes) { "Runtime download exceeds the allowed size." }
                         output.write(buffer, 0, count)
                         onProgress(total, declared)
                     }
                 }
             }
-            check(verifySha256(target, expectedSha256)) { "Downloaded file failed SHA-256 verification." }
+            if (expired.get() || System.currentTimeMillis() - startedAt >= overallTimeoutMillis) throw SocketTimeoutException("Runtime download timed out after " + (overallTimeoutMillis / 1000) + " seconds.")
+            check(part.isFile && part.length() > 0L) { "Runtime download returned an empty file." }
+            if (declared >= 0L) check(total == declared) { "Runtime download was incomplete: received " + total + " of " + declared + " bytes." }
+            val valid = verifySha256(part, expectedSha256)
+            android.util.Log.i("MuziiNap-BgUtils", "Runtime SHA-256 verification result=" + valid)
+            check(valid) { "Downloaded runtime failed SHA-256 verification." }
+            if (target.exists() && !target.delete()) throw IllegalStateException("Could not replace the previous runtime APK.")
+            check(part.renameTo(target)) { "Could not atomically publish the verified runtime APK." }
+        } catch (error: Exception) {
+            part.delete()
+            if (expired.get()) throw SocketTimeoutException("Runtime download timed out after " + (overallTimeoutMillis / 1000) + " seconds.")
+            android.util.Log.e("MuziiNap-BgUtils", "Runtime download failed", error)
+            throw error
         } finally {
+            finished.set(true)
+            watchdog.interrupt()
             connection.disconnect()
+            if (part.exists()) part.delete()
         }
     }
 
