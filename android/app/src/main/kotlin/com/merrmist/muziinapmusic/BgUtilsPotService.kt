@@ -25,6 +25,7 @@ class BgUtilsPotService : Service() {
     @Volatile private var serverProcess: Process? = null
     private val stopping = AtomicBoolean(false)
     @Volatile private var setupRunning = false
+    @Volatile private var setupThread: Thread? = null
     private val channelId = "muziinap_bgutils_provider"
     private val notificationId = 73043
 
@@ -64,7 +65,7 @@ class BgUtilsPotService : Service() {
         }
         if (setupRunning) return START_STICKY
         setupRunning = true
-        Thread({
+        val worker = Thread({
             try {
                 BgUtilsRuntimeManager.prepareServer(this) { message ->
                     setupState = message
@@ -99,8 +100,11 @@ class BgUtilsPotService : Service() {
                 stopSelf()
             } finally {
                 setupRunning = false
+                setupThread = null
             }
-        }, "MuziiNap-BgUtils-setup").start()
+        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true }
+        setupThread = worker
+        worker.start()
         return START_STICKY
     }
 
@@ -116,6 +120,8 @@ class BgUtilsPotService : Service() {
 
     private fun stopServer() {
         stopping.set(true)
+        setupThread?.interrupt()
+        BgUtilsRuntimeManager.cancelActiveDownload()
         serverProcess?.destroy()
         if (serverProcess?.isAlive == true) serverProcess?.destroyForcibly()
         serverProcess = null
