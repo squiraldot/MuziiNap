@@ -128,6 +128,36 @@ class BgUtilsRuntimeManagerTest {
     }
 
     @Test
+    fun interruptedDownloadCleansPartialFileAndDoesNotPublishTarget() {
+        val payload = ByteArray(256 * 1024) { 7 }
+        withServer(payload) { url ->
+            val directory = createTempDir(prefix = "bgutils-cancel")
+            val target = File(directory, "runtime.apk")
+            var failure: Throwable? = null
+            val worker = Thread {
+                try {
+                    BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), payload.size.toLong() + 1, 5_000) { _, _ ->
+                        Thread.currentThread().interrupt()
+                    }
+                } catch (error: Throwable) {
+                    failure = error
+                }
+            }
+            try {
+                worker.start()
+                worker.join(3_000)
+                assertFalse("download worker should exit after cancellation", worker.isAlive)
+                assertTrue(failure is InterruptedException)
+                assertFalse(target.exists())
+                assertFalse(File(directory, "runtime.apk.part").exists())
+            } finally {
+                worker.interrupt()
+                directory.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
     fun incompleteContentLengthIsNotPublished() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/short") { exchange ->
