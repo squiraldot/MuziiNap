@@ -37,7 +37,7 @@ class MainActivity : AudioServiceActivity() {
     private var presetEventSink: EventChannel.EventSink? = null
     private var initialPreset: String? = null
     private val visualizers = ConcurrentHashMap<Int, Visualizer>()
-    private val bgutilsSetupInProgress = AtomicBoolean(false)
+    private val bgutilsSetupGate = BgUtilsSetupGate()
     @Volatile private var bgutilsSetupThread: Thread? = null
     private var notificationPermissionRequestScheduled = false
 
@@ -80,7 +80,7 @@ class MainActivity : AudioServiceActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "setup" -> {
-                        if (!bgutilsSetupInProgress.compareAndSet(false, true)) {
+                        if (!bgutilsSetupGate.tryAcquire()) {
                             result.error("setup_in_progress", "BgUtils setup is already running.", null)
                             return@setMethodCallHandler
                         }
@@ -135,7 +135,7 @@ class MainActivity : AudioServiceActivity() {
                                 BgUtilsDownloadNotifications.failure(applicationContext)
                                 replyError("bgutils_setup_failed", error.message ?: "BgUtils setup failed.", error)
                             } finally {
-                                bgutilsSetupInProgress.set(false)
+                                bgutilsSetupGate.release()
                                 bgutilsSetupThread = null
                             }
                         }, "MuziiNap-BgUtils-setup").apply { isDaemon = true }
