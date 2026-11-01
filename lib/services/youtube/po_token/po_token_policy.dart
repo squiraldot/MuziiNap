@@ -75,6 +75,7 @@ class PoTokenPolicy {
         .replaceAll(RegExp(r'\\s+'), ' ')
         .trim();
     if (normalized.contains('po token') ||
+        normalized.contains('potoken') ||
         normalized.contains('proof of origin')) {
       return PoTokenPurpose.player;
     }
