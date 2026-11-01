@@ -11,6 +11,11 @@ import 'youtube/stream_url_decipherer.dart';
 import 'youtube/player_js_service.dart';
 import 'youtube/nsig_decipher_service.dart';
 import 'youtube/signature_decipher_service.dart';
+import 'youtube/po_token/po_token_manager.dart';
+import 'youtube/po_token/po_token_request.dart';
+import 'youtube/po_token/po_token_policy.dart';
+import 'youtube/po_token/po_token_provider.dart';
+import 'youtube/po_token/bgutil_http_po_token_provider.dart';
 
 import 'device_adaptive_stream_selector.dart';
 
@@ -57,6 +62,18 @@ class StreamProvider {
   );
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 1500);
+
+  static const PoTokenPolicy _poTokenPolicy = PoTokenPolicy();
+  static PoTokenManager _poTokenManager = PoTokenManager(
+    provider: const UnavailablePoTokenProvider(),
+  );
+
+  /// Allows the host application or tests to replace the attestation provider.
+  /// The provider is never assumed to exist and unsupported requests fail closed.
+  static void configurePoTokenProvider(PoTokenProvider provider) {
+    _poTokenManager.clear();
+    _poTokenManager = PoTokenManager(provider: provider);
+  }
 
   // Bump when URL playability semantics change so previously cached,
   // syntactically valid but unusable InnerTube URLs are re-resolved.
@@ -226,6 +243,19 @@ class StreamProvider {
       }
 
       pipedInstances = _getPipedInstances(prefs);
+      final poTokenProviderUrl =
+          prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
+      if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
+        try {
+          configurePoTokenProvider(
+            BgutilHttpPoTokenProvider(baseUrl: poTokenProviderUrl),
+          );
+        } catch (_) {
+          configurePoTokenProvider(const UnavailablePoTokenProvider());
+        }
+      } else {
+        configurePoTokenProvider(const UnavailablePoTokenProvider());
+      }
       // VISIONOS needs a visitorData value. If startup could not obtain one,
       // make one bounded refresh attempt before asking the player endpoint.
       if (visitorId.isEmpty && refreshVisitorId != null) {
@@ -659,6 +689,8 @@ class StreamProvider {
     String language = 'en',
     String country = 'US',
     CancelToken? cancelToken,
+    String? poToken,
+    bool poTokenRetried = false,
   }) async {
     final requestCancelToken = cancelToken ?? CancelToken();
     final timeoutTimer = Timer(
@@ -700,6 +732,14 @@ class StreamProvider {
         });
       }
 
+      final requestBody = <String, dynamic>{
+        'context': {'client': clientContext, 'user': <String, dynamic>{}},
+        'videoId': videoId,
+        'contentCheckOk': true,
+        'racyCheckOk': true,
+        if (poToken != null)
+          'serviceIntegrityDimensions': {'poToken': poToken},
+      };
       final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
         cancelToken: requestCancelToken,
@@ -708,12 +748,7 @@ class StreamProvider {
           sendTimeout: requestTimeout,
           receiveTimeout: requestTimeout,
         ),
-        data: {
-          'context': {'client': clientContext, 'user': <String, dynamic>{}},
-          'videoId': videoId,
-          'contentCheckOk': true,
-          'racyCheckOk': true,
-        },
+        data: requestBody,
       );
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(
@@ -737,11 +772,43 @@ class StreamProvider {
             ? (playability['reason'] ?? playability['status'])
             : null;
         final reasonText = reason?.toString() ?? 'No streaming data';
-        final normalizedReason = reasonText.toLowerCase();
-        final diagnostic = normalizedReason.contains('potoken') ||
-                normalizedReason.contains('proof of origin') ||
-                normalizedReason.contains('proof-of-origin')
-            ? 'YouTube requires a PoToken for this client; no proof-token provider is configured.'
+        final requiredPurpose =
+            _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
+        if (requiredPurpose == PoTokenPurpose.player &&
+            poToken == null &&
+            !poTokenRetried) {
+          final tokenResult = await _poTokenManager.getToken(PoTokenRequest(
+            clientName: clientName,
+            clientVersion: clientVersion,
+            videoId: videoId,
+            visitorData: visitorId,
+            purpose: PoTokenPurpose.player,
+            binding: PoTokenBinding.video,
+            userAgent: userAgent,
+          ));
+          if (tokenResult != null) {
+            // YouTube.js places Player PO Tokens in serviceIntegrityDimensions,
+            // not in the URL or an unrelated request header.
+            return _fetchInnerTube(
+              videoId: videoId,
+              clientName: clientName,
+              clientVersion: clientVersion,
+              userAgent: userAgent,
+              clientId: clientId,
+              visitorId: visitorId,
+              authenticatedHeaders: authenticatedHeaders,
+              requestTimeout: requestTimeout,
+              deviceProfile: deviceProfile,
+              language: language,
+              country: country,
+              cancelToken: cancelToken,
+              poToken: tokenResult.token,
+              poTokenRetried: true,
+            );
+          }
+        }
+        final diagnostic = requiredPurpose == PoTokenPurpose.player
+            ? 'YouTube explicitly requires a Player PO Token for $clientName; no compatible provider is available.'
             : reasonText;
         return StreamProvider(
           playable: false,
