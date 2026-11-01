@@ -17,6 +17,9 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> {
   bool _running = false;
   bool _busy = false;
   bool _statusInitialized = false;
+  bool _downloadingRuntime = false;
+  int _downloadedBytes = 0;
+  int _downloadTotalBytes = 0;
 
   @override
   void initState() {
@@ -35,10 +38,20 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> {
     try {
       final status = await _channel.invokeMapMethod<String, dynamic>('status');
       final running = status?['serverReady'] == true && status?['serviceRunning'] == true;
+      final downloading = status?['runtimeDownloadInProgress'] == true;
+      final downloaded = (status?['runtimeDownloadBytes'] as num?)?.toInt() ?? 0;
+      final total = (status?['runtimeDownloadTotalBytes'] as num?)?.toInt() ?? 0;
       if (!mounted) return;
-      if (!_statusInitialized || running != _running) {
+      if (!_statusInitialized ||
+          running != _running ||
+          downloading != _downloadingRuntime ||
+          downloaded != _downloadedBytes ||
+          total != _downloadTotalBytes) {
         setState(() {
           _running = running;
+          _downloadingRuntime = downloading;
+          _downloadedBytes = downloaded;
+          _downloadTotalBytes = total;
           _statusInitialized = true;
         });
         await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', running);
@@ -102,13 +115,19 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> {
     children: [
       ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-        leading: _busy
+        leading: (_busy || _downloadingRuntime)
             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.verified_user_outlined),
         title: const Text('YouTube PO Token Provider'),
-        subtitle: Text(_running
-            ? 'Local BgUtils service is running'
-            : 'Install the optional Node runtime and start the local BgUtils service'),
+        subtitle: Text(
+          _downloadingRuntime
+              ? (_downloadTotalBytes > 0
+                  ? 'Downloading Node.js runtime: ${(_downloadedBytes / (1024 * 1024)).toStringAsFixed(1)} / ${(_downloadTotalBytes / (1024 * 1024)).toStringAsFixed(1)} MB'
+                  : 'Downloading Node.js runtime: ${(_downloadedBytes / (1024 * 1024)).toStringAsFixed(1)} MB')
+              : _running
+                  ? 'Local BgUtils service is running'
+                  : 'Install the optional Node runtime and start the local BgUtils service',
+        ),
         trailing: Icon(_running ? Icons.check_circle : Icons.chevron_right,
             color: _running ? Theme.of(context).colorScheme.primary : null),
         onTap: _busy ? null : _setup,

@@ -129,7 +129,10 @@ class MainActivity : AudioServiceActivity() {
                         mapOf(
                             "runtimeInstalled" to BgUtilsRuntimeManager.isRuntimeInstalled(this),
                             "serverReady" to BgUtilsRuntimeManager.isServerReady(),
-                            "serviceRunning" to BgUtilsPotService.isRunning
+                            "serviceRunning" to BgUtilsPotService.isRunning,
+                            "runtimeDownloadInProgress" to BgUtilsRuntimeManager.runtimeDownloadInProgress,
+                            "runtimeDownloadBytes" to BgUtilsRuntimeManager.runtimeDownloadBytes,
+                            "runtimeDownloadTotalBytes" to BgUtilsRuntimeManager.runtimeDownloadTotalBytes
                         )
                     )
                     else -> result.notImplemented()

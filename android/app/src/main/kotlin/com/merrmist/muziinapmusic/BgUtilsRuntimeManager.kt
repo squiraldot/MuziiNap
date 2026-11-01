@@ -25,6 +25,12 @@ internal object BgUtilsRuntimeManager {
     const val PORT = 4416
     private const val PROVIDER_VERSION = "2.0.2"
     private const val RUNTIME_VERSION = "26.12.1"
+    @Volatile var runtimeDownloadInProgress: Boolean = false
+        private set
+    @Volatile var runtimeDownloadBytes: Long = 0L
+        private set
+    @Volatile var runtimeDownloadTotalBytes: Long = 0L
+        private set
     private val runtimeAssets = mapOf(
         "arm64-v8a" to ("app-nodejs-arm64-v8a-release.apk" to "57d6928e5ae7f715b6ac2ba9b15795fba1901d114c9125844bfbfb9d35b53ac6"),
         "armeabi-v7a" to ("app-nodejs-armeabi-v7a-release.apk" to "e2e107cebd5fc2e2e7e66cbbbbabb5dd506592a7865038fa6b22522439a58536"),
@@ -54,7 +60,18 @@ internal object BgUtilsRuntimeManager {
         val apk = File(dir, "nodejs-$RUNTIME_VERSION-$abi.apk")
         if (!apk.exists() || !verifySha256(apk, digest)) {
             apk.delete()
-            downloadVerified(url, apk, digest, 100L * 1024L * 1024L, onProgress)
+            runtimeDownloadBytes = 0L
+            runtimeDownloadTotalBytes = 0L
+            runtimeDownloadInProgress = true
+            try {
+                downloadVerified(url, apk, digest, 100L * 1024L * 1024L) { downloaded, total ->
+                    runtimeDownloadBytes = downloaded
+                    runtimeDownloadTotalBytes = total
+                    onProgress(downloaded, total)
+                }
+            } finally {
+                runtimeDownloadInProgress = false
+            }
         }
         return apk
     }
