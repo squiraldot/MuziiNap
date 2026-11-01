@@ -75,7 +75,7 @@ class BgUtilsPotService : Service() {
                 serverProcess?.destroy()
                 setupState = "checking_health"
                 serverProcess = BgUtilsRuntimeManager.launchServer(this)
-                android.util.Log.i("MuziiNap-BgUtils", "Node process started pid=" + serverProcess?.pid())
+                android.util.Log.i("MuziiNap-BgUtils", "Node process started")
                 val deadline = System.currentTimeMillis() + 30_000
                 while (!stopping.get() && System.currentTimeMillis() < deadline) {
                     if (BgUtilsRuntimeManager.isServerReady()) {
