@@ -6,7 +6,7 @@ import 'package:hive/hive.dart';
 
 import '../../../services/constant.dart';
 
-enum _BgUtilsSetupState { idle, checkingRuntime, downloadingRuntime, verifyingRuntime, awaitingInstallation, startingService, running, failed, cancelled }
+enum _BgUtilsSetupState { idle, checkingRuntime, downloadingRuntime, verifyingRuntime, awaitingInstallation, startingService, extractingRuntime, installingDependencies, compilingProvider, checkingHealth, running, failed, cancelled }
 
 class BgUtilsProviderSettings extends StatefulWidget {
   const BgUtilsProviderSettings({super.key});
@@ -134,6 +134,21 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (serviceState == 'failed') {
         _state = _BgUtilsSetupState.failed;
         _errorMessage = serviceFailure ?? 'BgUtils service failed to start. Tap Retry.';
+      } else if (serviceState == 'Preparing Node.js runtime') {
+        _state = _BgUtilsSetupState.extractingRuntime;
+        _stageMessage = 'Extracting Node.js runtime...';
+      } else if (serviceState == 'Installing BgUtils dependencies') {
+        _state = _BgUtilsSetupState.installingDependencies;
+        _stageMessage = 'Installing BgUtils dependencies...';
+      } else if (serviceState == 'Compiling BgUtils server') {
+        _state = _BgUtilsSetupState.compilingProvider;
+        _stageMessage = 'Compiling BgUtils provider...';
+      } else if (serviceState == 'checking_health') {
+        _state = _BgUtilsSetupState.checkingHealth;
+        _stageMessage = 'Checking local service health...';
+      } else if (serviceState == 'starting_service') {
+        _state = _BgUtilsSetupState.startingService;
+        _stageMessage = 'Starting local service...';
       } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
         _state = _BgUtilsSetupState.awaitingInstallation;
         _stageMessage = 'Waiting for Android installation...';
@@ -264,6 +279,10 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       case _BgUtilsSetupState.verifyingRuntime: return 'Verifying downloaded runtime...';
       case _BgUtilsSetupState.awaitingInstallation: return 'Waiting for Android installation...';
       case _BgUtilsSetupState.startingService: return 'Starting local service...';
+      case _BgUtilsSetupState.extractingRuntime: return 'Extracting Node.js runtime...';
+      case _BgUtilsSetupState.installingDependencies: return 'Installing BgUtils dependencies...';
+      case _BgUtilsSetupState.compilingProvider: return 'Compiling BgUtils provider...';
+      case _BgUtilsSetupState.checkingHealth: return 'Checking local service health...';
       case _BgUtilsSetupState.running: return 'Local BgUtils service is running';
       case _BgUtilsSetupState.failed: return 'Setup failed. Tap Retry.';
       case _BgUtilsSetupState.cancelled: return 'Setup cancelled. Tap Retry to try again.';
@@ -275,6 +294,10 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       _state == _BgUtilsSetupState.checkingRuntime ||
       _state == _BgUtilsSetupState.verifyingRuntime ||
       _state == _BgUtilsSetupState.startingService ||
+      _state == _BgUtilsSetupState.extractingRuntime ||
+      _state == _BgUtilsSetupState.installingDependencies ||
+      _state == _BgUtilsSetupState.compilingProvider ||
+      _state == _BgUtilsSetupState.checkingHealth ||
       _state == _BgUtilsSetupState.awaitingInstallation;
 
   @override
