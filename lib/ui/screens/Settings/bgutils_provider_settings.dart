@@ -16,13 +16,13 @@ class BgUtilsProviderSettings extends StatefulWidget {
 
 class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with WidgetsBindingObserver {
   static const _channel = MethodChannel('muziinap/bgutils');
-  static const _setupTimeout = Duration(minutes: 9);
+  static const _setupTimeout = Duration(minutes: 18);
   Timer? _statusTimer;
   _BgUtilsSetupState _state = _BgUtilsSetupState.idle;
   bool _statusInitialized = false;
   bool _running = false;
   bool _setupInFlight = false;
-  bool _waitingForInstaller = false;
+  bool _waitingForInstaller = false;\n  bool _awaitingInstallPermission = false;
   int _downloadedBytes = 0;
   int _downloadTotalBytes = 0;
   int _pollGeneration = 0;
@@ -63,6 +63,14 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
         _stageMessage = 'Node.js installed. Starting BgUtils...';
       });
       await _setup();
+    } else if (_awaitingInstallPermission) {
+      setState(() {
+        _waitingForInstaller = false;
+        _awaitingInstallPermission = false;
+        _state = _BgUtilsSetupState.checkingRuntime;
+        _stageMessage = 'Permission granted. Opening Android installer...';
+      });
+      await _setup();
     } else {
       setState(() {
         _waitingForInstaller = false;
@@ -101,7 +109,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     final downloading = status['runtimeDownloadInProgress'] == true;
     final downloaded = (status['runtimeDownloadBytes'] as num?)?.toInt() ?? 0;
     final total = (status['runtimeDownloadTotalBytes'] as num?)?.toInt() ?? 0;
-    final runtimeState = status['runtimeInstallState'] as String?;
+    final runtimeState = status['runtimeInstallState'] as String?;\n    final serviceState = status['serviceState'] as String?;\n    final serviceFailure = status['serviceFailure'] as String?;
     if (!mounted || generation != _pollGeneration) return;
     setState(() {
       _running = running;
@@ -115,7 +123,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (downloading) {
         _state = _BgUtilsSetupState.downloadingRuntime;
         _stageMessage = 'Downloading Node.js runtime...';
-      } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
+      } else if (serviceState == 'failed') {\n        _state = _BgUtilsSetupState.failed;\n        _errorMessage = serviceFailure ?? 'BgUtils service failed to start. Tap Retry.';\n      } else if (runtimeState == 'verified' || runtimeState == 'awaiting_installation' || runtimeState == 'awaiting_install_permission') {
         _state = _BgUtilsSetupState.awaitingInstallation;
         _stageMessage = 'Waiting for Android installation...';
       } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && !_waitingForInstaller) {
@@ -148,6 +156,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
       } else if (status == 'installer_opened' || status == 'allow_install_from_this_source') {
         setState(() {
           _waitingForInstaller = true;
+          _awaitingInstallPermission = status == 'allow_install_from_this_source';
           _state = _BgUtilsSetupState.awaitingInstallation;
           _stageMessage = status == 'allow_install_from_this_source'
               ? 'Allow MuziiNap to install apps, then return here.'
