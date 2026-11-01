@@ -788,7 +788,8 @@ class StreamProvider {
             _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
         if (requiredPurpose == PoTokenPurpose.player) {
           final sessionId = _poTokenPolicy.extractSessionId(decoded);
-            final tokenRequest = PoTokenRequest(
+          final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
+          final tokenRequest = PoTokenRequest(
             clientName: clientName,
             clientVersion: clientVersion,
             videoId: videoId,
@@ -849,7 +850,6 @@ class StreamProvider {
       String? gvsPoToken;
       if (clientName == 'WEB_REMIX') {
         final sessionId = _poTokenPolicy.extractSessionId(decoded);
-        final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
         final gvsRequest = PoTokenRequest(
           clientName: clientName,
           clientVersion: clientVersion,
