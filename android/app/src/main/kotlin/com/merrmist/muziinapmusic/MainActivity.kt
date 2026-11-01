@@ -43,8 +43,12 @@ class MainActivity : AudioServiceActivity() {
                         Thread({
                             try {
                                 if (!BgUtilsRuntimeManager.isRuntimeInstalled(this)) {
-                                    val apk = BgUtilsRuntimeManager.prepareInstaller(this)
+                                    BgUtilsDownloadNotifications.begin(this)
+                                    val apk = BgUtilsRuntimeManager.prepareInstaller(this) { downloaded, total ->
+                                        BgUtilsDownloadNotifications.update(this, downloaded, total)
+                                    }
                                     runOnUiThread {
+                                        BgUtilsDownloadNotifications.success(this)
                                         try {
                                             result.success(BgUtilsRuntimeManager.launchInstaller(this, apk))
                                         } catch (error: Exception) {
@@ -52,33 +56,33 @@ class MainActivity : AudioServiceActivity() {
                                         }
                                     }
                                 } else {
+                                    // Starting the service and waiting for its HTTP health check must
+                                    // stay off the Activity/UI thread to avoid an ANR after app restart.
+                                    BgUtilsRuntimeManager.startService(this)
+                                    var ready = false
+                                    val deadline = System.currentTimeMillis() + 5 * 60 * 1000L
+                                    while (System.currentTimeMillis() < deadline) {
+                                        if (BgUtilsRuntimeManager.isServerReady()) {
+                                            ready = true
+                                            break
+                                        }
+                                        Thread.sleep(500)
+                                    }
                                     runOnUiThread {
-                                        try {
-                                            BgUtilsRuntimeManager.startService(this)
-                                            var ready = false
-                                            for (attempt in 0 until 600) {
-                                                if (BgUtilsRuntimeManager.isServerReady()) {
-                                                    ready = true
-                                                    break
-                                                }
-                                                Thread.sleep(500)
-                                            }
-                                            runOnUiThread {
-                                                if (ready) {
-                                                    result.success("server_started")
-                                                } else {
-                                                    result.error("server_not_ready", "BgUtils did not become ready within five minutes. Check the provider notification and retry.", null)
-                                                }
-                                            }
-                                        } catch (error: Exception) {
-                                            result.error("server_start_failed", error.message, null)
+                                        if (ready) {
+                                            result.success("server_started")
+                                        } else {
+                                            result.error("server_not_ready", "BgUtils did not become ready within five minutes. Check the provider notification and retry.", null)
                                         }
                                     }
                                 }
                             } catch (error: Exception) {
-                                runOnUiThread { result.error("bgutils_setup_failed", error.message, null) }
+                                runOnUiThread {
+                                    BgUtilsDownloadNotifications.failure(this)
+                                    result.error("bgutils_setup_failed", error.message, null)
+                                }
                             }
-                        }, "MuziiNap-BgUtils-installer").start()
+                        }, "MuziiNap-BgUtils-setup").start()
                     }
                     "stop" -> {
                         BgUtilsRuntimeManager.stopService(this)
@@ -87,7 +91,8 @@ class MainActivity : AudioServiceActivity() {
                     "status" -> result.success(
                         mapOf(
                             "runtimeInstalled" to BgUtilsRuntimeManager.isRuntimeInstalled(this),
-                            "serverReady" to BgUtilsRuntimeManager.isServerReady()
+                            "serverReady" to BgUtilsRuntimeManager.isServerReady(),
+                            "serviceRunning" to BgUtilsPotService.isRunning
                         )
                     )
                     else -> result.notImplemented()

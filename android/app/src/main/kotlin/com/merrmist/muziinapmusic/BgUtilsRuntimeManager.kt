@@ -45,7 +45,7 @@ internal object BgUtilsRuntimeManager {
         false
     }
 
-    fun prepareInstaller(context: Context): File {
+    fun prepareInstaller(context: Context, onProgress: (Long, Long) -> Unit = { _, _ -> }): File {
         val abi = Build.SUPPORTED_ABIS.firstOrNull { runtimeAssets.containsKey(it) }
             ?: throw IllegalStateException("No compatible Node runtime is published for this device ABI.")
         val (assetName, digest) = runtimeAssets.getValue(abi)
@@ -54,7 +54,7 @@ internal object BgUtilsRuntimeManager {
         val apk = File(dir, "nodejs-$RUNTIME_VERSION-$abi.apk")
         if (!apk.exists() || !verifySha256(apk, digest)) {
             apk.delete()
-            downloadVerified(url, apk, digest, 100L * 1024L * 1024L)
+            downloadVerified(url, apk, digest, 100L * 1024L * 1024L, onProgress)
         }
         return apk
     }
@@ -275,7 +275,7 @@ internal object BgUtilsRuntimeManager {
             connection.disconnect()
         }
     }
-    private fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long) {
+    private fun downloadVerified(url: String, target: File, expectedSha256: String, maxBytes: Long, onProgress: (Long, Long) -> Unit) {
         target.parentFile?.mkdirs()
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 30_000
@@ -295,6 +295,7 @@ internal object BgUtilsRuntimeManager {
                         total += count
                         check(total <= maxBytes) { "Download exceeds the allowed size." }
                         output.write(buffer, 0, count)
+                        onProgress(total, declared)
                     }
                 }
             }

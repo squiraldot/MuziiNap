@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:muziinap/ui/screens/Settings/bgutils_provider_settings.dart';
 import '../../../services/constant.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -50,61 +51,7 @@ class SettingsScreen extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 200, top: 20),
             children: [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                leading: const Icon(Icons.verified_user_outlined),
-                title: const Text('YouTube PO Token Provider'),
-                subtitle: const Text('Install the optional Node runtime and start the local BgUtils service'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  const channel = MethodChannel('muziinap/bgutils');
-                  try {
-                    final status = await channel.invokeMethod<String>('setup');
-                    if (status == 'server_started') {
-                      await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', true);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('BgUtils is preparing. Keep MuziiNap open until the provider is ready.')),
-                        );
-                      }
-                    } else if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(status == 'allow_install_from_this_source'
-                            ? 'Allow MuziiNap to install the verified Node runtime, then tap this option again.'
-                            : 'Android installer opened. Confirm the Node runtime installation, then tap this option again.')),
-                      );
-                    }
-                  } on PlatformException catch (error) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(error.message ?? 'BgUtils setup failed')),
-                      );
-                    }
-                  }
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                leading: const Icon(Icons.stop_circle_outlined),
-                title: const Text('Stop local PO Token Provider'),
-                onTap: () async {
-                  try {
-                    await const MethodChannel('muziinap/bgutils').invokeMethod<bool>('stop');
-                    await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', false);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Local PO Token Provider stopped.')),
-                      );
-                    }
-                  } on PlatformException catch (error) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(error.message ?? 'Could not stop BgUtils')),
-                      );
-                    }
-                  }
-                },
-              ),
+              const BgUtilsProviderSettings(),
               Offstage(
                 offstage: true,
                 child: CustomExpansionTile(

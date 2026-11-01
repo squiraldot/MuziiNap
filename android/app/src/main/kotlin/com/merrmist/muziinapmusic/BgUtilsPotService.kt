@@ -12,6 +12,11 @@ import androidx.core.app.NotificationCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 class BgUtilsPotService : Service() {
+    companion object {
+        @Volatile var isRunning: Boolean = false
+            private set
+    }
+
     @Volatile private var serverProcess: Process? = null
     private val stopping = AtomicBoolean(false)
     @Volatile private var setupRunning = false
@@ -20,6 +25,7 @@ class BgUtilsPotService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
@@ -98,6 +104,7 @@ class BgUtilsPotService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         stopServer()
         super.onDestroy()
     }
