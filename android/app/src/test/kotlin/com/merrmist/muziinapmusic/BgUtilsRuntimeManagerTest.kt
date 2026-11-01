@@ -1,16 +1,180 @@
 package com.merrmist.muziinapmusic
 
-import java.net.URL
-import org.junit.Assert.assertEquals
+import com.sun.net.httpserver.HttpServer
+import java.io.File
+import java.net.InetSocketAddress
+import java.security.MessageDigest
+import java.util.concurrent.Executors
+import org.junit.Assert.*
 import org.junit.Test
 
 class BgUtilsRuntimeManagerTest {
     @Test
     fun healthCheckUsesCleartextPermittedLocalhostHost() {
-        val url = URL(BgUtilsRuntimeManager.HEALTH_CHECK_URL)
-
+        val url = java.net.URL(BgUtilsRuntimeManager.HEALTH_CHECK_URL)
         assertEquals("http", url.protocol)
         assertEquals("localhost", url.host)
         assertEquals("/ping", url.path)
+    }
+
+    @Test
+    fun selectsCorrectPublishedRuntimeAssetForSupportedAbis() {
+        assertEquals("app-nodejs-arm64-v8a-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("arm64-v8a")?.first)
+        assertEquals("app-nodejs-armeabi-v7a-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("armeabi-v7a")?.first)
+        assertEquals("app-nodejs-x86-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("x86")?.first)
+        assertEquals("app-nodejs-x86_64-release.apk", BgUtilsRuntimeManager.runtimeAssetForAbi("x86_64")?.first)
+        assertNull(BgUtilsRuntimeManager.runtimeAssetForAbi("riscv64"))
+    }
+
+    @Test
+    fun constructsVersionedRuntimeReleaseUrl() {
+        assertEquals(
+            "https://github.com/deniscerri/ytdlnis-packages/releases/download/nodejs-26.12.1/app-nodejs-arm64-v8a-release.apk",
+            BgUtilsRuntimeManager.runtimeUrlForAbi("arm64-v8a")
+        )
+        assertNull(BgUtilsRuntimeManager.runtimeUrlForAbi("unknown"))
+    }
+
+    @Test
+    fun verifiesSha256AndRejectsMismatch() {
+        val file = File.createTempFile("bgutils-digest", ".bin")
+        try {
+            file.writeBytes("verified-runtime".toByteArray())
+            assertTrue(BgUtilsRuntimeManager.verifySha256(file, sha256("verified-runtime".toByteArray())))
+            assertFalse(BgUtilsRuntimeManager.verifySha256(file, "0".repeat(64)))
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun successfulDownloadAtomicallyReplacesTargetAfterVerification() {
+        val payload = "new verified apk bytes".toByteArray()
+        withServer(payload) { url ->
+            val directory = createTempDir(prefix = "bgutils-atomic")
+            val target = File(directory, "runtime.apk")
+            target.writeText("old invalid file")
+            try {
+                BgUtilsRuntimeManager.downloadVerified(url, target, sha256(payload), 1024, 5_000) { _, _ -> }
+                assertArrayEquals(payload, target.readBytes())
+                assertFalse(File(directory, "runtime.apk.part").exists())
+            } finally {
+                directory.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun httpErrorDoesNotPublishOrLeavePartialFile() {
+        withServer("denied".toByteArray(), status = 403) { url ->
+            val directory = createTempDir(prefix = "bgutils-http")
+            val target = File(directory, "runtime.apk")
+            try {
+                assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+                assertFalse(target.exists())
+                assertFalse(File(directory, "runtime.apk.part").exists())
+            } finally {
+                directory.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun shaMismatchDeletesPartAndPreservesPreviousTarget() {
+        withServer("tampered".toByteArray()) { url ->
+            val directory = createTempDir(prefix = "bgutils-sha")
+            val target = File(directory, "runtime.apk")
+            target.writeText("previous")
+            try {
+                assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+                assertEquals("previous", target.readText())
+                assertFalse(File(directory, "runtime.apk.part").exists())
+            } finally {
+                directory.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun overallDeadlineClosesSlowTricklingResponseAndCleansPartialFile() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.executor = Executors.newSingleThreadExecutor()
+        server.createContext("/runtime") { exchange ->
+            exchange.sendResponseHeaders(200, 0)
+            try {
+                exchange.responseBody.write(byteArrayOf(1))
+                exchange.responseBody.flush()
+                Thread.sleep(600)
+                exchange.responseBody.write(byteArrayOf(2))
+                exchange.responseBody.flush()
+            } catch (_: Exception) {
+            } finally {
+                exchange.close()
+            }
+        }
+        server.start()
+        val directory = createTempDir(prefix = "bgutils-timeout")
+        val target = File(directory, "runtime.apk")
+        try {
+            val url = "http://127.0.0.1:${server.address.port}/runtime"
+            val error = assertFails {
+                BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 120) { _, _ -> }
+            }
+            assertTrue(error is java.net.SocketTimeoutException)
+            assertFalse(target.exists())
+            assertFalse(File(directory, "runtime.apk.part").exists())
+        } finally {
+            server.stop(0)
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun incompleteContentLengthIsNotPublished() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/short") { exchange ->
+            exchange.sendResponseHeaders(200, 100)
+            exchange.responseBody.write(byteArrayOf(1, 2, 3))
+            exchange.close()
+        }
+        server.start()
+        val directory = createTempDir(prefix = "bgutils-short")
+        val target = File(directory, "runtime.apk")
+        try {
+            val url = "http://127.0.0.1:${server.address.port}/short"
+            assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+            assertFalse(target.exists())
+            assertFalse(File(directory, "runtime.apk.part").exists())
+        } finally {
+            server.stop(0)
+            directory.deleteRecursively()
+        }
+    }
+
+    private fun withServer(payload: ByteArray, status: Int = 200, block: (String) -> Unit) {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/runtime") { exchange ->
+            exchange.sendResponseHeaders(status, payload.size.toLong())
+            exchange.responseBody.use { it.write(payload) }
+        }
+        server.start()
+        try {
+            block("http://127.0.0.1:${server.address.port}/runtime")
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun assertFails(block: () -> Unit): Exception {
+        try {
+            block()
+        } catch (error: Exception) {
+            return error
+        }
+        fail("Expected operation to fail")
+        throw AssertionError("unreachable")
     }
 }
