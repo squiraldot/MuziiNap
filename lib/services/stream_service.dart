@@ -68,6 +68,7 @@ class StreamProvider {
     provider: const UnavailablePoTokenProvider(),
   );
   static bool _poTokenProviderOverridden = false;
+  static String? _configuredPoTokenProviderUrl;
 
   /// Allows the host application or tests to replace the attestation provider.
   /// The provider is never assumed to exist and unsupported requests fail closed.
@@ -248,7 +249,9 @@ class StreamProvider {
       if (!_poTokenProviderOverridden) {
         final poTokenProviderUrl =
             prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
-        if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
+        if (poTokenProviderUrl != _configuredPoTokenProviderUrl) {
+          _configuredPoTokenProviderUrl = poTokenProviderUrl;
+          if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
           try {
             _poTokenManager = PoTokenManager(
               provider: BgutilHttpPoTokenProvider(baseUrl: poTokenProviderUrl),
@@ -258,10 +261,11 @@ class StreamProvider {
               provider: const UnavailablePoTokenProvider(),
             );
           }
-        } else {
-          _poTokenManager = PoTokenManager(
-            provider: const UnavailablePoTokenProvider(),
-          );
+          } else {
+            _poTokenManager = PoTokenManager(
+              provider: const UnavailablePoTokenProvider(),
+            );
+          }
         }
       }
       // VISIONOS needs a visitorData value. If startup could not obtain one,
