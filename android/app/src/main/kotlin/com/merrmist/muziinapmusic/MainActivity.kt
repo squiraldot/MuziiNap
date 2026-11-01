@@ -431,6 +431,12 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        if (!isChangingConfigurations) {
+            bgutilsSetupThread?.let { worker ->
+                worker.interrupt()
+                BgUtilsRuntimeManager.cancelActiveDownload()
+            }
+        }
         stopVisualizer()
         super.onDestroy()
     }
