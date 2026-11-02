@@ -28,6 +28,7 @@ class BgUtilsPotService : Service() {
     }
 
     @Volatile private var serverProcess: Process? = null
+    private val processLock = Any()
     private val stopping = AtomicBoolean(false)
     @Volatile private var setupRunning = false
     @Volatile private var setupThread: Thread? = null
@@ -73,9 +74,20 @@ class BgUtilsPotService : Service() {
                     updateNotification(message)
                 }
                 if (stopping.get()) return@Thread
-                serverProcess?.destroy()
                 setupState = "checking_health"
-                serverProcess = BgUtilsRuntimeManager.launchServer(this)
+                val launchedProcess = BgUtilsRuntimeManager.launchServer(this)
+                val accepted = synchronized(processLock) {
+                    if (stopping.get()) {
+                        launchedProcess.destroy()
+                        if (launchedProcess.isAlive) launchedProcess.destroyForcibly()
+                        false
+                    } else {
+                        serverProcess?.destroy()
+                        serverProcess = launchedProcess
+                        true
+                    }
+                }
+                if (!accepted) return@Thread
                 android.util.Log.i("MuziiNap-BgUtils", "Node process started")
                 val deadline = System.currentTimeMillis() + 30_000
                 while (!stopping.get() && System.currentTimeMillis() < deadline) {
@@ -122,6 +134,7 @@ class BgUtilsPotService : Service() {
                     stopSelf()
                 }
             } finally {
+                if (stopping.get()) terminateServerProcess()
                 setupRunning = false
                 setupThread = null
             }
@@ -157,14 +170,29 @@ class BgUtilsPotService : Service() {
             .build()
     }
 
+    private fun terminateServerProcess() {
+        synchronized(processLock) {
+            val process = serverProcess
+            serverProcess = null
+            process?.destroy()
+            if (process?.isAlive == true) process.destroyForcibly()
+        }
+    }
+
     private fun stopServer() {
         stopping.set(true)
         setupThread?.interrupt()
         BgUtilsRuntimeManager.cancelActiveDownload()
-        serverProcess?.destroy()
-        if (serverProcess?.isAlive == true) serverProcess?.destroyForcibly()
-        serverProcess = null
+        terminateServerProcess()
         if (setupState != "failed") setupState = "idle"
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        android.util.Log.i("MuziiNap-BgUtils", "App task removed; stopping local PO Token provider")
+        stopServer()
+        stopForeground(true)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
