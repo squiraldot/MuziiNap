@@ -51,7 +51,6 @@ class SettingsScreen extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 200, top: 20),
             children: [
-              const BgUtilsProviderSettings(),
               Offstage(
                 offstage: true,
                 child: CustomExpansionTile(
@@ -473,6 +472,13 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Get.to(() => const AboutScreen()),
+              ),
+              CustomExpansionTile(
+                title: 'Developer Options',
+                icon: Icons.developer_mode,
+                children: [
+                  const BgUtilsProviderSettings(),
+                ],
               ),
             ],
           )),
