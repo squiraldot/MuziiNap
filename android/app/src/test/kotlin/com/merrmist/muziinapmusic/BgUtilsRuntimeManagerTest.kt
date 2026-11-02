@@ -301,9 +301,9 @@ class BgUtilsRuntimeManagerTest {
     }
 
     private fun OutputStream.writeHeaders(status: Int, contentLength: Int) {
-        write("HTTP/1.1 $status Test\\r\\n".toByteArray())
-        write("Content-Length: $contentLength\\r\\n".toByteArray())
-        write("Connection: close\\r\\n\\r\\n".toByteArray())
+        write("HTTP/1.1 $status Test\r\n".toByteArray())
+        write("Content-Length: $contentLength\r\n".toByteArray())
+        write("Connection: close\r\n\r\n".toByteArray())
         flush()
     }
 
