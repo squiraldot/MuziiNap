@@ -165,7 +165,8 @@ class StreamProvider {
     return uri != null &&
         uri.scheme == 'https' &&
         uri.host.isNotEmpty &&
-        uri.userInfo.isEmpty;
+        uri.userInfo.isEmpty &&
+        !(uri.queryParametersAll['sabr']?.contains('1') ?? false);
   }
 
   static bool isAudioMimeType(String? mimeType) {
