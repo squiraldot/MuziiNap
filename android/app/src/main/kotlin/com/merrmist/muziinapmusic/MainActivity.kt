@@ -73,8 +73,24 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/notification_navigation")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "consumeBgUtilsSettingsRequest") {
+                    val shouldOpen = intent?.getBooleanExtra("open_bgutils_settings", false) == true
+                    intent?.removeExtra("open_bgutils_settings")
+                    result.success(shouldOpen)
+                } else {
+                    result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/bgutils")
             .setMethodCallHandler { call, result ->
