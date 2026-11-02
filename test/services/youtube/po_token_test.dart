@@ -205,14 +205,24 @@ void main() {
   });
 
   group('Provider and policy boundaries', () {
-    test('BgUtils adapter rejects non-Web clients and SABR', () {
+    test('GVS binding follows the Web visitor or account session, never video ID', () {
+      const policy = PoTokenPolicy();
+      expect(policy.gvsBindingForSession(visitorData: 'visitor-123'), PoTokenBinding.visitor);
+      expect(
+        policy.gvsBindingForSession(visitorData: 'visitor-123', sessionId: 'account-session'),
+        PoTokenBinding.session,
+      );
+      expect(policy.gvsBindingForSession(visitorData: ''), isNull);
+    });
+
+    test('BgUtils adapter rejects non-Web clients, SABR, and video-bound GVS', () {
       final provider = BgutilHttpPoTokenProvider(
         baseUrl: 'https://pot.example.test',
       );
-      expect(
-        provider.supports(request(binding: PoTokenBinding.video)),
-        isTrue,
-      );
+      expect(provider.supports(request(binding: PoTokenBinding.video)), isTrue);
+      expect(provider.supports(request(purpose: PoTokenPurpose.gvs, binding: PoTokenBinding.video)), isFalse);
+      expect(provider.supports(request(purpose: PoTokenPurpose.gvs, binding: PoTokenBinding.visitor)), isTrue);
+      expect(provider.supports(request(purpose: PoTokenPurpose.gvs, binding: PoTokenBinding.session, sessionId: 'session-a')), isTrue);
       expect(
         provider.supports(request(binding: PoTokenBinding.visitor)),
         isTrue,
