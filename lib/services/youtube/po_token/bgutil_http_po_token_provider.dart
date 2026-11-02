@@ -47,14 +47,20 @@ class BgutilHttpPoTokenProvider implements PoTokenProvider {
   String get id => 'bgutil-web-botguard';
 
   @override
-  bool supports(PoTokenRequest request) =>
-      request.clientName == 'WEB_REMIX' &&
-      (request.purpose == PoTokenPurpose.player ||
-          request.purpose == PoTokenPurpose.gvs) &&
-      (request.binding == PoTokenBinding.video ||
-          request.binding == PoTokenBinding.visitor ||
-          request.binding == PoTokenBinding.session) &&
-      request.bindingValue != null;
+  bool supports(PoTokenRequest request) {
+    if (request.clientName != 'WEB_REMIX' ||
+        (request.purpose != PoTokenPurpose.player &&
+            request.purpose != PoTokenPurpose.gvs)) {
+      return false;
+    }
+    // Web GVS tokens are session-bound (visitor ID or account session ID).
+    // A video-ID binding is valid for some Player contexts, not GVS.
+    if (request.purpose == PoTokenPurpose.gvs &&
+        request.binding == PoTokenBinding.video) {
+      return false;
+    }
+    return request.bindingValue != null;
+  }
 
   @override
   Future<PoTokenResult?> getToken(PoTokenRequest request) async {
