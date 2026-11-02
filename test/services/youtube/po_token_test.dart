@@ -129,6 +129,41 @@ void main() {
       expect(provider.calls, 1);
     });
 
+    test('reuses account-session-bound GVS tokens across videos', () async {
+      final provider = FakeProvider();
+      final manager = PoTokenManager(provider: provider);
+      final first = await manager.getToken(request(
+        videoId: 'one',
+        purpose: PoTokenPurpose.gvs,
+        binding: PoTokenBinding.session,
+        sessionId: 'account-session',
+      ));
+      final second = await manager.getToken(request(
+        videoId: 'two',
+        purpose: PoTokenPurpose.gvs,
+        binding: PoTokenBinding.session,
+        sessionId: 'account-session',
+      ));
+      expect(second?.token, first?.token);
+      expect(provider.calls, 1);
+    });
+
+    test('isolates account-session-bound tokens by account session ID', () async {
+      final provider = FakeProvider();
+      final manager = PoTokenManager(provider: provider);
+      await manager.getToken(request(
+        purpose: PoTokenPurpose.gvs,
+        binding: PoTokenBinding.session,
+        sessionId: 'account-one',
+      ));
+      await manager.getToken(request(
+        purpose: PoTokenPurpose.gvs,
+        binding: PoTokenBinding.session,
+        sessionId: 'account-two',
+      ));
+      expect(provider.calls, 2);
+    });
+
     test('isolates tokens by visitor session identity', () async {
       final provider = FakeProvider();
       final manager = PoTokenManager(provider: provider);
