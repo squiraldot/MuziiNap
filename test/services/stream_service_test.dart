@@ -158,6 +158,13 @@ void main() {
         isEmpty,
       );
 
+      final rejectedAttempt = await firstClientAttempt;
+      expect(rejectedAttempt.playable, isFalse);
+      expect(
+        rejectedAttempt.statusMSG,
+        'No validated direct audio formats',
+      );
+
       final result = await StreamProvider.firstPlayableResult([
         firstClientAttempt,
         nextClientAttempt,
