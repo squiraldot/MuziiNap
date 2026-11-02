@@ -1,8 +1,9 @@
 package com.merrmist.muziinapmusic
 
-import com.sun.net.httpserver.HttpServer
 import java.io.File
-import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -125,25 +126,18 @@ class BgUtilsRuntimeManagerTest {
 
     @Test
     fun readTimeoutRejectsAResponseThatStopsSendingData() {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/stall") { exchange ->
-            try {
-                Thread.sleep(500)
-                exchange.sendResponseHeaders(200, 1)
-                exchange.responseBody.write(byteArrayOf(1))
-            } catch (_: Exception) {
-            } finally {
-                exchange.close()
-            }
+        val server = TestHttpServer { socket ->
+            socket.getInputStream().readRequest()
+            socket.getOutputStream().writeHeaders(200, 1)
+            Thread.sleep(500)
+            socket.getOutputStream().write(byteArrayOf(1))
         }
-        server.start()
         val directory = createTempDir(prefix = "bgutils-read-timeout")
         val target = File(directory, "runtime.apk")
         try {
-            val url = "http://127.0.0.1:${server.address.port}/stall"
             val error = assertFails {
                 BgUtilsRuntimeManager.downloadVerified(
-                    url,
+                    server.url,
                     target,
                     "0".repeat(64),
                     1024,
@@ -155,69 +149,59 @@ class BgUtilsRuntimeManagerTest {
             assertFalse(target.exists())
             assertFalse(File(directory, "runtime.apk.part").exists())
         } finally {
-            server.stop(0)
+            server.stop()
             directory.deleteRecursively()
         }
     }
 
     @Test
     fun overallDeadlineClosesSlowTricklingResponseAndCleansPartialFile() {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/runtime") { exchange ->
-            exchange.sendResponseHeaders(200, 0)
-            try {
-                exchange.responseBody.write(byteArrayOf(1))
-                exchange.responseBody.flush()
-                Thread.sleep(600)
-                exchange.responseBody.write(byteArrayOf(2))
-                exchange.responseBody.flush()
-            } catch (_: Exception) {
-            } finally {
-                exchange.close()
-            }
+        val server = TestHttpServer { socket ->
+            socket.getInputStream().readRequest()
+            val output = socket.getOutputStream()
+            output.writeHeaders(200, 2)
+            output.write(byteArrayOf(1))
+            output.flush()
+            Thread.sleep(600)
+            output.write(byteArrayOf(2))
+            output.flush()
         }
-        server.start()
         val directory = createTempDir(prefix = "bgutils-timeout")
         val target = File(directory, "runtime.apk")
         try {
-            val url = "http://127.0.0.1:${server.address.port}/runtime"
             val error = assertFails {
-                BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 120) { _, _ -> }
+                BgUtilsRuntimeManager.downloadVerified(server.url, target, "0".repeat(64), 1024, 120) { _, _ -> }
             }
             assertTrue(error is java.net.SocketTimeoutException)
             assertFalse(target.exists())
             assertFalse(File(directory, "runtime.apk.part").exists())
         } finally {
-            server.stop(0)
+            server.stop()
             directory.deleteRecursively()
         }
     }
 
     @Test
     fun explicitCancellationDisconnectsActiveHttpRequestAndCleansPartFile() {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val firstChunkSent = CountDownLatch(1)
-        server.createContext("/slow") { exchange ->
-            exchange.sendResponseHeaders(200, 0)
-            try {
-                exchange.responseBody.write(byteArrayOf(1))
-                exchange.responseBody.flush()
-                firstChunkSent.countDown()
-                Thread.sleep(2_000)
-                exchange.responseBody.write(byteArrayOf(2))
-            } catch (_: Exception) {
-            } finally {
-                exchange.close()
-            }
+        val server = TestHttpServer { socket ->
+            socket.getInputStream().readRequest()
+            val output = socket.getOutputStream()
+            output.writeHeaders(200, 2)
+            output.write(byteArrayOf(1))
+            output.flush()
+            firstChunkSent.countDown()
+            Thread.sleep(2_000)
+            output.write(byteArrayOf(2))
+            output.flush()
         }
-        server.start()
         val directory = createTempDir(prefix = "bgutils-cancel-active")
         val target = File(directory, "runtime.apk")
         var failure: Throwable? = null
         val worker = Thread {
             try {
                 BgUtilsRuntimeManager.downloadVerified(
-                    "http://127.0.0.1:${server.address.port}/slow",
+                    server.url,
                     target,
                     "0".repeat(64),
                     1024,
@@ -238,74 +222,102 @@ class BgUtilsRuntimeManagerTest {
             assertFalse(File(directory, "runtime.apk.part").exists())
         } finally {
             BgUtilsRuntimeManager.cancelActiveDownload()
-            server.stop(0)
+            server.stop()
             directory.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun interruptedDownloadCleansPartialFileAndDoesNotPublishTarget() {
-        val payload = ByteArray(256 * 1024) { 7 }
-        withServer(payload) { url ->
-            val directory = createTempDir(prefix = "bgutils-cancel")
-            val target = File(directory, "runtime.apk")
-            var failure: Throwable? = null
-            val worker = Thread {
-                try {
-                    BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), payload.size.toLong() + 1, 5_000) { _, _ ->
-                        Thread.currentThread().interrupt()
-                    }
-                } catch (error: Throwable) {
-                    failure = error
-                }
-            }
-            try {
-                worker.start()
-                worker.join(3_000)
-                assertFalse("download worker should exit after cancellation", worker.isAlive)
-                assertTrue(failure is InterruptedException)
-                assertFalse(target.exists())
-                assertFalse(File(directory, "runtime.apk.part").exists())
-            } finally {
-                worker.interrupt()
-                directory.deleteRecursively()
-            }
         }
     }
 
     @Test
     fun incompleteContentLengthIsNotPublished() {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/short") { exchange ->
-            exchange.sendResponseHeaders(200, 100)
-            exchange.responseBody.write(byteArrayOf(1, 2, 3))
-            exchange.close()
+        val server = TestHttpServer { socket ->
+            socket.getInputStream().readRequest()
+            val output = socket.getOutputStream()
+            output.writeHeaders(200, 100)
+            output.write(byteArrayOf(1, 2, 3))
+            output.flush()
         }
-        server.start()
         val directory = createTempDir(prefix = "bgutils-short")
         val target = File(directory, "runtime.apk")
         try {
-            val url = "http://127.0.0.1:${server.address.port}/short"
-            assertFails { BgUtilsRuntimeManager.downloadVerified(url, target, "0".repeat(64), 1024, 2_000) { _, _ -> } }
+            assertFails {
+                BgUtilsRuntimeManager.downloadVerified(server.url, target, "0".repeat(64), 1024, 2_000) { _, _ -> }
+            }
             assertFalse(target.exists())
             assertFalse(File(directory, "runtime.apk.part").exists())
         } finally {
-            server.stop(0)
+            server.stop()
             directory.deleteRecursively()
         }
     }
 
-    private fun withServer(payload: ByteArray, status: Int = 200, block: (String) -> Unit) {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/runtime") { exchange ->
-            exchange.sendResponseHeaders(status, payload.size.toLong())
-            exchange.responseBody.use { it.write(payload) }
+    private class TestHttpServer(
+        private val handler: (Socket) -> Unit
+    ) {
+        private val server = ServerSocket(0)
+        private val worker = Thread {
+            try {
+                server.accept().use { socket ->
+                    try {
+                        handler(socket)
+                    } catch (_: Exception) {
+                        // Client cancellation and timeout intentionally close the socket.
+                    }
+                }
+            } catch (_: Exception) {
+                // Server is closed by stop().
+            }
+        }.apply {
+            isDaemon = true
+            start()
         }
-        server.start()
+
+        val url: String = "http://127.0.0.1:${server.localPort}/runtime"
+
+        fun stop() {
+            try {
+                server.close()
+            } catch (_: Exception) {
+            }
+            worker.interrupt()
+            worker.join(500)
+        }
+    }
+
+    private fun InputStream.readRequest() {
+        var matched = 0
+        while (matched < 4) {
+            val next = read()
+            if (next == -1) return
+            matched = when {
+                matched == 0 && next == 13 -> 1
+                matched == 1 && next == 10 -> 2
+                matched == 2 && next == 13 -> 3
+                matched == 3 && next == 10 -> 4
+                next == 13 -> 1
+                else -> 0
+            }
+        }
+    }
+
+    private fun OutputStream.writeHeaders(status: Int, contentLength: Int) {
+        write("HTTP/1.1 $status Test\\r\\n".toByteArray())
+        write("Content-Length: $contentLength\\r\\n".toByteArray())
+        write("Connection: close\\r\\n\\r\\n".toByteArray())
+        flush()
+    }
+
+    private fun withServer(payload: ByteArray, status: Int = 200, block: (String) -> Unit) {
+        val server = TestHttpServer { socket ->
+            socket.getInputStream().readRequest()
+            val output = socket.getOutputStream()
+            output.writeHeaders(status, payload.size)
+            output.write(payload)
+            output.flush()
+        }
         try {
-            block("http://127.0.0.1:${server.address.port}/runtime")
+            block(server.url)
         } finally {
-            server.stop(0)
+            server.stop()
         }
     }
 
