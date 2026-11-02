@@ -1366,12 +1366,14 @@ class PlayerController extends GetxController
     await _audioHandler.customAction("resetEqualizer");
   }
 
-  /// Called from audio handler in case audio is not playable
-  /// or returned streamInfo null due to network error
+  /// Shows the specific stream-resolution or native playback failure.
   void notifyPlayError(String message) {
     ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
-        Get.context!, message == "networkError" ? message.tr : message,
-        size: SanckBarSize.MEDIUM));
+      Get.context!,
+      message == "networkError" ? message.tr : message,
+      size: SanckBarSize.BIG,
+      duration: const Duration(seconds: 5),
+    ));
   }
 
   @override
