@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:muziinap/services/playback_error_message.dart';
 
-void main() {
+class _EmptyError implements Exception {\n  @override\n  String toString() => '   ';\n}\n\nvoid main() {
   group('playbackErrorMessage', () {
     test('preserves the native player error code and message', () {
       final error = PlayerException(2001, 'Decoder initialization failed', 0);
@@ -23,7 +23,7 @@ void main() {
     });
 
     test('never returns an empty message', () {
-      expect(playbackErrorMessage(Exception('   ')), 'Playback failed (Exception)');
+      expect(playbackErrorMessage(_EmptyError()), 'Playback failed (_EmptyError)');
     });
   });
 }
