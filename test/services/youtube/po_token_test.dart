@@ -306,7 +306,7 @@ void main() {
     test('recognizes PO Token requirements with repeated whitespace', () {
       const policy = PoTokenPolicy();
       expect(
-        policy.purposeRequiredByPlayerReason('PO   TOKEN\\nREQUIRED'),
+        policy.purposeRequiredByPlayerReason('PO   TOKEN\nREQUIRED'),
         PoTokenPurpose.player,
       );
     });
