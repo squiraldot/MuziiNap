@@ -21,6 +21,10 @@ class BgUtilsPotService : Service() {
         @Volatile var lastFailure: String? = null
             private set
         const val ACTION_STOP = "com.merrmist.muziinapmusic.BGUTILS_STOP"
+        internal const val HEALTH_CHECK_FAILURE_LIMIT = 3
+
+        internal fun nextHealthCheckFailureCount(current: Int, healthy: Boolean): Int =
+            if (healthy) 0 else current + 1
     }
 
     @Volatile private var serverProcess: Process? = null
@@ -79,7 +83,19 @@ class BgUtilsPotService : Service() {
                         setupState = "running"
                         android.util.Log.i("MuziiNap-BgUtils", "Health check passed at " + BgUtilsRuntimeManager.HEALTH_CHECK_URL)
                         updateNotification("Ready • localhost:${BgUtilsRuntimeManager.PORT}")
-                        while (!stopping.get() && serverProcess?.isAlive == true) Thread.sleep(1000)
+                        var consecutiveHealthFailures = 0
+                        while (!stopping.get() && serverProcess?.isAlive == true) {
+                            Thread.sleep(1000)
+                            consecutiveHealthFailures = nextHealthCheckFailureCount(
+                                consecutiveHealthFailures,
+                                BgUtilsRuntimeManager.isServerReady()
+                            )
+                            if (consecutiveHealthFailures >= HEALTH_CHECK_FAILURE_LIMIT) {
+                                throw IllegalStateException(
+                                    "BgUtils server stopped responding to health checks."
+                                )
+                            }
+                        }
                         break
                     }
                     if (serverProcess?.isAlive != true) {
@@ -87,7 +103,14 @@ class BgUtilsPotService : Service() {
                     }
                     Thread.sleep(400)
                 }
-                if (!stopping.get()) check(BgUtilsRuntimeManager.isServerReady()) { "BgUtils server did not become ready." }
+                if (!stopping.get()) {
+                    check(serverProcess?.isAlive == true) {
+                        "BgUtils server process exited unexpectedly."
+                    }
+                    check(BgUtilsRuntimeManager.isServerReady()) {
+                        "BgUtils server did not become ready."
+                    }
+                }
             } catch (error: Exception) {
                 if (stopping.get() && error is InterruptedException) {
                     android.util.Log.i("MuziiNap-BgUtils", "Provider preparation cancelled")
