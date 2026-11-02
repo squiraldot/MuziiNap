@@ -108,12 +108,14 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     final generation = ++_pollGeneration;
     final status = await _readStatus();
     if (!mounted || status == null || generation != _pollGeneration) return;
-    final running = status['serverReady'] == true && status['serviceRunning'] == true;
+    final serviceRunning = status['serviceRunning'] == true;
+    final serviceState = status['serviceState'] as String?;
+    final running = serviceRunning &&
+        (status['serverReady'] == true || serviceState == 'running');
     final downloading = status['runtimeDownloadInProgress'] == true;
     final downloaded = (status['runtimeDownloadBytes'] as num?)?.toInt() ?? 0;
     final total = (status['runtimeDownloadTotalBytes'] as num?)?.toInt() ?? 0;
     final runtimeState = status['runtimeInstallState'] as String?;
-    final serviceState = status['serviceState'] as String?;
     final serviceFailure = status['serviceFailure'] as String?;
     if (!mounted || generation != _pollGeneration) return;
     setState(() {
@@ -158,6 +160,8 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
         _stageMessage = serviceState;
       } else if (!_setupInFlight && _state != _BgUtilsSetupState.failed && _state != _BgUtilsSetupState.cancelled && !_waitingForInstaller) {
         _state = _BgUtilsSetupState.idle;
+        _stageMessage = null;
+        _errorMessage = null;
       }
     });
     await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', running);
@@ -249,6 +253,7 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
     try {
       await _channel.invokeMethod<bool>('stop').timeout(const Duration(seconds: 10));
       await Hive.box(appPrefsBoxName).put('bgutilLocalEnabled', false);
+      await _refreshStatus();
       if (mounted) {
         setState(() {
           _running = false;
@@ -315,9 +320,9 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
               ),
         title: const Text('YouTube PO Token Provider'),
         subtitle: Text(_statusText()),
-        trailing: Icon(_running ? Icons.check_circle : Icons.chevron_right,
-            color: _running ? Theme.of(context).colorScheme.primary : null),
-        onTap: _setupInFlight ? null : _setup,
+        trailing: Icon(_running ? Icons.stop_circle_outlined : Icons.chevron_right,
+            color: _running ? Theme.of(context).colorScheme.error : null),
+        onTap: _setupInFlight ? null : (_running ? _stop : _setup),
       ),
       if (_state == _BgUtilsSetupState.downloadingRuntime && _downloadTotalBytes > 0)
         Padding(
@@ -341,13 +346,6 @@ class _BgUtilsProviderSettingsState extends State<BgUtilsProviderSettings> with 
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
           ),
-        ),
-      if (_running)
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-          leading: const Icon(Icons.stop_circle_outlined),
-          title: const Text('Stop local PO Token Provider'),
-          onTap: _stop,
         ),
     ],
   );
