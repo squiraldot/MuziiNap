@@ -879,7 +879,7 @@ class StreamProvider {
         if (!_poTokenManager.supports(gvsRequest)) {
           return StreamProvider(
             playable: false,
-            statusMSG: 'WEB_REMIX requires a compatible video-bound GVS PO Token provider.',
+            statusMSG: 'WEB_REMIX requires a compatible visitor- or session-bound GVS PO Token provider.',
           );
         }
         final gvsResult = await _poTokenManager.getToken(gvsRequest);
