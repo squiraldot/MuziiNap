@@ -856,6 +856,16 @@ class StreamProvider {
       String? gvsPoToken;
       if (clientName == 'WEB_REMIX') {
         final sessionId = _poTokenPolicy.extractSessionId(decoded);
+        final gvsBinding = _poTokenPolicy.gvsBindingForSession(
+          visitorData: visitorId,
+          sessionId: sessionId,
+        );
+        if (gvsBinding == null) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'WEB_REMIX GVS requires visitorData or an account session ID.',
+          );
+        }
         final gvsRequest = PoTokenRequest(
           clientName: clientName,
           clientVersion: clientVersion,
@@ -863,9 +873,7 @@ class StreamProvider {
           visitorData: visitorId,
           sessionId: sessionId,
           purpose: PoTokenPurpose.gvs,
-          // Current Web GVS PO tokens are video-ID-bound. Player tokens
-          // retain their separate WEB_REMIX session/visitor binding policy.
-          binding: PoTokenBinding.video,
+          binding: gvsBinding,
           userAgent: userAgent,
         );
         if (!_poTokenManager.supports(gvsRequest)) {
