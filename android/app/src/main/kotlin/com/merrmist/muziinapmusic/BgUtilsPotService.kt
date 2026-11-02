@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.app.PendingIntent
 import android.os.Build
 import android.os.IBinder
 import android.content.pm.ServiceInfo
@@ -41,12 +42,7 @@ class BgUtilsPotService : Service() {
                 NotificationChannel(channelId, "YouTube PO Token Provider", NotificationManager.IMPORTANCE_LOW)
             )
         }
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("MuziiNap PO Token Provider")
-            .setContentText("Preparing the local YouTube attestation service")
-            .setOngoing(true)
-            .build()
+        val notification = buildProviderNotification("Preparing the local YouTube attestation service")
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -113,13 +109,29 @@ class BgUtilsPotService : Service() {
     }
 
     private fun updateNotification(message: String) {
-        val notification: Notification = NotificationCompat.Builder(this, channelId)
+        getSystemService(NotificationManager::class.java).notify(notificationId, buildProviderNotification(message))
+    }
+
+    private fun buildProviderNotification(message: String): Notification {
+        val openSettingsIntent = Intent(this, MainActivity::class.java).apply {
+            action = "com.merrmist.muziinapmusic.OPEN_BGUTILS_SETTINGS"
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_bgutils_settings", true)
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            notificationId,
+            openSettingsIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("MuziiNap PO Token Provider")
             .setContentText(message)
+            .setContentIntent(contentIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
-        getSystemService(NotificationManager::class.java).notify(notificationId, notification)
     }
 
     private fun stopServer() {
@@ -136,6 +148,8 @@ class BgUtilsPotService : Service() {
         isRunning = false
         android.util.Log.i("MuziiNap-BgUtils", "Foreground service destroyed; final state=" + setupState)
         stopServer()
+        stopForeground(true)
+        getSystemService(NotificationManager::class.java).cancel(notificationId)
         super.onDestroy()
     }
 
