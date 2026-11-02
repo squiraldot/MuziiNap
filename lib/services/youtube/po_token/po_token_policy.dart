@@ -52,6 +52,18 @@ class PoTokenPolicy {
     }).toList(growable: false);
   }
 
+  /// GVS Web PO Tokens are bound to the visitor when logged out, or to the
+  /// account session when signed in. They are never video-ID-bound.
+  PoTokenBinding? gvsBindingForSession({
+    required String visitorData,
+    String? sessionId,
+  }) {
+    if (sessionId != null && sessionId.trim().isNotEmpty) {
+      return PoTokenBinding.session;
+    }
+    return visitorData.trim().isNotEmpty ? PoTokenBinding.visitor : null;
+  }
+
   /// Extracts the account-bound session identifier documented by yt-dlp.
   String? extractSessionId(Map response) {
     final responseContext = response['responseContext'];
