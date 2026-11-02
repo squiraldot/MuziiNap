@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:just_audio/just_audio.dart';
 
 import '../../lib/services/device_adaptive_stream_selector.dart';
 
