@@ -84,7 +84,7 @@ class PoTokenPolicy {
     final normalized = reason
         .toLowerCase()
         .replaceAll(RegExp(r'[_-]+'), ' ')
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     if (normalized.contains('po token') ||
         normalized.contains('potoken') ||
