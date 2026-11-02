@@ -303,6 +303,14 @@ void main() {
       expect(policy.purposeRequiredByPlayerReason('HTTP 403'), isNull);
     });
 
+    test('recognizes PO Token requirements with repeated whitespace', () {
+      const policy = PoTokenPolicy();
+      expect(
+        policy.purposeRequiredByPlayerReason('PO   TOKEN\\nREQUIRED'),
+        PoTokenPurpose.player,
+      );
+    });
+
     test('recognizes explicit player PO Token requirements only', () {
       const policy = PoTokenPolicy();
       expect(
