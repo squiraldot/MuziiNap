@@ -20,6 +20,7 @@ import '../../services/downloader.dart';
 import '../screens/Playlist/playlist_screen_controller.dart';
 import '../widgets/snackbar.dart';
 import '../../services/synced_lyrics_service.dart';
+import '../../services/home_lyrics_widget_coordinator.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
@@ -90,56 +91,6 @@ class PlayerController extends GetxController
   );
   RxMap<String, dynamic> lyrics =
       <String, dynamic>{"synced": "", "plainLyrics": ""}.obs;
-  static const MethodChannel _homeLyricsWidgetChannel =
-      MethodChannel('muziinap/home_lyrics_widget');
-  List<TimedLyricLine> _homeWidgetTimeline = const <TimedLyricLine>[];
-  String? _lastHomeWidgetPayload;
-  int _lastHomeWidgetLyricIndex = -2;
-  Worker? _homeWidgetLyricsWorker;
-  Worker? _homeWidgetSongWorker;
-
-  void _publishCurrentLyricToHomeWidget() {
-    if (!GetPlatform.isAndroid) return;
-    final activeIndex = LyricsTimeline.activeIndex(
-      _homeWidgetTimeline,
-      effectiveLyricsPositionMs,
-    );
-    final previous = activeIndex > 0
-        ? _homeWidgetTimeline[activeIndex - 1].text
-        : '';
-    final current = activeIndex >= 0 && activeIndex < _homeWidgetTimeline.length
-        ? _homeWidgetTimeline[activeIndex].text
-        : '';
-    final next = activeIndex >= 0 && activeIndex + 1 < _homeWidgetTimeline.length
-        ? _homeWidgetTimeline[activeIndex + 1].text
-        : '';
-    // Only redraw when the visible three-line window changes, not on every
-    // audio-position tick. The native widget handles the visual cross-fade.
-    final payloadKey = jsonEncode(<String>[previous, current, next]);
-    if (payloadKey == _lastHomeWidgetPayload && activeIndex == _lastHomeWidgetLyricIndex) return;
-    _lastHomeWidgetPayload = payloadKey;
-    _lastHomeWidgetLyricIndex = activeIndex;
-    unawaited(
-      _homeLyricsWidgetChannel.invokeMethod<void>(
-        'updateLines',
-        <String, Object>{
-          'previous': previous,
-          'current': current,
-          'next': next,
-          'activeIndex': activeIndex,
-        },
-      ).catchError((Object error) {
-        printINFO('Home-screen lyrics widget update failed: $error');
-      }),
-    );
-  }
-
-  @override
-  void onClose() {
-    _homeWidgetLyricsWorker?.dispose();
-    _homeWidgetSongWorker?.dispose();
-    super.onClose();
-  }
 
   ScrollController scrollController = ScrollController();
   final GlobalKey<ScaffoldState> homeScaffoldkey = GlobalKey<ScaffoldState>();
@@ -169,33 +120,6 @@ class PlayerController extends GetxController
   void _init() async {
     _listenForChangesInPlayerState();
     _listenForChangesInPosition();
-    _homeWidgetLyricsWorker = ever(lyrics, (_) {
-      _homeWidgetTimeline = LyricsTimeline.parse(
-        lyrics['synced']?.toString() ?? '',
-      );
-      _lastHomeWidgetPayload = null;
-      _lastHomeWidgetLyricIndex = -2;
-      _publishCurrentLyricToHomeWidget();
-    });
-    _homeWidgetSongWorker = ever(currentSong, (song) {
-      _homeWidgetTimeline = const <TimedLyricLine>[];
-      _lastHomeWidgetPayload = null;
-      _lastHomeWidgetLyricIndex = -2;
-      // Never leave the previous song's lyrics in the widget while the next
-      // track is resolving. Lyrics lookup must not depend on opening Player UI.
-      lyrics.value = {"synced": "", "plainLyrics": ""};
-      _publishCurrentLyricToHomeWidget();
-      if (song != null) {
-        unawaited(_loadLyricsForSong(song));
-      }
-    });
-    // GetX's ever() only reacts to future changes; it does not emit the
-    // current value. If playback/session restoration selected a track before
-    // this worker was registered, explicitly fetch its lyrics on startup.
-    final initialSong = currentSong.value;
-    if (initialSong != null) {
-      unawaited(_loadLyricsForSong(initialSong));
-    }
     _listenForChangesInBufferedPosition();
     _listenForChangesInDuration();
     _listenForPlaylistChange();
@@ -585,7 +509,6 @@ class PlayerController extends GetxController
         val.buffered = oldState.buffered;
         val.total = oldState.total;
       });
-      _publishCurrentLyricToHomeWidget();
     });
   }
 
@@ -1186,41 +1109,24 @@ class PlayerController extends GetxController
   Future<void> _loadLyricsForSong(MediaItem song) async {
     isLyricsLoading.value = true;
     try {
-      Map<String, dynamic>? lyricsResult;
-      // Each attempt runs the full provider fallback chain (LRCLIB exact,
-      // LRCLIB search, NetEase, YouTube Music). Prefer synced lyrics only;
-      // plain-only matches must not stop the retry sequence.
-      for (var attempt = 1; attempt <= 3; attempt++) {
-        if (currentSong.value != null && currentSong.value?.id != song.id) return;
-        lyricsResult = await SyncedLyricsService.getSyncedLyrics(
-          song,
-          progressBarStatus.value.total.inSeconds,
-          forceReload: attempt > 1,
-        );
-        final synced = lyricsResult?['synced']?.toString().trim() ?? '';
-        if (synced.isNotEmpty &&
-            RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced)) {
-          break;
-        }
-        if (attempt < 3) {
-          await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
-        }
-      }
-
-      if (currentSong.value == null || currentSong.value?.id == song.id) {
-        final synced = lyricsResult?['synced']?.toString().trim() ?? '';
-        final hasSynced = synced.isNotEmpty &&
-            RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced);
+      final result = await Get.find<HomeLyricsWidgetCoordinator>()
+          .loadLyricsForSong(
+        song,
+        durationSeconds: progressBarStatus.value.total.inSeconds,
+      );
+      if (currentSong.value?.id == song.id && result != null) {
+        final synced = result['synced']?.toString().trim() ?? '';
+        final hasSynced = RegExp(
+          r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]',
+        ).hasMatch(synced);
         lyrics.value = hasSynced
-            ? lyricsResult!
-            : {"synced": "", "plainLyrics": ""};
+            ? result
+            : {"synced": "", "plainLyrics": result['plainLyrics'] ?? ""};
       }
-    } catch (_) {
-      if (currentSong.value == null || currentSong.value?.id == song.id) {
-        lyrics.value = {"synced": "", "plainLyrics": ""};
-      }
+    } catch (error) {
+      printINFO('Player lyrics lookup failed: $error');
     } finally {
-      if (currentSong.value == null || currentSong.value?.id == song.id) {
+      if (currentSong.value?.id == song.id) {
         isLyricsLoading.value = false;
       }
     }
@@ -1244,8 +1150,11 @@ class PlayerController extends GetxController
     isLyricsLoading.value = true;
     try {
       final Map<String, dynamic>? lyricsR =
-          await SyncedLyricsService.getSyncedLyrics(
-              song, progressBarStatus.value.total.inSeconds, forceReload: true);
+          await Get.find<HomeLyricsWidgetCoordinator>().loadLyricsForSong(
+        song,
+        durationSeconds: progressBarStatus.value.total.inSeconds,
+        forceReload: true,
+      );
       if (lyricsR != null &&
           ((lyricsR["synced"]?.toString().trim().isNotEmpty ?? false) ||
               (lyricsR["plainLyrics"]?.toString().trim().isNotEmpty ?? false))) {

@@ -17,6 +17,7 @@ import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
+import './services/home_lyrics_widget_coordinator.dart';
 import './services/isar_database_service.dart';
 import './services/innertube_auth_interceptor.dart';
 import './ui/screens/Settings/youtube_login_screen.dart';
@@ -232,6 +233,15 @@ Future<void> startApplicationServices() async {
     final handler = await initAudioService();
     Get.put<AudioHandler>(handler, permanent: true);
     return AudioPlaybackService.create(handler);
+  }, permanent: true);
+  // Widget lyrics are driven by the app-scoped AudioHandler stream, never by
+  // the lifecycle or visibility of the Player Screen controller.
+  await Get.putAsync<HomeLyricsWidgetCoordinator>(() async {
+    final coordinator = HomeLyricsWidgetCoordinator(
+      audioHandler: Get.find<AudioHandler>(),
+    );
+    await coordinator.start();
+    return coordinator;
   }, permanent: true);
   Get.lazyPut(() => SearchScreenController(), fenix: true);
 }
