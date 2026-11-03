@@ -19,12 +19,10 @@ import '../../models/playling_from.dart';
 import '../../services/downloader.dart';
 import '../screens/Playlist/playlist_screen_controller.dart';
 import '../widgets/snackbar.dart';
-import '../../services/synced_lyrics_service.dart';
 import '../../services/home_lyrics_widget_coordinator.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../utils/helper.dart';
-import '../../utils/lyrics_timeline.dart';
 import '../../utils/home_history.dart';
 import '../../models/media_Item_builder.dart';
 import '../screens/Home/home_screen_controller.dart';
@@ -577,6 +575,9 @@ class PlayerController extends GetxController
         // the end of this listener can otherwise erase that first result.
         lyrics.value = {"synced": "", "plainLyrics": ""};
         currentSong.value = mediaItem;
+        // Keep the Player Screen's reactive lyrics map backed by the same
+        // app-scoped request used by the home-screen widget.
+        unawaited(_loadLyricsForSong(mediaItem));
         await loadLyricsSyncOffsetForCurrentSong();
         currentSongIndex.value = currentQueue
             .indexWhere((element) => element.id == currentSong.value!.id);

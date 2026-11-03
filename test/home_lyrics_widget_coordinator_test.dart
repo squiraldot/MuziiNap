@@ -35,7 +35,7 @@ void main() {
         positionStream: positions.stream,
         lyricsLoader: loader,
         offsetLoader: (_) async => 0,
-        widgetPublisher: (previous, current, next, index) async {
+        retryDelay: const Duration(milliseconds: 10),\n        widgetPublisher: (previous, current, next, index) async {
           published.add([previous, current, next, index]);
         },
       );
@@ -57,7 +57,7 @@ void main() {
 
     test('loads lyrics on track events without a PlayerController', () async {
       final coordinator = createCoordinator(loader: (track, duration,
-          {forceReload = false}) async {
+          {required bool forceReload}) async {
         requests.add(track.id);
         return {'synced': '[00:01.00]hello', 'plainLyrics': 'hello'};
       });
