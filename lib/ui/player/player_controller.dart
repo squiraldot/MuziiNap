@@ -354,6 +354,7 @@ class PlayerController extends GetxController
     final songId = currentSong.value?.id;
     if (songId != null) {
       await Hive.box(appPrefsBoxName).put('lyricsSyncOffset:$songId', safeValue);
+      Get.find<HomeLyricsWidgetCoordinator>().updateOffset(songId, safeValue);
     }
   }
 
@@ -1204,7 +1205,12 @@ class PlayerController extends GetxController
           "synced": hasTimestamps ? fileContent : "",
           "plainLyrics": hasTimestamps ? "" : fileContent
         };
-        lyricsMode.value = hasTimestamps ? 0 : 1; 
+        lyricsMode.value = hasTimestamps ? 0 : 1;
+        final song = currentSong.value;
+        if (song != null) {
+          Get.find<HomeLyricsWidgetCoordinator>()
+              .updateLyricsForActiveSong(song, lyrics);
+        } 
       }
     } catch (e) {
       printERROR(e);

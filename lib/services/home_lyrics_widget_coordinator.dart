@@ -263,6 +263,25 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     });
   }
 
+  /// Apply the Player Screen's per-track offset to the widget timeline.
+  void updateOffset(String songId, int offsetMs) {
+    if (_activeSong?.id != songId) return;
+    _offsetMs = offsetMs.clamp(-10000, 10000).toInt();
+    _publishCurrentLine(force: true);
+  }
+
+  /// Keep manually imported LRC files on the same widget timeline.
+  void updateLyricsForActiveSong(
+    MediaItem song,
+    Map<String, dynamic> lyrics,
+  ) {
+    if (_activeSong?.id != song.id) return;
+    _timeline = _hasSyncedLyrics(lyrics)
+        ? LyricsTimeline.parse(lyrics['synced'].toString())
+        : const [];
+    _publishCurrentLine(force: true);
+  }
+
   static bool _hasSyncedLyrics(Map<String, dynamic>? result) {
     final synced = result?['synced']?.toString().trim() ?? '';
     return synced.isNotEmpty &&
