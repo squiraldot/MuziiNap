@@ -72,7 +72,7 @@ void main() {
     test('clears the old track and ignores a stale lookup response', () async {
       final first = Completer<Map<String, dynamic>?>();
       final coordinator = createCoordinator(loader: (track, duration,
-          {forceReload = false}) {
+          {required bool forceReload}) {
         requests.add(track.id);
         if (track.id == 'old') return first.future;
         return Future.value({'synced': '[00:01.00]new line'});

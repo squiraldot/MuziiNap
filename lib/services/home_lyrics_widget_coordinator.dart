@@ -59,7 +59,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   List<TimedLyricLine> _timeline = const [];
   Duration _position = Duration.zero;
   int _offsetMs = 0;
-  int _generation = 0;
+  int _generation = 0;\n  int _requestRevision = 0;
   String? _lastPublishedPayload;
   int _lastPublishedIndex = -2;
   bool _started = false;\n  Timer? _retryTimer;\n  final Duration retryDelay;
@@ -207,7 +207,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
         }
       }
 
-      if (_activeSong?.id != song.id || generation != _generation) {
+      if (_activeSong?.id != song.id ||\n          generation != _generation ||\n          requestRevision != _requestRevision) {
         return result;
       }
 
@@ -215,7 +215,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
         _resolved[song.id] = Map<String, dynamic>.from(result!);
         _timeline = LyricsTimeline.parse(result['synced'].toString());
         _offsetMs = await _offsetLoader(song.id);
-        if (_activeSong?.id == song.id && generation == _generation) {
+        if (_activeSong?.id == song.id &&\n          generation == _generation &&\n          requestRevision == _requestRevision) {
           _publishCurrentLine(force: true);
         }
       } else {
@@ -235,7 +235,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     }
   }
 
-  void _scheduleRetry(MediaItem song, int generation) {\n    _retryTimer?.cancel();\n    _retryTimer = Timer(retryDelay, () {\n      if (_activeSong?.id == song.id && generation == _generation) {\n        unawaited(loadLyricsForSong(song));\n      }\n    });\n  }\n\n  static bool _hasSyncedLyrics(Map<String, dynamic>? result) {
+  void _scheduleRetry(MediaItem song, int generation) {\n    _retryTimer?.cancel();\n    _retryTimer = Timer(retryDelay, () {\n      final activeSong = _activeSong;\n      if (activeSong?.id == song.id && generation == _generation) {\n        unawaited(loadLyricsForSong(activeSong!));\n      }\n    });\n  }\n\n  static bool _hasSyncedLyrics(Map<String, dynamic>? result) {
     final synced = result?['synced']?.toString().trim() ?? '';
     return synced.isNotEmpty &&
         RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced);
