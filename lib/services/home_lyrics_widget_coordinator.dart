@@ -13,7 +13,7 @@ import '../utils/lyrics_timeline.dart';
 typedef WidgetLyricsLoader = Future<Map<String, dynamic>?> Function(
   MediaItem song,
   int durationSeconds, {
-  bool forceReload,
+  required bool forceReload,
 });
 typedef WidgetLyricsPublisher = Future<void> Function(
   String previous,
@@ -25,9 +25,9 @@ typedef WidgetLyricsPublisher = Future<void> Function(
 /// Owns synchronized home-widget lyrics for the lifetime of the application.
 ///
 /// AudioService exposes the background AudioHandler's media-item and playback
-/// streams to the UI isolate. The coordinator therefore stays in the UI
-/// isolate, where the existing MainActivity MethodChannel is available, while
-/// playback itself continues in audio_service's background isolate.
+/// streams to the UI isolate. The coordinator stays in that isolate, where the
+/// existing MainActivity MethodChannel is available, while playback continues
+/// in audio_service's background isolate.
 class HomeLyricsWidgetCoordinator extends GetxService {
   HomeLyricsWidgetCoordinator({
     required AudioHandler audioHandler,
@@ -35,6 +35,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     WidgetLyricsLoader? lyricsLoader,
     WidgetLyricsPublisher? widgetPublisher,
     Future<int> Function(String songId)? offsetLoader,
+    this.retryDelay = const Duration(seconds: 30),
   })  : _audioHandler = audioHandler,
         _positionStream = positionStream ?? AudioService.position,
         _lyricsLoader = lyricsLoader ?? _defaultLyricsLoader,
@@ -49,8 +50,8 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   final WidgetLyricsLoader _lyricsLoader;
   final WidgetLyricsPublisher _widgetPublisher;
   final Future<int> Function(String songId) _offsetLoader;
+  final Duration retryDelay;
   final Map<String, Future<Map<String, dynamic>?>> _inFlight = {};
-  final Map<String, Map<String, dynamic>> _resolved = {};
 
   StreamSubscription<MediaItem?>? _mediaItemSubscription;
   StreamSubscription<Duration>? _positionSubscription;
@@ -59,15 +60,17 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   List<TimedLyricLine> _timeline = const [];
   Duration _position = Duration.zero;
   int _offsetMs = 0;
-  int _generation = 0;\n  int _requestRevision = 0;
+  int _generation = 0;
+  int _requestRevision = 0;
   String? _lastPublishedPayload;
   int _lastPublishedIndex = -2;
-  bool _started = false;\n  Timer? _retryTimer;\n  final Duration retryDelay;
+  Timer? _retryTimer;
+  bool _started = false;
 
   static Future<Map<String, dynamic>?> _defaultLyricsLoader(
     MediaItem song,
     int durationSeconds, {
-    bool forceReload = false,
+    required bool forceReload,
   }) =>
       SyncedLyricsService.getSyncedLyrics(
         song,
@@ -124,6 +127,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   Future<void> _handleMediaItem(MediaItem? song) async {
     if (song == null) {
       _generation++;
+      _retryTimer?.cancel();
       _activeSong = null;
       _timeline = const [];
       _offsetMs = 0;
@@ -137,6 +141,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     final previousSong = _activeSong;
     if (previousSong?.id != song.id) {
       _generation++;
+      _retryTimer?.cancel();
       _activeSong = song;
       _timeline = const [];
       _offsetMs = 0;
@@ -148,8 +153,6 @@ class HomeLyricsWidgetCoordinator extends GetxService {
       return;
     }
 
-    // Some sources publish their duration after the media item is first
-    // announced. Retry the same track once usable duration metadata arrives.
     final durationWasMissing =
         (previousSong?.duration ?? Duration.zero) <= Duration.zero;
     _activeSong = song;
@@ -165,22 +168,26 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     int? durationSeconds,
     bool forceReload = false,
   }) {
-    final existing = _inFlight[song.id];
+    final generation = _generation;
+    final requestedDuration = durationSeconds != null && durationSeconds > 0
+        ? durationSeconds
+        : (song.duration?.inSeconds ?? 0);
+    final requestKey = '${song.id}#$generation#$requestedDuration';
+    final existing = _inFlight[requestKey];
     if (existing != null) return existing;
 
-    final generation = _generation;
-    final duration = durationSeconds ??
-        (song.duration?.inSeconds ?? 0);
+    final requestRevision = ++_requestRevision;
     final future = _loadWithRetry(
       song,
-      duration,
+      requestedDuration,
       generation,
+      requestRevision,
       forceReload: forceReload,
     );
-    _inFlight[song.id] = future;
+    _inFlight[requestKey] = future;
     return future.whenComplete(() {
-      if (identical(_inFlight[song.id], future)) {
-        _inFlight.remove(song.id);
+      if (identical(_inFlight[requestKey], future)) {
+        _inFlight.remove(requestKey);
       }
     });
   }
@@ -188,7 +195,8 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   Future<Map<String, dynamic>?> _loadWithRetry(
     MediaItem song,
     int durationSeconds,
-    int generation, {
+    int generation,
+    int requestRevision, {
     required bool forceReload,
   }) async {
     try {
@@ -207,35 +215,51 @@ class HomeLyricsWidgetCoordinator extends GetxService {
         }
       }
 
-      if (_activeSong?.id != song.id ||\n          generation != _generation ||\n          requestRevision != _requestRevision) {
+      if (_activeSong?.id != song.id ||
+          generation != _generation ||
+          requestRevision != _requestRevision) {
         return result;
       }
 
       if (_hasSyncedLyrics(result)) {
-        _resolved[song.id] = Map<String, dynamic>.from(result!);
-        _timeline = LyricsTimeline.parse(result['synced'].toString());
+        _timeline = LyricsTimeline.parse(result!['synced'].toString());
         _offsetMs = await _offsetLoader(song.id);
-        if (_activeSong?.id == song.id &&\n          generation == _generation &&\n          requestRevision == _requestRevision) {
+        if (_activeSong?.id == song.id &&
+            generation == _generation &&
+            requestRevision == _requestRevision) {
+          _retryTimer?.cancel();
           _publishCurrentLine(force: true);
         }
       } else {
-        // Keep the song retryable: a later duration update or a new media-item
-        // event can try again. Do not cache an empty/temporary failure here.
         _timeline = const [];
         _publishCurrentLine(force: true);
+        _scheduleRetry(song, generation);
       }
       return result;
     } catch (error) {
       printINFO('Automatic widget lyrics lookup failed for ${song.id}: $error');
-      if (_activeSong?.id == song.id && generation == _generation) {
+      if (_activeSong?.id == song.id &&
+          generation == _generation &&
+          requestRevision == _requestRevision) {
         _timeline = const [];
         _publishCurrentLine(force: true);
+        _scheduleRetry(song, generation);
       }
       return null;
     }
   }
 
-  void _scheduleRetry(MediaItem song, int generation) {\n    _retryTimer?.cancel();\n    _retryTimer = Timer(retryDelay, () {\n      final activeSong = _activeSong;\n      if (activeSong?.id == song.id && generation == _generation) {\n        unawaited(loadLyricsForSong(activeSong!));\n      }\n    });\n  }\n\n  static bool _hasSyncedLyrics(Map<String, dynamic>? result) {
+  void _scheduleRetry(MediaItem song, int generation) {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(retryDelay, () {
+      final activeSong = _activeSong;
+      if (activeSong?.id == song.id && generation == _generation) {
+        unawaited(loadLyricsForSong(activeSong!));
+      }
+    });
+  }
+
+  static bool _hasSyncedLyrics(Map<String, dynamic>? result) {
     final synced = result?['synced']?.toString().trim() ?? '';
     return synced.isNotEmpty &&
         RegExp(r'\[\d{1,3}:\d{2}(?:\.\d{1,3})?\]').hasMatch(synced);
@@ -243,13 +267,10 @@ class HomeLyricsWidgetCoordinator extends GetxService {
 
   void _publishCurrentLine({bool force = false}) {
     if (_activeSong == null) return;
-    final activeIndex = LyricsTimeline.activeIndex(
-      _timeline,
-      (_position.inMilliseconds - _offsetMs).clamp(
-        0,
-        _activeSong?.duration?.inMilliseconds ?? 0,
-      ).toInt(),
-    );
+    final adjustedPosition =
+        (_position.inMilliseconds - _offsetMs).clamp(0, 1 << 31).toInt();
+    final activeIndex =
+        LyricsTimeline.activeIndex(_timeline, adjustedPosition);
     final previous =
         activeIndex > 0 ? _timeline[activeIndex - 1].text : '';
     final current = activeIndex >= 0 && activeIndex < _timeline.length
@@ -284,6 +305,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
 
   @override
   void onClose() {
+    _retryTimer?.cancel();
     unawaited(_mediaItemSubscription?.cancel() ?? Future<void>.value());
     unawaited(_positionSubscription?.cancel() ?? Future<void>.value());
     unawaited(_playbackSubscription?.cancel() ?? Future<void>.value());

@@ -23,7 +23,7 @@ void main() {
       required Future<Map<String, dynamic>?> Function(
         MediaItem,
         int, {
-        bool forceReload,
+        required bool forceReload,
       }) loader,
     }) {
       final handler = _FakeAudioHandler(
@@ -35,7 +35,8 @@ void main() {
         positionStream: positions.stream,
         lyricsLoader: loader,
         offsetLoader: (_) async => 0,
-        retryDelay: const Duration(milliseconds: 10),\n        widgetPublisher: (previous, current, next, index) async {
+        retryDelay: const Duration(milliseconds: 10),
+        widgetPublisher: (previous, current, next, index) async {
           published.add([previous, current, next, index]);
         },
       );
@@ -92,7 +93,7 @@ void main() {
 
     test('retries when duration metadata arrives after the track', () async {
       final coordinator = createCoordinator(loader: (track, duration,
-          {forceReload = false}) async {
+          {required bool forceReload}) async {
         requests.add('${track.id}:$duration');
         return duration > 0
             ? {'synced': '[00:01.00]duration ready'}
@@ -112,7 +113,7 @@ void main() {
 
     test('seeking updates the previous/current/next widget lines', () async {
       final coordinator = createCoordinator(loader: (track, duration,
-          {forceReload = false}) async => {
+          {required bool forceReload}) async => {
             'synced':
                 '[00:01.00]one\n[00:02.00]two\n[00:03.00]three',
           });
