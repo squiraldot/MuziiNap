@@ -191,7 +191,7 @@ void main() {
     test('stale playback-state position cannot rewind the live position stream', () async {
       final coordinator = createCoordinator(loader: (track, duration,
           {required bool forceReload}) async => {
-            'synced': '[00:00.00]one\\n[00:01.00]two',
+            'synced': '[00:00.00]one\n[00:01.00]two',
           });
       await coordinator.start();
       mediaItems.add(song('position-race', duration: const Duration(minutes: 3)));
@@ -210,7 +210,7 @@ void main() {
     test('shows the first upcoming lyric before its timestamp', () async {
       final coordinator = createCoordinator(loader: (track, duration,
           {required bool forceReload}) async => {
-            'synced': '[00:02.00]first\\n[00:04.00]second',
+            'synced': '[00:02.00]first\n[00:04.00]second',
           });
       await coordinator.start();
       mediaItems.add(song('before-first-line',
