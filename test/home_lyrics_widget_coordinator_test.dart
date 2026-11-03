@@ -66,6 +66,8 @@ void main() {
       await coordinator.start();
       mediaItems.add(song('first', duration: const Duration(minutes: 3)));
       await Future<void>.delayed(const Duration(milliseconds: 20));
+      positions.add(const Duration(milliseconds: 1500));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(requests, ['first']);
       expect(published.any((line) => line[1] == 'hello'), isTrue);
       coordinator.onClose();
@@ -84,6 +86,8 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       mediaItems.add(song('new'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
+      positions.add(const Duration(milliseconds: 1500));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       first.complete({'synced': '[00:01.00]old line'});
       await Future<void>.delayed(const Duration(milliseconds: 20));
       expect(published.first, ['', '', '', -1]);
@@ -106,6 +110,8 @@ void main() {
       mediaItems.add(song('late-duration',
           duration: const Duration(minutes: 2)));
       await Future<void>.delayed(const Duration(milliseconds: 20));
+      positions.add(const Duration(milliseconds: 1500));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(requests.any((request) => request == 'late-duration:0'), isTrue);
       expect(requests.any((request) => request == 'late-duration:120'), isTrue);
       expect(published.any((line) => line[1] == 'duration ready'), isTrue);
@@ -123,6 +129,8 @@ void main() {
       await coordinator.start();
       mediaItems.add(song('temporary-failure'));
       await Future<void>.delayed(const Duration(milliseconds: 100));
+      positions.add(const Duration(milliseconds: 1500));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(attempts, greaterThanOrEqualTo(4));
       expect(published.any((line) => line[1] == 'recovered'), isTrue);
       coordinator.onClose();
