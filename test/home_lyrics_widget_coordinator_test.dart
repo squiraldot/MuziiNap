@@ -182,7 +182,7 @@ void main() {
       currentLyrics.complete({'synced': '[00:00.00]current'});
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(requested, ['current']);
+      expect(requested, ['old', 'current']);
       expect(published.any((line) => line[1] == 'current'), isTrue);
       expect(published.any((line) => line[1] == 'old'), isFalse);
       coordinator.onClose();
