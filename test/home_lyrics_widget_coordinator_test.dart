@@ -207,6 +207,19 @@ void main() {
       coordinator.onClose();
     });
 
+    test('shows the first upcoming lyric before its timestamp', () async {
+      final coordinator = createCoordinator(loader: (track, duration,
+          {required bool forceReload}) async => {
+            'synced': '[00:02.00]first\\n[00:04.00]second',
+          });
+      await coordinator.start();
+      mediaItems.add(song('before-first-line',
+          duration: const Duration(minutes: 3)));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(published.last, ['', '', 'first', -1]);
+      coordinator.onClose();
+    });
+
     test('seeking updates the previous/current/next widget lines', () async {
       final coordinator = createCoordinator(loader: (track, duration,
           {required bool forceReload}) async => {

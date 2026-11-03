@@ -690,7 +690,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       final currQueue = queue.value;
       if (currentIndex == null || currQueue.isEmpty || duration == null) return;
       final currentSong = queue.value[currentIndex];
-      if (currentSong.duration == null || currentIndex == 0) {
+      // The resolved just_audio duration is authoritative. Queue entries
+      // can carry estimated durations, so publish corrections at every index.
+      if (currentSong.duration != duration) {
         final newMediaItem = currentSong.copyWith(duration: duration);
         mediaItem.add(newMediaItem);
       }

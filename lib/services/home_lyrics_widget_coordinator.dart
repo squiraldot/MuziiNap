@@ -63,7 +63,8 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   Duration _position = Duration.zero;
   int _offsetMs = 0;
   int _generation = 0;
-  int _requestRevision = 0;
+  int _activeRequestRevision = 0;
+  Future<void> _widgetUpdateQueue = Future<void>.value();
   String? _lastPublishedPayload;
   int _lastPublishedIndex = -2;
   Timer? _retryTimer;
@@ -119,8 +120,9 @@ class HomeLyricsWidgetCoordinator extends GetxService {
           printINFO('Widget lyrics position stream failed: $error'),
     );
     _playbackSubscription = _audioHandler.playbackState.listen(
-      (state) {
-        _position = state.updatePosition;
+      (_) {
+        // PlaybackState.updatePosition is a snapshot, not a continuous clock.
+        // AudioService.position is the authoritative projected position stream.
         _publishCurrentLine();
       },
       onError: (Object error) =>
@@ -131,6 +133,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   Future<void> _handleMediaItem(MediaItem? song) async {
     if (song == null) {
       _generation++;
+      _activeRequestRevision = 0;
       _retryTimer?.cancel();
       _activeSong = null;
       _timeline = const [];
@@ -145,6 +148,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     final previousSong = _activeSong;
     if (previousSong?.id != song.id) {
       _generation++;
+      _activeRequestRevision = 0;
       _retryTimer?.cancel();
       _activeSong = song;
       _timeline = const [];
@@ -152,15 +156,16 @@ class HomeLyricsWidgetCoordinator extends GetxService {
       _position = Duration.zero;
       _lastPublishedPayload = null;
       _lastPublishedIndex = -2;
-      await _publishEmpty();
+      // Queue the clear before the lookup, without waiting for a platform
+      // channel round-trip. Native updates are serialized below.
+      unawaited(_publishEmpty());
       unawaited(loadLyricsForSong(song));
       return;
     }
 
-    final durationWasMissing =
-        (previousSong?.duration ?? Duration.zero) <= Duration.zero;
+    final durationChanged = previousSong?.duration != song.duration;
     _activeSong = song;
-    if (durationWasMissing &&
+    if (durationChanged &&
         (song.duration ?? Duration.zero) > Duration.zero &&
         _timeline.isEmpty) {
       unawaited(loadLyricsForSong(song));
@@ -172,15 +177,21 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     int? durationSeconds,
     bool forceReload = false,
   }) {
+    // A delayed callback from an older mediaItem event must not start a
+    // request after a newer track has become active.
+    if (_activeSong?.id != song.id) {
+      return Future<Map<String, dynamic>?>.value(null);
+    }
     final generation = _generation;
-    final requestedDuration = durationSeconds != null && durationSeconds > 0
-        ? durationSeconds
-        : (song.duration?.inSeconds ?? 0);
+    final songDuration = song.duration?.inSeconds ?? 0;
+    final requestedDuration = songDuration > 0
+        ? songDuration
+        : (durationSeconds != null && durationSeconds > 0 ? durationSeconds : 0);
     final requestKey = '${song.id}#$generation#$requestedDuration';
     final existing = _inFlight[requestKey];
-    if (existing != null) return existing;
+    if (existing != null && !forceReload) return existing;
 
-    final requestRevision = ++_requestRevision;
+    final requestRevision = ++_activeRequestRevision;
     final future = _loadWithRetry(
       song,
       requestedDuration,
@@ -221,7 +232,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
 
       if (_activeSong?.id != song.id ||
           generation != _generation ||
-          requestRevision != _requestRevision) {
+          requestRevision != _activeRequestRevision) {
         return result;
       }
 
@@ -230,7 +241,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
         final offsetMs = await _offsetLoader(song.id);
         if (_activeSong?.id == song.id &&
             generation == _generation &&
-            requestRevision == _requestRevision) {
+            requestRevision == _activeRequestRevision) {
           _timeline = timeline;
           _offsetMs = offsetMs;
           _retryTimer?.cancel();
@@ -278,6 +289,8 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     Map<String, dynamic> lyrics,
   ) {
     if (_activeSong?.id != song.id) return;
+    _activeRequestRevision++;
+    _retryTimer?.cancel();
     _timeline = _hasSyncedLyrics(lyrics)
         ? LyricsTimeline.parse(lyrics['synced'].toString())
         : const [];
@@ -301,9 +314,11 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     final current = activeIndex >= 0 && activeIndex < _timeline.length
         ? _timeline[activeIndex].text
         : '';
-    final next = activeIndex >= 0 && activeIndex + 1 < _timeline.length
-        ? _timeline[activeIndex + 1].text
-        : '';
+    final next = activeIndex < 0
+        ? (_timeline.isNotEmpty ? _timeline.first.text : '')
+        : (activeIndex + 1 < _timeline.length
+            ? _timeline[activeIndex + 1].text
+            : '');
     final payload = '${previous}\u0000${current}\u0000${next}';
     if (!force &&
         payload == _lastPublishedPayload &&
@@ -312,17 +327,31 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     }
     _lastPublishedPayload = payload;
     _lastPublishedIndex = activeIndex;
-    unawaited(_widgetPublisher(previous, current, next, activeIndex).catchError(
-      (Object error) =>
-          printINFO('Home-screen lyrics widget update failed: $error'),
-    ));
+    unawaited(_enqueueWidgetUpdate(previous, current, next, activeIndex));
+  }
+
+  /// Serialize native widget updates so an older clear cannot erase a
+  /// newer track's lyrics after an asynchronous platform-channel round trip.
+  Future<void> _enqueueWidgetUpdate(
+    String previous,
+    String current,
+    String next,
+    int activeIndex,
+  ) {
+    final update = _widgetUpdateQueue.then(
+      (_) => _widgetPublisher(previous, current, next, activeIndex),
+    );
+    _widgetUpdateQueue = update.catchError((Object error) {
+      printINFO('Home-screen lyrics widget update failed: $error');
+    });
+    return _widgetUpdateQueue;
   }
 
   Future<void> _publishEmpty() async {
     _lastPublishedPayload = '\u0000\u0000';
     _lastPublishedIndex = -1;
     try {
-      await _widgetPublisher('', '', '', -1);
+      await _enqueueWidgetUpdate('', '', '', -1);
     } catch (error) {
       printINFO('Unable to clear home-screen lyrics widget: $error');
     }
