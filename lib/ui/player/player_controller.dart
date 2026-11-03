@@ -2,7 +2,6 @@ import '../../models/equalizer.dart';
 
 import '../../services/constant.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_lyric/lyric_ui/lyric_ui.dart';
 import 'package:file_picker/file_picker.dart';
