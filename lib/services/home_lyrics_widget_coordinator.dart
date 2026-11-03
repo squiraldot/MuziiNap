@@ -257,7 +257,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
       printINFO('Automatic widget lyrics lookup failed for ${song.id}: $error');
       if (_activeSong?.id == song.id &&
           generation == _generation &&
-          requestRevision == _requestRevision) {
+          requestRevision == _activeRequestRevision) {
         _timeline = const [];
         _publishCurrentLine(force: true);
         _scheduleRetry(song, generation);
