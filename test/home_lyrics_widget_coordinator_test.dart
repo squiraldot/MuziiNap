@@ -35,7 +35,8 @@ void main() {
         positionStream: positions.stream,
         lyricsLoader: loader,
         offsetLoader: (_) async => 0,
-        retryDelay: const Duration(milliseconds: 10),\n        attemptDelay: const Duration(milliseconds: 1),
+        retryDelay: const Duration(milliseconds: 10),
+        attemptDelay: const Duration(milliseconds: 1),
         widgetPublisher: (previous, current, next, index) async {
           published.add([previous, current, next, index]);
         },
