@@ -35,7 +35,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
     WidgetLyricsLoader? lyricsLoader,
     WidgetLyricsPublisher? widgetPublisher,
     Future<int> Function(String songId)? offsetLoader,
-    this.retryDelay = const Duration(seconds: 30),
+    this.retryDelay = const Duration(seconds: 30),\n    this.attemptDelay = const Duration(milliseconds: 500),
   })  : _audioHandler = audioHandler,
         _positionStream = positionStream ?? AudioService.position,
         _lyricsLoader = lyricsLoader ?? _defaultLyricsLoader,
@@ -50,7 +50,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   final WidgetLyricsLoader _lyricsLoader;
   final WidgetLyricsPublisher _widgetPublisher;
   final Future<int> Function(String songId) _offsetLoader;
-  final Duration retryDelay;
+  final Duration retryDelay;\n  final Duration attemptDelay;
   final Map<String, Future<Map<String, dynamic>?>> _inFlight = {};
 
   StreamSubscription<MediaItem?>? _mediaItemSubscription;
@@ -95,7 +95,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
   static Future<int> _loadOffset(String songId) async {
     final box = Hive.box(appPrefsBoxName);
     final value = box.get('lyricsSyncOffset:$songId', defaultValue: 0);
-    return value is num ? value.toInt().clamp(-10000, 10000) : 0;
+    return value is num\n        ? value.toInt().clamp(-10000, 10000).toInt()\n        : 0;
   }
 
   Future<void> start() async {
@@ -210,7 +210,7 @@ class HomeLyricsWidgetCoordinator extends GetxService {
         if (_hasSyncedLyrics(result)) break;
         if (attempt < 2) {
           await Future<void>.delayed(
-            Duration(milliseconds: 500 * (attempt + 1)),
+            Duration(milliseconds: attemptDelay.inMilliseconds * (attempt + 1)),
           );
         }
       }

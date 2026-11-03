@@ -35,7 +35,7 @@ void main() {
         positionStream: positions.stream,
         lyricsLoader: loader,
         offsetLoader: (_) async => 0,
-        retryDelay: const Duration(milliseconds: 10),
+        retryDelay: const Duration(milliseconds: 10),\n        attemptDelay: const Duration(milliseconds: 1),
         widgetPublisher: (previous, current, next, index) async {
           published.add([previous, current, next, index]);
         },
@@ -108,6 +108,22 @@ void main() {
       expect(requests.any((request) => request == 'late-duration:0'), isTrue);
       expect(requests.any((request) => request == 'late-duration:120'), isTrue);
       expect(published.any((line) => line[1] == 'duration ready'), isTrue);
+      coordinator.onClose();
+    });
+
+    test('temporary provider failures are retried without a player screen', () async {
+      var attempts = 0;
+      final coordinator = createCoordinator(loader: (track, duration,
+          {required bool forceReload}) async {
+        attempts++;
+        if (attempts <= 3) return null;
+        return {'synced': '[00:01.00]recovered'};
+      });
+      await coordinator.start();
+      mediaItems.add(song('temporary-failure'));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(attempts, greaterThanOrEqualTo(4));
+      expect(published.any((line) => line[1] == 'recovered'), isTrue);
       coordinator.onClose();
     });
 
