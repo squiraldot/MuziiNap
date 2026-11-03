@@ -226,11 +226,13 @@ class HomeLyricsWidgetCoordinator extends GetxService {
       }
 
       if (_hasSyncedLyrics(result)) {
-        _timeline = LyricsTimeline.parse(result!['synced'].toString());
-        _offsetMs = await _offsetLoader(song.id);
+        final timeline = LyricsTimeline.parse(result!['synced'].toString());
+        final offsetMs = await _offsetLoader(song.id);
         if (_activeSong?.id == song.id &&
             generation == _generation &&
             requestRevision == _requestRevision) {
+          _timeline = timeline;
+          _offsetMs = offsetMs;
           _retryTimer?.cancel();
           _publishCurrentLine(force: true);
         }
