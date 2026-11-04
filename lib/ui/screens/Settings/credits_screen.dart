@@ -92,7 +92,12 @@ class CreditsScreen extends StatelessWidget {
             _FooterRow(
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy policy',
-              onTap: () => _showPrivacyPolicyUnavailable(context),
+              onTap: () async {
+                await launchUrl(
+                  Uri.parse('https://muziinap-site.vercel.app/pages/privacy.html'),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
             ),
             const Divider(height: 1, color: _divider),
             const SizedBox(height: 28),
@@ -110,14 +115,6 @@ class CreditsScreen extends StatelessWidget {
     );
   }
 
-  void _showPrivacyPolicyUnavailable(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Privacy policy URL is not configured in this app yet.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 }
 
 class _Credit {
