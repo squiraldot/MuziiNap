@@ -18,11 +18,6 @@ class CreditsScreen extends StatelessWidget {
         'https://telegram.me/InstaPrimeDev',
       ]),
     ]),
-    _CreditCategory('UI/UX', Icons.brush_outlined, [
-      _Credit('ViMusic', 'Design inspiration', socialLinks: [
-        'https://github.com/vfsfitvnm/ViMusic',
-      ]),
-    ]),
     _CreditCategory('Manager', Icons.manage_accounts_outlined, [
       _Credit('Danish Moon', 'Promotion and outreach', socialLinks: [
         'https://instagram.com/danzy.30',
