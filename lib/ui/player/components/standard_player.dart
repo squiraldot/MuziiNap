@@ -216,7 +216,9 @@ class StandardPlayer extends StatelessWidget {
                     size: 25,
                   ),
                   tooltip: 'More',
-                  color: Colors.transparent,
+                  position: PopupMenuPosition.under,
+                  offset: const Offset(0, 8),
+                  color: const Color(0xF20A0A0A),
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
