@@ -14,7 +14,7 @@ class CreditsScreen extends StatelessWidget {
         'https://github.com/squiraldot',
         'https://instagram.com/squiraldot',
       ]),
-      _Credit('Ravi Verma', 'App development (owner of InstaPrime)', socialLinks: [
+      _Credit('Ravi Varma', 'App development (owner of InstaPrime)', socialLinks: [
         'https://telegram.me/InstaPrimeDev',
       ]),
     ]),
