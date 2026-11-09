@@ -25,6 +25,7 @@ import './playback_circuit_breaker.dart';
 import './music_service.dart';
 import './innertube_session_manager.dart';
 import './audio_cache_manager.dart';
+import './playback_error_message.dart';
 import '../models/hm_streaming_data.dart';
 import '../models/equalizer.dart';
 import '../ui/player/player_controller.dart';
@@ -537,15 +538,16 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     _pendingPlaybackPosition = null;
     currentSongUrl = null;
     isSongLoading = false;
+    final message = playbackErrorMessage(error);
     playbackState.add(playbackState.value.copyWith(
       playing: false,
       processingState: AudioProcessingState.error,
       errorCode: 500,
-      errorMessage: error.toString(),
+      errorMessage: message,
     ));
     try {
       if (Get.context != null) {
-        Get.find<PlayerController>().notifyPlayError("networkError");
+        Get.find<PlayerController>().notifyPlayError(message);
       }
     } catch (notifyError) {
       printERROR("Unable to show playback error: $notifyError");
@@ -688,7 +690,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       final currQueue = queue.value;
       if (currentIndex == null || currQueue.isEmpty || duration == null) return;
       final currentSong = queue.value[currentIndex];
-      if (currentSong.duration == null || currentIndex == 0) {
+      // The resolved just_audio duration is authoritative. Queue entries
+      // can carry estimated durations, so publish corrections at every index.
+      if (currentSong.duration != duration) {
         final newMediaItem = currentSong.copyWith(duration: duration);
         mediaItem.add(newMediaItem);
       }

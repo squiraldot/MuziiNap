@@ -1,0 +1,209 @@
+package com.merrmist.muziinapmusic
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Intent
+import android.app.PendingIntent
+import android.os.Build
+import android.os.IBinder
+import android.content.pm.ServiceInfo
+import androidx.core.app.NotificationCompat
+import java.util.concurrent.atomic.AtomicBoolean
+
+class BgUtilsPotService : Service() {
+    companion object {
+        @Volatile var isRunning: Boolean = false
+            private set
+        @Volatile var setupState: String = "idle"
+            private set
+        @Volatile var lastFailure: String? = null
+            private set
+        const val ACTION_STOP = "com.merrmist.muziinapmusic.BGUTILS_STOP"
+        internal const val HEALTH_CHECK_FAILURE_LIMIT = 3
+
+        internal fun nextHealthCheckFailureCount(current: Int, healthy: Boolean): Int =
+            if (healthy) 0 else current + 1
+    }
+
+    @Volatile private var serverProcess: Process? = null
+    private val processLock = Any()
+    private val stopping = AtomicBoolean(false)
+    @Volatile private var setupRunning = false
+    @Volatile private var setupThread: Thread? = null
+    private val channelId = "muziinap_bgutils_provider"
+    private val notificationId = 73043
+
+    override fun onCreate() {
+        super.onCreate()
+        isRunning = true
+        setupState = "starting_service"
+        lastFailure = null
+        android.util.Log.i("MuziiNap-BgUtils", "Foreground service created")
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(channelId, "YouTube PO Token Provider", NotificationManager.IMPORTANCE_LOW)
+            )
+        }
+        val notification = buildProviderNotification("Preparing the local YouTube attestation service")
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(notificationId, notification)
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopServer()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (serverProcess?.isAlive == true && BgUtilsRuntimeManager.isServerReady()) {
+            return START_STICKY
+        }
+        if (setupRunning) return START_STICKY
+        setupRunning = true
+        val worker = Thread({
+            try {
+                BgUtilsRuntimeManager.prepareServer(this) { message ->
+                    setupState = message
+                    android.util.Log.i("MuziiNap-BgUtils", "Setup stage: " + message)
+                    updateNotification(message)
+                }
+                if (stopping.get()) return@Thread
+                setupState = "checking_health"
+                val launchedProcess = BgUtilsRuntimeManager.launchServer(this)
+                val accepted = synchronized(processLock) {
+                    if (stopping.get()) {
+                        launchedProcess.destroy()
+                        if (launchedProcess.isAlive) launchedProcess.destroyForcibly()
+                        false
+                    } else {
+                        serverProcess?.destroy()
+                        serverProcess = launchedProcess
+                        true
+                    }
+                }
+                if (!accepted) return@Thread
+                android.util.Log.i("MuziiNap-BgUtils", "Node process started")
+                val deadline = System.currentTimeMillis() + 30_000
+                while (!stopping.get() && System.currentTimeMillis() < deadline) {
+                    if (BgUtilsRuntimeManager.isServerReady()) {
+                        setupState = "running"
+                        android.util.Log.i("MuziiNap-BgUtils", "Health check passed at " + BgUtilsRuntimeManager.HEALTH_CHECK_URL)
+                        updateNotification("Ready • localhost:${BgUtilsRuntimeManager.PORT}")
+                        var consecutiveHealthFailures = 0
+                        while (!stopping.get() && serverProcess?.isAlive == true) {
+                            Thread.sleep(1000)
+                            consecutiveHealthFailures = nextHealthCheckFailureCount(
+                                consecutiveHealthFailures,
+                                BgUtilsRuntimeManager.isServerReady()
+                            )
+                            if (consecutiveHealthFailures >= HEALTH_CHECK_FAILURE_LIMIT) {
+                                throw IllegalStateException(
+                                    "BgUtils server stopped responding to health checks."
+                                )
+                            }
+                        }
+                        break
+                    }
+                    if (serverProcess?.isAlive != true) {
+                        throw IllegalStateException("BgUtils server exited before becoming ready.")
+                    }
+                    Thread.sleep(400)
+                }
+                if (!stopping.get()) {
+                    check(serverProcess?.isAlive == true) {
+                        "BgUtils server process exited unexpectedly."
+                    }
+                    check(BgUtilsRuntimeManager.isServerReady()) {
+                        "BgUtils server did not become ready."
+                    }
+                }
+            } catch (error: Exception) {
+                if (stopping.get() && error is InterruptedException) {
+                    android.util.Log.i("MuziiNap-BgUtils", "Provider preparation cancelled")
+                } else {
+                    setupState = "failed"
+                    lastFailure = error.message ?: error.javaClass.simpleName
+                    android.util.Log.e("MuziiNap-BgUtils", "Provider startup failed", error)
+                    updateNotification("Setup failed • open Settings to retry")
+                    stopSelf()
+                }
+            } finally {
+                if (stopping.get()) terminateServerProcess()
+                setupRunning = false
+                setupThread = null
+            }
+        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true }
+        setupThread = worker
+        worker.start()
+        return START_STICKY
+    }
+
+    private fun updateNotification(message: String) {
+        getSystemService(NotificationManager::class.java).notify(notificationId, buildProviderNotification(message))
+    }
+
+    private fun buildProviderNotification(message: String): Notification {
+        val openSettingsIntent = Intent(this, MainActivity::class.java).apply {
+            action = "com.merrmist.muziinapmusic.OPEN_BGUTILS_SETTINGS"
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_bgutils_settings", true)
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            notificationId,
+            openSettingsIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("MuziiNap PO Token Provider")
+            .setContentText(message)
+            .setContentIntent(contentIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
+    }
+
+    private fun terminateServerProcess() {
+        synchronized(processLock) {
+            val process = serverProcess
+            serverProcess = null
+            process?.destroy()
+            if (process?.isAlive == true) process.destroyForcibly()
+        }
+    }
+
+    private fun stopServer() {
+        stopping.set(true)
+        setupThread?.interrupt()
+        BgUtilsRuntimeManager.cancelActiveDownload()
+        terminateServerProcess()
+        if (setupState != "failed") setupState = "idle"
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        android.util.Log.i("MuziiNap-BgUtils", "App task removed; stopping local PO Token provider")
+        stopServer()
+        stopForeground(true)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onDestroy() {
+        isRunning = false
+        android.util.Log.i("MuziiNap-BgUtils", "Foreground service destroyed; final state=" + setupState)
+        stopServer()
+        stopForeground(true)
+        getSystemService(NotificationManager::class.java).cancel(notificationId)
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+}

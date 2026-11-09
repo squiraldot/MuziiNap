@@ -7,6 +7,16 @@ import 'package:dio/io.dart';
 import 'package:hive/hive.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'youtube/stream_url_decipherer.dart';
+import 'youtube/player_js_service.dart';
+import 'youtube/nsig_decipher_service.dart';
+import 'youtube/signature_decipher_service.dart';
+import 'youtube/po_token/po_token_manager.dart';
+import 'youtube/po_token/po_token_request.dart';
+import 'youtube/po_token/po_token_policy.dart';
+import 'youtube/po_token/po_token_provider.dart';
+import 'youtube/po_token/bgutil_http_po_token_provider.dart';
+
 import 'device_adaptive_stream_selector.dart';
 
 import '../utils/helper.dart';
@@ -45,12 +55,32 @@ class StreamProvider {
     );
 
   static const Duration _requestTimeout = Duration(seconds: 5);
+  static final PlayerJsService _playerJsService = PlayerJsService();
+  static final StreamUrlDecipherer _streamUrlDecipherer = StreamUrlDecipherer(
+    nsig: NsigDecipherService(_playerJsService),
+    signature: SignatureDecipherService(_playerJsService),
+  );
   static const Duration _initialHandshakeTimeout =
       Duration(milliseconds: 1500);
 
+  static const PoTokenPolicy _poTokenPolicy = PoTokenPolicy();
+  static PoTokenManager _poTokenManager = PoTokenManager(
+    provider: const UnavailablePoTokenProvider(),
+  );
+  static bool _poTokenProviderOverridden = false;
+  static String? _configuredPoTokenProviderUrl;
+
+  /// Allows the host application or tests to replace the attestation provider.
+  /// The provider is never assumed to exist and unsupported requests fail closed.
+  static void configurePoTokenProvider(PoTokenProvider provider) {
+    _poTokenProviderOverridden = true;
+    _poTokenManager.clear();
+    _poTokenManager = PoTokenManager(provider: provider);
+  }
+
   // Bump when URL playability semantics change so previously cached,
   // syntactically valid but unusable InnerTube URLs are re-resolved.
-  static const int streamResolverVersion = 3;
+  static const int streamResolverVersion = 4;
   static const Duration _urlCacheMaxAge = Duration(minutes: 10);
   static const Duration _urlExpirySafetyWindow = Duration(seconds: 60);
   static const List<String> _defaultPipedInstances = [
@@ -135,7 +165,8 @@ class StreamProvider {
     return uri != null &&
         uri.scheme == 'https' &&
         uri.host.isNotEmpty &&
-        uri.userInfo.isEmpty;
+        uri.userInfo.isEmpty &&
+        !(uri.queryParametersAll['sabr']?.contains('1') ?? false);
   }
 
   static bool isAudioMimeType(String? mimeType) {
@@ -216,6 +247,34 @@ class StreamProvider {
       }
 
       pipedInstances = _getPipedInstances(prefs);
+      if (!_poTokenProviderOverridden) {
+        final configuredProviderUrl =
+            prefs.get('youtubePoTokenProviderUrl')?.toString().trim();
+        final localProviderEnabled =
+            prefs.get('bgutilLocalEnabled', defaultValue: false) == true;
+        final poTokenProviderUrl = (configuredProviderUrl != null &&
+                configuredProviderUrl.isNotEmpty)
+            ? configuredProviderUrl
+            : (localProviderEnabled ? 'http://localhost:4416' : null);
+        if (poTokenProviderUrl != _configuredPoTokenProviderUrl) {
+          _configuredPoTokenProviderUrl = poTokenProviderUrl;
+          if (poTokenProviderUrl != null && poTokenProviderUrl.isNotEmpty) {
+          try {
+            _poTokenManager = PoTokenManager(
+              provider: BgutilHttpPoTokenProvider(baseUrl: poTokenProviderUrl),
+            );
+          } catch (_) {
+            _poTokenManager = PoTokenManager(
+              provider: const UnavailablePoTokenProvider(),
+            );
+          }
+          } else {
+            _poTokenManager = PoTokenManager(
+              provider: const UnavailablePoTokenProvider(),
+            );
+          }
+        }
+      }
       // VISIONOS needs a visitorData value. If startup could not obtain one,
       // make one bounded refresh attempt before asking the player endpoint.
       if (visitorId.isEmpty && refreshVisitorId != null) {
@@ -649,6 +708,8 @@ class StreamProvider {
     String language = 'en',
     String country = 'US',
     CancelToken? cancelToken,
+    String? poToken,
+    bool poTokenRetried = false,
   }) async {
     final requestCancelToken = cancelToken ?? CancelToken();
     final timeoutTimer = Timer(
@@ -690,6 +751,14 @@ class StreamProvider {
         });
       }
 
+      final requestBody = <String, dynamic>{
+        'context': {'client': clientContext, 'user': <String, dynamic>{}},
+        'videoId': videoId,
+        'contentCheckOk': true,
+        'racyCheckOk': true,
+      };
+      final bodyWithToken =
+          _poTokenPolicy.attachPlayerToken(requestBody, poToken);
       final response = await _innerTubeDio.post<dynamic>(
         uri.toString(),
         cancelToken: requestCancelToken,
@@ -698,12 +767,7 @@ class StreamProvider {
           sendTimeout: requestTimeout,
           receiveTimeout: requestTimeout,
         ),
-        data: {
-          'context': {'client': clientContext, 'user': <String, dynamic>{}},
-          'videoId': videoId,
-          'contentCheckOk': true,
-          'racyCheckOk': true,
-        },
+        data: bodyWithToken,
       );
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(
@@ -727,11 +791,54 @@ class StreamProvider {
             ? (playability['reason'] ?? playability['status'])
             : null;
         final reasonText = reason?.toString() ?? 'No streaming data';
-        final normalizedReason = reasonText.toLowerCase();
-        final diagnostic = normalizedReason.contains('potoken') ||
-                normalizedReason.contains('proof of origin') ||
-                normalizedReason.contains('proof-of-origin')
-            ? 'YouTube requires a PoToken for this client; no proof-token provider is configured.'
+        final requiredPurpose =
+            _poTokenPolicy.purposeRequiredByPlayerReason(reasonText);
+        if (requiredPurpose == PoTokenPurpose.player) {
+          final sessionId = _poTokenPolicy.extractSessionId(decoded);
+          final isAuthenticated = authenticatedHeaders?.isNotEmpty ?? false;
+          final tokenRequest = PoTokenRequest(
+            clientName: clientName,
+            clientVersion: clientVersion,
+            videoId: videoId,
+            visitorData: visitorId,
+            sessionId: sessionId,
+            purpose: PoTokenPurpose.player,
+            binding: sessionId != null || isAuthenticated
+                ? PoTokenBinding.session
+                : PoTokenBinding.visitor,
+            userAgent: userAgent,
+          );
+          if (poToken != null) {
+            // The upstream explicitly rejected this token; do not keep serving
+            // it from cache on the next playback attempt.
+            _poTokenManager.invalidate(tokenRequest);
+          } else if (!poTokenRetried) {
+            final tokenResult =
+                await _poTokenManager.getToken(tokenRequest);
+            if (tokenResult != null) {
+              // YouTube.js places Player PO Tokens in serviceIntegrityDimensions,
+              // not in the URL or an unrelated request header.
+              return await _fetchInnerTube(
+                videoId: videoId,
+                clientName: clientName,
+                clientVersion: clientVersion,
+                userAgent: userAgent,
+                clientId: clientId,
+                visitorId: visitorId,
+                authenticatedHeaders: authenticatedHeaders,
+                requestTimeout: requestTimeout,
+                deviceProfile: deviceProfile,
+                language: language,
+                country: country,
+                cancelToken: cancelToken,
+                poToken: tokenResult.token,
+                poTokenRetried: true,
+              );
+            }
+          }
+        }
+        final diagnostic = requiredPurpose == PoTokenPurpose.player
+            ? 'YouTube explicitly requires a Player PO Token for $clientName; no compatible provider is available.'
             : reasonText;
         return StreamProvider(
           playable: false,
@@ -747,9 +854,58 @@ class StreamProvider {
         );
       }
 
-      final audioFormats = parseInnerTubeAudioFormats(
+      String? gvsPoToken;
+      if (clientName == 'WEB_REMIX') {
+        final sessionId = _poTokenPolicy.extractSessionId(decoded);
+        final gvsBinding = _poTokenPolicy.gvsBindingForSession(
+          visitorData: visitorId,
+          sessionId: sessionId,
+        );
+        if (gvsBinding == null) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'WEB_REMIX GVS requires visitorData or an account session ID.',
+          );
+        }
+        final gvsRequest = PoTokenRequest(
+          clientName: clientName,
+          clientVersion: clientVersion,
+          videoId: videoId,
+          visitorData: visitorId,
+          sessionId: sessionId,
+          purpose: PoTokenPurpose.gvs,
+          binding: gvsBinding,
+          userAgent: userAgent,
+        );
+        if (!_poTokenManager.supports(gvsRequest)) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'WEB_REMIX requires a compatible visitor- or session-bound GVS PO Token provider.',
+          );
+        }
+        final gvsResult = await _poTokenManager.getToken(gvsRequest);
+        if (gvsResult == null) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'Unable to generate a valid WEB_REMIX GVS PO Token.',
+          );
+        }
+        gvsPoToken = gvsResult.token;
+      }
+
+      final playerJsUrl = _extractPlayerJsUrl(decoded);
+      final decipheredFormats = await _streamUrlDecipherer.decipherFormats(
         formats,
+        playerUrl: playerJsUrl,
+      );
+      final tokenizedFormats = _poTokenPolicy.attachGvsTokenToFormats(
+        decipheredFormats,
+        gvsPoToken,
+      );
+      final audioFormats = parseInnerTubeAudioFormats(
+        tokenizedFormats,
         profile: deviceProfile,
+        allowDecipheredN: true,
       );
       if (audioFormats.isEmpty) {
         final hasCipherOnlyAudio = formats.any((item) =>
@@ -780,9 +936,44 @@ class StreamProvider {
     }
   }
 
+  /// Finds the player script associated with this exact InnerTube response.
+  static Uri? _extractPlayerJsUrl(Map response) {
+    final candidates = <dynamic>[
+      (response['assets'] is Map) ? response['assets']['js'] : null,
+      (response['playerConfig'] is Map &&
+              response['playerConfig']['assets'] is Map)
+          ? response['playerConfig']['assets']['js']
+          : null,
+      (response['playerResponse'] is Map &&
+              response['playerResponse']['assets'] is Map)
+          ? response['playerResponse']['assets']['js']
+          : null,
+    ];
+    for (final candidate in candidates) {
+      final raw = candidate?.toString().trim();
+      if (raw == null || raw.isEmpty) continue;
+      final parsed = Uri.tryParse(raw.startsWith('//') ? 'https:$raw' : raw);
+      final resolved = parsed == null
+          ? null
+          : parsed.hasScheme
+              ? parsed
+              : Uri.https('www.youtube.com', parsed.path);
+      if (resolved != null &&
+          resolved.scheme == 'https' &&
+          (resolved.host == 'youtube.com' ||
+              resolved.host == 'www.youtube.com' ||
+              resolved.host == 'youtube-nocookie.com' ||
+              resolved.host == 'www.youtube-nocookie.com')) {
+        return resolved;
+      }
+    }
+    return null;
+  }
+
   static List<Audio> parseInnerTubeAudioFormats(
     List<dynamic> formats, {
     DeviceStreamProfile? profile,
+    bool allowDecipheredN = false,
   }) {
     final parsed = <Audio>[];
     for (final item in formats) {
@@ -791,11 +982,14 @@ class StreamProvider {
       final rawUrl = item['url']?.toString();
       if (!isAudioMimeType(mimeType) ||
           !isValidAudioFormatUrl(rawUrl) ||
-          !_isDirectlyPlayableInnerTubeUrl(rawUrl) ||
+          !_isDirectlyPlayableInnerTubeUrl(
+            rawUrl,
+            allowDecipheredN: allowDecipheredN,
+          ) ||
           _isSpatialOrWrappedAudio(item)) {
-        // Cipher-only formats and URLs with an undeciphered YouTube "n"
-        // throttling parameter are not playable as-is. Let YouTubeExplode,
-        // the next extractor, perform the required player-JS deciphering.
+        // Raw parser callers fail closed for undeciphered n values.
+        // The primary InnerTube path opts in only after StreamUrlDecipherer
+        // has successfully transformed every required challenge.
         continue;
       }
 
@@ -817,10 +1011,14 @@ class StreamProvider {
 
   /// Raw InnerTube URLs may contain an undeciphered "n" throttling token.
   /// Such URLs pass HTTPS validation but are not ready for media playback.
-  static bool _isDirectlyPlayableInnerTubeUrl(String? rawUrl) {
+  static bool _isDirectlyPlayableInnerTubeUrl(
+    String? rawUrl, {
+    bool allowDecipheredN = false,
+  }) {
     if (!isValidAudioFormatUrl(rawUrl)) return false;
     final uri = Uri.tryParse(rawUrl!.trim());
-    return uri != null && !uri.queryParameters.containsKey('n');
+    return uri != null &&
+        (allowDecipheredN || !uri.queryParameters.containsKey('n'));
   }
 
   static bool _isSpatialOrWrappedAudio(Map item) {

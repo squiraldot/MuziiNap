@@ -17,6 +17,7 @@ import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
+import './services/home_lyrics_widget_coordinator.dart';
 import './services/isar_database_service.dart';
 import './services/innertube_auth_interceptor.dart';
 import './ui/screens/Settings/youtube_login_screen.dart';
@@ -24,6 +25,7 @@ import './services/music_service.dart';
 import './ui/intro_video_splash.dart';
 import './ui/player/player_controller.dart';
 import 'ui/screens/Settings/settings_screen_controller.dart';
+import 'ui/screens/Settings/settings_screen.dart';
 import './ui/utils/theme_controller.dart';
 import 'ui/screens/Home/home_screen_controller.dart';
 import 'ui/screens/Library/library_controller.dart';
@@ -55,10 +57,56 @@ Future<void> main() async {
 
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  static const _notificationNavigation = MethodChannel('muziinap/notification_navigation');
+  bool _openingProviderSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 700), _handleProviderSettingsIntent);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _handleProviderSettingsIntent();
+    }
+  }
+
+  Future<void> _handleProviderSettingsIntent() async {
+    if (!mounted || _openingProviderSettings) return;
+    _openingProviderSettings = true;
+    try {
+      final shouldOpen = await _notificationNavigation.invokeMethod<bool>(
+        'consumeBgUtilsSettingsRequest',
+      );
+      if (shouldOpen == true && mounted) {
+        Get.offAll(() => const SettingsScreen());
+      }
+    } on PlatformException catch (error) {
+      debugPrint('Could not handle provider notification navigation: ${error.message}');
+    } finally {
+      _openingProviderSettings = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     Get.put(AppLinksController());
@@ -185,6 +233,15 @@ Future<void> startApplicationServices() async {
     final handler = await initAudioService();
     Get.put<AudioHandler>(handler, permanent: true);
     return AudioPlaybackService.create(handler);
+  }, permanent: true);
+  // Widget lyrics are driven by the app-scoped AudioHandler stream, never by
+  // the lifecycle or visibility of the Player Screen controller.
+  await Get.putAsync<HomeLyricsWidgetCoordinator>(() async {
+    final coordinator = HomeLyricsWidgetCoordinator(
+      audioHandler: Get.find<AudioHandler>(),
+    );
+    await coordinator.start();
+    return coordinator;
   }, permanent: true);
   Get.lazyPut(() => SearchScreenController(), fenix: true);
 }

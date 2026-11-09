@@ -56,7 +56,7 @@ class DeviceStreamProfile {
       minBuffer = const Duration(milliseconds: 2500);
       maxBuffer = const Duration(seconds: 12);
     } else if (prefersOpus) {
-      minBuffer = const Duration(milliseconds: 1500);
+      minBuffer = const Duration(seconds: 2);
       maxBuffer = const Duration(seconds: 30);
     } else if (networkType == DeviceNetworkType.mobile) {
       minBuffer = const Duration(seconds: 2);

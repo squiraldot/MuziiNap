@@ -1,9 +1,13 @@
 package com.merrmist.muziinapmusic
 
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.media.audiofx.Visualizer
 import android.util.Base64
@@ -18,6 +22,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.hypot
 
 class MainActivity : AudioServiceActivity() {
@@ -32,9 +37,155 @@ class MainActivity : AudioServiceActivity() {
     private var presetEventSink: EventChannel.EventSink? = null
     private var initialPreset: String? = null
     private val visualizers = ConcurrentHashMap<Int, Visualizer>()
+    private val bgutilsSetupGate = BgUtilsSetupGate()
+    @Volatile private var bgutilsSetupThread: Thread? = null
+    private var notificationPermissionRequestScheduled = false
+
+    /**
+     * Ask once on the first app launch on Android 13+. Notification denial
+     * must not block app startup or music playback.
+     */
+    override fun onPostResume() {
+        super.onPostResume()
+        if (notificationPermissionRequestScheduled ||
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+        ) return
+
+        val preferences = getSharedPreferences("muziinap_runtime_permissions", MODE_PRIVATE)
+        if (preferences.getBoolean("NOTIFICATION_PERMISSION_REQUESTED", false)) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            preferences.edit().putBoolean("NOTIFICATION_PERMISSION_REQUESTED", true).apply()
+            return
+        }
+
+        notificationPermissionRequestScheduled = true
+        Handler(Looper.getMainLooper()).post {
+            // Persist before displaying the system prompt so Activity recreation
+            // cannot trigger repeated permission dialogs.
+            preferences.edit().putBoolean("NOTIFICATION_PERMISSION_REQUESTED", true).apply()
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQUEST_POST_NOTIFICATIONS
+            )
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/notification_navigation")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "consumeBgUtilsSettingsRequest") {
+                    val shouldOpen = intent?.getBooleanExtra("open_bgutils_settings", false) == true
+                    intent?.removeExtra("open_bgutils_settings")
+                    result.success(shouldOpen)
+                } else {
+                    result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/bgutils")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setup" -> {
+                        if (!bgutilsSetupGate.tryAcquire()) {
+                            result.error("setup_in_progress", "BgUtils setup is already running.", null)
+                            return@setMethodCallHandler
+                        }
+                        val responded = AtomicBoolean(false)
+                        val replySuccess: (Any?) -> Unit = { value ->
+                            if (responded.compareAndSet(false, true)) runOnUiThread { result.success(value) }
+                        }
+                        val replyError: (String, String, Throwable?) -> Unit = { code, message, error ->
+                            if (error != null) android.util.Log.e("MuziiNap-BgUtils", message, error)
+                            if (responded.compareAndSet(false, true)) runOnUiThread { result.error(code, message, error?.stackTraceToString()) }
+                        }
+                        val setupThread = Thread({
+                            try {
+                                android.util.Log.i("MuziiNap-BgUtils", "Setup requested")
+                                val runtimeInstalled = BgUtilsRuntimeManager.isRuntimeInstalled(applicationContext)
+                                android.util.Log.i("MuziiNap-BgUtils", "Runtime package detection result=" + runtimeInstalled)
+                                if (!runtimeInstalled) {
+                                    BgUtilsDownloadNotifications.begin(applicationContext)
+                                    val apk = BgUtilsRuntimeManager.prepareInstaller(applicationContext) { downloaded, total ->
+                                        BgUtilsDownloadNotifications.update(applicationContext, downloaded, total)
+                                    }
+                                    runOnUiThread {
+                                        try {
+                                            BgUtilsDownloadNotifications.success(applicationContext)
+                                            replySuccess(BgUtilsRuntimeManager.launchInstaller(this, apk))
+                                        } catch (error: Exception) {
+                                            replyError("installer_failed", error.message ?: "Could not launch Android package installer.", error)
+                                        }
+                                    }
+                                } else {
+                                    android.util.Log.i("MuziiNap-BgUtils", "Node.js runtime package detected; starting provider service")
+                                    BgUtilsRuntimeManager.startService(applicationContext)
+                                    val deadline = System.currentTimeMillis() + 20 * 60 * 1000L
+                                    var ready = false
+                                    while (System.currentTimeMillis() < deadline) {
+                                        if (Thread.currentThread().isInterrupted) throw InterruptedException("BgUtils setup cancelled.")
+                                        if (BgUtilsRuntimeManager.isServerReady()) { ready = true; break }
+                                        if (BgUtilsPotService.setupState == "failed") {
+                                            throw IllegalStateException(BgUtilsPotService.lastFailure ?: "BgUtils service startup failed.")
+                                        }
+                                        if (!BgUtilsPotService.isRunning && BgUtilsPotService.setupState == "idle") {
+                                            throw IllegalStateException("BgUtils foreground service stopped before becoming healthy.")
+                                        }
+                                        Thread.sleep(500)
+                                    }
+                                    if (ready) {
+                                        android.util.Log.i("MuziiNap-BgUtils", "Provider health check succeeded")
+                                        replySuccess("server_started")
+                                    } else {
+                                        throw IllegalStateException("BgUtils did not become healthy within twenty minutes. Check Node.js runtime installation and provider startup logs, then retry.")
+                                    }
+                                }
+                            } catch (error: Exception) {
+                                BgUtilsDownloadNotifications.failure(applicationContext)
+                                replyError("bgutils_setup_failed", error.message ?: "BgUtils setup failed.", error)
+                            } finally {
+                                bgutilsSetupGate.release()
+                                bgutilsSetupThread = null
+                            }
+                        }, "MuziiNap-BgUtils-setup").apply { isDaemon = true }
+                        bgutilsSetupThread = setupThread
+                        setupThread.start()
+                    }
+                    "cancel" -> {
+                        val worker = bgutilsSetupThread
+                        if (worker == null) {
+                            result.success(false)
+                        } else {
+                            worker.interrupt()
+                            BgUtilsRuntimeManager.cancelActiveDownload()
+                            BgUtilsRuntimeManager.stopService(applicationContext)
+                            result.success(true)
+                        }
+                    }
+                    "stop" -> {
+                        BgUtilsRuntimeManager.stopService(this)
+                        result.success(true)
+                    }
+                    "status" -> result.success(
+                        mapOf(
+                            "runtimeInstalled" to BgUtilsRuntimeManager.isRuntimeInstalled(this),
+                            "serverReady" to BgUtilsRuntimeManager.isServerReady(),
+                            "serviceRunning" to BgUtilsPotService.isRunning,
+                            "serviceState" to BgUtilsPotService.setupState,
+                            "serviceFailure" to BgUtilsPotService.lastFailure,
+                            "runtimeDownloadInProgress" to BgUtilsRuntimeManager.runtimeDownloadInProgress,
+                            "runtimeDownloadBytes" to BgUtilsRuntimeManager.runtimeDownloadBytes,
+                            "runtimeDownloadTotalBytes" to BgUtilsRuntimeManager.runtimeDownloadTotalBytes,
+                            "runtimeInstallState" to BgUtilsRuntimeManager.runtimeInstallState
+                        )
+                    )
+                    else -> result.notImplemented()
+                }
+            }
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, presetShareChannel)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
@@ -291,7 +442,18 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        if (!isChangingConfigurations) {
+            bgutilsSetupThread?.let { worker ->
+                worker.interrupt()
+                BgUtilsRuntimeManager.cancelActiveDownload()
+                BgUtilsRuntimeManager.stopService(applicationContext)
+            }
+        }
         stopVisualizer()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val REQUEST_POST_NOTIFICATIONS = 73045
     }
 }

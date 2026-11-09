@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/innertube-primary-streaming
+      - dev
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +19,7 @@ jobs:
   build-apk:
     name: Build MuziiNap release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     env:
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -73,6 +74,16 @@ jobs:
           channel: stable
           flutter-version: '3.47.5'
           cache: true
+      - name: Free unused runner disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: Repair and install Android NDK with retries
         shell: bash
         run: |
@@ -84,7 +95,7 @@ jobs:
 
           NDK_DIR="$SDK_ROOT/ndk/27.0.12077973"
           # Clear stale SDK Manager downloads and partial NDK extraction.
-          rm -rf "$NDK_DIR" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
+          rm -rf "$SDK_ROOT/ndk" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
 
           # Accept licenses separately. Do not use pipefail for the 'yes'
           # producer: sdkmanager can close stdin early after accepting input,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/services/device_adaptive_stream_selector.dart';
 import 'package:muziinap/services/stream_service.dart';
+import 'package:muziinap/services/youtube/po_token/po_token_policy.dart';
 
 void main() {
   group('InnerTube audio format validation', () {
@@ -31,6 +32,26 @@ void main() {
       expect(formats, isEmpty);
     });
 
+    test('accepts an n URL only after the deciphering pipeline marks it resolved', () {
+      final formats = StreamProvider.parseInnerTubeAudioFormats(
+        [
+          {
+            'itag': 140,
+            'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+            'url': 'https://media.example.com/audio?n=decipheredToken',
+            'bitrate': 128000,
+          },
+        ],
+        allowDecipheredN: true,
+      );
+
+      expect(formats, hasLength(1));
+      expect(
+        Uri.parse(formats.single.url).queryParameters['n'],
+        'decipheredToken',
+      );
+    });
+
     test('accepts a direct HTTPS audio URL', () {
       final formats = StreamProvider.parseInnerTubeAudioFormats([
         {
@@ -43,6 +64,139 @@ void main() {
 
       expect(formats, hasLength(1));
       expect(formats.single.url, 'https://media.example.com/audio');
+    });
+
+    test('rejects direct audio URLs containing sabr=1', () {
+      final formats = StreamProvider.parseInnerTubeAudioFormats([
+        {
+          'itag': 140,
+          'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+          'url': 'https://media.example.com/audio?expire=123&sabr=1',
+          'bitrate': 128000,
+        },
+      ]);
+
+      expect(formats, isEmpty);
+      expect(
+        StreamProvider.isValidAudioFormatUrl(
+          'https://media.example.com/audio?sabr=1',
+        ),
+        isFalse,
+      );
+    });
+
+    test('allows ordinary unrelated query parameters on direct audio URLs', () {
+      const url = 'https://media.example.com/audio?expire=123&source=music';
+      final formats = StreamProvider.parseInnerTubeAudioFormats([
+        {
+          'itag': 140,
+          'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+          'url': url,
+          'bitrate': 128000,
+        },
+      ]);
+
+      expect(formats, hasLength(1));
+      expect(formats.single.url, url);
+    });
+
+    test('allows a non-enabled sabr query value on direct audio URLs', () {
+      const url = 'https://media.example.com/audio?sabr=0';
+      expect(StreamProvider.isValidAudioFormatUrl(url), isTrue);
+    });
+
+    test('rejects a SABR-only response and continues with the next client', () async {
+      final sabrOnlyResponse = {
+        'streamingData': {
+          'adaptiveFormats': [
+            {
+              'itag': 140,
+              'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+              'bitrate': 128000,
+            },
+          ],
+          'serverAbrStreamingUrl':
+              'https://rr.googlevideo.com/videoplayback?sabr=1',
+        },
+      };
+      final streamingData = sabrOnlyResponse['streamingData']!;
+      final adaptiveFormats = streamingData['adaptiveFormats'] as List;
+
+      final firstClientAttempt = () async {
+        final formats = StreamProvider.parseInnerTubeAudioFormats(
+          adaptiveFormats,
+        );
+        if (formats.isEmpty) {
+          return StreamProvider(
+            playable: false,
+            statusMSG: 'No validated direct audio formats',
+          );
+        }
+        return StreamProvider(playable: true, audioFormats: formats);
+      }();
+
+      final nextClientFormats = StreamProvider.parseInnerTubeAudioFormats([
+        {
+          'itag': 140,
+          'mimeType': 'audio/mp4; codecs="mp4a.40.2"',
+          'url': 'https://media.example.com/fallback?expire=456',
+          'bitrate': 128000,
+        },
+      ]);
+      final nextClientAttempt = Future<StreamProvider>.value(
+        StreamProvider(playable: true, audioFormats: nextClientFormats),
+      );
+
+      expect(
+        StreamProvider.isValidAudioFormatUrl(
+          streamingData['serverAbrStreamingUrl'] as String,
+        ),
+        isFalse,
+      );
+      expect(
+        StreamProvider.parseInnerTubeAudioFormats(adaptiveFormats),
+        isEmpty,
+      );
+
+      final rejectedAttempt = await firstClientAttempt;
+      expect(rejectedAttempt.playable, isFalse);
+      expect(
+        rejectedAttempt.statusMSG,
+        'No validated direct audio formats',
+      );
+
+      final result = await StreamProvider.firstPlayableResult([
+        firstClientAttempt,
+        nextClientAttempt,
+      ]);
+
+      expect(result.playable, isTrue);
+      expect(result.audioFormats, hasLength(1));
+      expect(
+        result.audioFormats!.single.url,
+        'https://media.example.com/fallback?expire=456',
+      );
+    });
+  });
+
+  group('GVS PO Token URL attachment', () {
+    test('attaches pot to eligible direct Google Video Server URLs only', () {
+      const policy = PoTokenPolicy();
+      const directUrl =
+          'https://rr.googlevideo.com/videoplayback?expire=123';
+      const sabrUrl =
+          'https://rr.googlevideo.com/videoplayback?expire=123&sabr=1';
+
+      final formats = policy.attachGvsTokenToFormats([
+        {'url': directUrl},
+        {'url': sabrUrl},
+      ], 'gvs-token');
+
+      expect(
+        Uri.parse(formats[0]['url'] as String).queryParameters['pot'],
+        'gvs-token',
+      );
+      expect(formats[1]['url'], sabrUrl);
     });
   });
 

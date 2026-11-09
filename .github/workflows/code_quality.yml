@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/innertube-primary-streaming
+      - dev
   workflow_dispatch:
 
 concurrency:
@@ -30,6 +31,48 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.2'
+      - name: Free unused runner disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          echo "Disk space after cleanup:"
+          df -h /
+
+      - name: Install pinned Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+
+          # Keep only the NDK version declared by android/app/build.gradle.
+          rm -rf "$SDK_ROOT/ndk" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses
+          set -o pipefail
+
+          NDK_DIR="$SDK_ROOT/ndk/27.0.12077973"
+          for attempt in 1 2 3; do
+            echo "Installing NDK 27.0.12077973 (attempt $attempt/3)"
+            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973" &&
+               test -f "$NDK_DIR/source.properties" &&
+               test -x "$NDK_DIR/ndk-build" &&
+               grep -Fq "Pkg.Revision = 27.0.12077973" "$NDK_DIR/source.properties"; then
+              echo "Pinned NDK installed and verified."
+              exit 0
+            fi
+            rm -rf "$NDK_DIR" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
+          done
+
+          echo "::error::Could not install the pinned Android NDK." >&2
+          exit 1
+
       - name: Install packages
         run: flutter pub get
       - name: Generate Isar collection schemas

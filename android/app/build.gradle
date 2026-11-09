@@ -34,7 +34,7 @@ def releaseSigningConfigured = [
 
 android {
     compileSdkVersion flutter.compileSdkVersion
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -95,4 +95,5 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     implementation 'com.android.support:multidex:2.0.1'
     implementation 'androidx.core:core-splashscreen:1.0.0-beta02'
+    implementation 'org.apache.commons:commons-compress:1.27.1'
 }

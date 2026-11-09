@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:muziinap/ui/screens/Settings/bgutils_provider_settings.dart';
 import '../../../services/constant.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -470,6 +472,13 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Get.to(() => const AboutScreen()),
+              ),
+              CustomExpansionTile(
+                title: 'Developer Options',
+                icon: Icons.developer_mode,
+                children: [
+                  const BgUtilsProviderSettings(),
+                ],
               ),
             ],
           )),

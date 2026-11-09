@@ -176,6 +176,20 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 18),
             const Divider(color: _divider),
             const SizedBox(height: 18),
+            _sectionTitle(theme, 'Privacy & Legal'),
+            const SizedBox(height: 6),
+            _AboutLinkTile(
+              icon: Icons.privacy_tip_outlined,
+              title: 'Privacy Policy',
+              subtitle: 'Read how MuziiNap handles your data.',
+              onTap: () => _openLink(
+                context,
+                'https://muziinap-site.vercel.app/pages/privacy.html',
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Divider(color: _divider),
+            const SizedBox(height: 18),
             _sectionTitle(theme, 'Feedback & Support'),
             const SizedBox(height: 6),
             _AboutLinkTile(
