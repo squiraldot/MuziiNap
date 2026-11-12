@@ -40,7 +40,7 @@ void main() {
     });
 
     test('rejects invalid video ID lengths and alphabets', () {
-      for (final id in ['short', 'dQw4w9WgXcQ!!', 'dQw4w9WgXc']) {
+      for (final id in ['', 'short', 'dQw4w9WgXcQ!!', 'dQw4w9WgXc']) {
         expect(
           SongSharingConfig.parseVideoId(
             Uri.parse('https://muziinap-site.vercel.app/song/$id'),
@@ -133,6 +133,27 @@ void main() {
 
       expect(requests, hasLength(1));
       expect(requests.single.videoId, 'aqz-KE-bpKQ');
+
+      await subscription.cancel();
+    });
+
+    test('delivers multiple distinct incoming song links in order', () async {
+      final requests = <SongLinkRequest>[];
+      final subscription = service.songRequests.listen(requests.add);
+
+      await service.start();
+      source.controller.add(
+        Uri.parse('https://muziinap-site.vercel.app/song/dQw4w9WgXcQ'),
+      );
+      source.controller.add(
+        Uri.parse('https://muziinap-site.vercel.app/song/aqz-KE-bpKQ'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        requests.map((request) => request.videoId).toList(),
+        ['dQw4w9WgXcQ', 'aqz-KE-bpKQ'],
+      );
 
       await subscription.cancel();
     });
