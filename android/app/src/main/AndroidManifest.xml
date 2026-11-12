@@ -34,7 +34,25 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-             <!-- App Link plugin intent-filter -->
+             <!-- Verified HTTPS App Links for canonical MuziiNap song URLs.
+                 The two exact-length patterns allow the contract's optional trailing slash
+                 without claiming unrelated website routes. Song ID alphabet validation
+                 remains enforced by SongSharingConfig in Flutter. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="muziinap-site.vercel.app"
+                    android:pathPattern="/song/..........." />
+                <data
+                    android:scheme="https"
+                    android:host="muziinap-site.vercel.app"
+                    android:pathPattern="/song/.........../" />
+            </intent-filter>
+
+            <!-- App Link plugin intent-filter -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.BROWSABLE" />
