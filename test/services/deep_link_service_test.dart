@@ -121,6 +121,22 @@ void main() {
       await initialSource.close();
     });
 
+    test('normalizes valid song requests to the canonical URL', () async {
+      final requests = <SongLinkRequest>[];
+      final subscription = service.songRequests.listen(requests.add);
+
+      await service.start();
+      source.controller.add(
+        Uri.parse('https://muziinap-site.vercel.app/song/dQw4w9WgXcQ/'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(requests.single.uri.toString(),
+          'https://muziinap-site.vercel.app/song/dQw4w9WgXcQ');
+
+      await subscription.cancel();
+    });
+
     test('subscribes to runtime links and emits valid song requests', () async {
       final requests = <SongLinkRequest>[];
       final subscription = service.songRequests.listen(requests.add);
