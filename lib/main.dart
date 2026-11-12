@@ -15,6 +15,7 @@ import './utils/get_localization.dart';
 import './services/downloader.dart';
 import './services/piped_service.dart';
 import 'utils/app_link_controller.dart';
+import 'services/deep_link_service.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
 import './services/home_lyrics_widget_coordinator.dart';
@@ -109,7 +110,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    Get.put(AppLinksController());
+    if (!Get.isRegistered<DeepLinkService>()) {
+      Get.put<DeepLinkService>(DeepLinkService(), permanent: true);
+    }
+    if (!Get.isRegistered<AppLinksController>()) {
+      Get.put<AppLinksController>(AppLinksController(), permanent: true);
+    }
     return GetMaterialApp(
         title: 'MuziiNap',
         home: const IntroVideoSplash(),
