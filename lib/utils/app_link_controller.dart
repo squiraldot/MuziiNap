@@ -16,6 +16,17 @@ import '../ui/widgets/common_dialog_widget.dart';
 
 class AppLinksController extends GetxController with ProcessLink {
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<SongLinkRequest>? _songRequestSubscription;
+
+  /// In-memory only: canonical song requests are queued for the application
+  /// layer while this process is alive. Nothing is persisted for post-install
+  /// or deferred retrieval.
+  final RxList<SongLinkRequest> incomingSongRequests = <SongLinkRequest>[].obs;
+
+  SongLinkRequest? takeNextSongRequest() {
+    if (incomingSongRequests.isEmpty) return null;
+    return incomingSongRequests.removeAt(0);
+  }
 
   @override
   void onInit() {
@@ -24,6 +35,12 @@ class AppLinksController extends GetxController with ProcessLink {
 
     // The service owns the only app_links listener. Keep the existing
     // YouTube/import path intact by forwarding non-canonical URLs here.
+    _songRequestSubscription = deepLinkService.songRequests.listen(
+      incomingSongRequests.add,
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('MuziiNap song-link delivery error: $error');
+      },
+    );
     _linkSubscription = deepLinkService.legacyLinks.listen(
       (uri) => unawaited(filterLinks(uri)),
       onError: (Object error, StackTrace stackTrace) {
@@ -39,6 +56,7 @@ class AppLinksController extends GetxController with ProcessLink {
   @override
   void onClose() {
     unawaited(_linkSubscription?.cancel() ?? Future<void>.value());
+    unawaited(_songRequestSubscription?.cancel() ?? Future<void>.value());
     super.onClose();
   }
 }
