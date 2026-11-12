@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../models/playling_from.dart';
 import '../services/deep_link_service.dart';
+import '../services/song_link_playback_coordinator.dart';
 import '../ui/widgets/songinfo_bottom_sheet.dart';
 import './helper.dart';
 import '../ui/widgets/loader.dart';
@@ -17,6 +19,7 @@ import '../ui/widgets/common_dialog_widget.dart';
 class AppLinksController extends GetxController with ProcessLink {
   StreamSubscription<Uri>? _linkSubscription;
   StreamSubscription<SongLinkRequest>? _songRequestSubscription;
+  late final SongLinkPlaybackCoordinator _songPlaybackCoordinator;
 
   /// In-memory only: canonical song requests are queued for the application
   /// layer while this process is alive. Nothing is persisted for post-install
@@ -35,8 +38,16 @@ class AppLinksController extends GetxController with ProcessLink {
 
     // The service owns the only app_links listener. Keep the existing
     // YouTube/import path intact by forwarding non-canonical URLs here.
+    _songPlaybackCoordinator = SongLinkPlaybackCoordinator(
+      resolveSong: _resolveSharedSong,
+      playSong: (song) => Get.find<PlayerController>().playSharedSong(song),
+      onFailure: _handleSongLinkFailure,
+    );
     _songRequestSubscription = deepLinkService.songRequests.listen(
-      incomingSongRequests.add,
+      (request) {
+        incomingSongRequests.add(request);
+        unawaited(_songPlaybackCoordinator.handle(request.videoId));
+      },
       onError: (Object error, StackTrace stackTrace) {
         debugPrint('MuziiNap song-link delivery error: $error');
       },
@@ -51,6 +62,29 @@ class AppLinksController extends GetxController with ProcessLink {
     // Subscribe before start(): the service installs its runtime listener
     // before awaiting the cold-start URI.
     unawaited(deepLinkService.start());
+  }
+
+  Future<MediaItem?> _resolveSharedSong(String videoId) async {
+    final result = await Get.find<MusicServices>().getSongWithId(videoId);
+    if (result.length < 2 || result[0] != true || result[1] is! List) {
+      return null;
+    }
+    for (final item in (result[1] as List).whereType<MediaItem>()) {
+      if (item.id == videoId) return item;
+    }
+    return null;
+  }
+
+  void _handleSongLinkFailure(Object error) {
+    debugPrint('MuziiNap shared-song playback failed: $error');
+    final context = Get.context;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(snackbar(
+        context,
+        "notaSongVideo".tr,
+        size: SanckBarSize.MEDIUM,
+      ));
+    }
   }
 
   void _handleLegacyLink(Uri uri) {
@@ -69,6 +103,7 @@ class AppLinksController extends GetxController with ProcessLink {
   void onClose() {
     unawaited(_linkSubscription?.cancel() ?? Future<void>.value());
     unawaited(_songRequestSubscription?.cancel() ?? Future<void>.value());
+    _songPlaybackCoordinator.dispose();
     super.onClose();
   }
 }
@@ -90,9 +125,8 @@ mixin ProcessLink {
       Navigator.of(Get.context!).pop();
     }
 
-    // Canonical MuziiNap song links are validated and emitted by
-    // DeepLinkService.songRequests. Playback is intentionally deferred to
-    // the next phase; this handler remains responsible for legacy imports.
+    // Canonical MuziiNap song links are consumed by the app-scoped playback
+    // coordinator. This handler remains responsible for legacy imports.
     if (uri.host == "youtube.com" ||
         uri.host == "music.youtube.com" ||
         uri.host == "youtu.be" ||

@@ -28,6 +28,7 @@ import '../screens/Home/home_screen_controller.dart';
 import '../widgets/sliding_up_panel.dart';
 import '../../models/durationstate.dart';
 import '../../services/music_service.dart';
+import '../../services/song_link_playback_policy.dart';
 import '../widgets/keyboard_shortcuts_menu.dart';
 import '../widgets/lyrics_dialog.dart';
 class PlayerController extends GetxController
@@ -711,6 +712,45 @@ class PlayerController extends GetxController
         isShuffleModeEnabled.isFalse) {
       toggleQueueLoopMode();
     }
+  }
+
+  /// Plays a shared song through the existing AudioHandler while retaining
+  /// the user's queue and its relative order.
+  Future<void> playSharedSong(MediaItem mediaItem) async {
+    isRadioModeOn = false;
+    playinfrom.value = PlaylingFrom(type: PlaylingFromType.SELECTION);
+
+    final playbackState = _audioHandler.playbackState.value;
+    if (currentSong.value?.id == mediaItem.id) {
+      if (!playbackState.playing &&
+          playbackState.processingState == AudioProcessingState.ready) {
+        await _audioHandler.play();
+      }
+      return;
+    }
+
+    final nextQueue = SharedSongQueuePolicy.prioritize(
+      _audioHandler.queue.value,
+      mediaItem,
+      (item) => item.id,
+    );
+    final panelPreparation = _playerPanelCheck();
+    await _audioHandler.updateQueue(nextQueue);
+    if (isShuffleModeEnabled.value) {
+      await _audioHandler.customAction("shuffleCmd", {"index": 0});
+    }
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (Hive.box(appPrefsBoxName).get("discoverContentType") == "BOLI") {
+        Get.find<HomeScreenController>()
+            .changeDiscoverContent("BOLI", songId: mediaItem.id);
+      }
+    });
+
+    await Future.wait<void>([
+      panelPreparation,
+      _audioHandler.customAction("playByIndex", {"index": 0}),
+    ]);
   }
 
   Future<void> playPlayListSong(List<MediaItem> mediaItems, int index,
