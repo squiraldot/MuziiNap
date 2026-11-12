@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../models/playling_from.dart';
+import 'song_sharing_config.dart';
 import '../ui/widgets/songinfo_bottom_sheet.dart';
 import './helper.dart';
 import '../ui/widgets/loader.dart';
@@ -61,6 +62,15 @@ mixin ProcessLink {
 
     if (Get.isRegistered<SongInfoController>()) {
       Navigator.of(Get.context!).pop();
+    }
+
+    // Canonical website song links are separate from YouTube import URLs.
+    // Parse them with the shared contract before falling through to the
+    // unsupported-link snackbar.
+    final sharedSongId = SongSharingConfig.parseVideoId(uri);
+    if (sharedSongId != null) {
+      await playSong(sharedSongId);
+      return;
     }
 
     if (uri.host == "youtube.com" ||
