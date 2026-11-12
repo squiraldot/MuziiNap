@@ -102,7 +102,12 @@ class DeepLinkService {
     final videoId = SongSharingConfig.parseVideoId(uri);
     if (videoId != null) {
       if (_isDuplicate('song:$videoId')) return;
-      _songRequests.add(SongLinkRequest(videoId: videoId, uri: uri));
+      _songRequests.add(
+        SongLinkRequest(
+          videoId: videoId,
+          uri: Uri.parse(SongSharingConfig.canonicalUrl(videoId)),
+        ),
+      );
       return;
     }
 
