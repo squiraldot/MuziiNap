@@ -42,7 +42,7 @@ class AppLinksController extends GetxController with ProcessLink {
       },
     );
     _linkSubscription = deepLinkService.legacyLinks.listen(
-      (uri) => unawaited(filterLinks(uri)),
+      _handleLegacyLink,
       onError: (Object error, StackTrace stackTrace) {
         debugPrint('MuziiNap legacy link handling error: $error');
       },
@@ -51,6 +51,18 @@ class AppLinksController extends GetxController with ProcessLink {
     // Subscribe before start(): the service installs its runtime listener
     // before awaiting the cold-start URI.
     unawaited(deepLinkService.start());
+  }
+
+  void _handleLegacyLink(Uri uri) {
+    // Initial links can arrive before GetMaterialApp has installed its context.
+    // Defer UI-dependent legacy handling until the first frame is complete.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.context != null) {
+        unawaited(filterLinks(uri));
+      } else {
+        debugPrint('Skipping legacy link because app navigation is not ready.');
+      }
+    });
   }
 
   @override
