@@ -21,9 +21,8 @@ class AppLinksController extends GetxController with ProcessLink {
   StreamSubscription<SongLinkRequest>? _songRequestSubscription;
   late final SongLinkPlaybackCoordinator _songPlaybackCoordinator;
 
-  /// In-memory only: canonical song requests are queued for the application
-  /// layer while this process is alive. Nothing is persisted for post-install
-  /// or deferred retrieval.
+  /// In-memory only: retain the latest canonical request for the application
+  /// layer. Nothing is persisted for post-install or deferred retrieval.
   final RxList<SongLinkRequest> incomingSongRequests = <SongLinkRequest>[].obs;
 
   SongLinkRequest? takeNextSongRequest() {
@@ -45,7 +44,9 @@ class AppLinksController extends GetxController with ProcessLink {
     );
     _songRequestSubscription = deepLinkService.songRequests.listen(
       (request) {
-        incomingSongRequests.add(request);
+        incomingSongRequests
+          ..clear()
+          ..add(request);
         unawaited(_songPlaybackCoordinator.handle(request.videoId));
       },
       onError: (Object error, StackTrace stackTrace) {

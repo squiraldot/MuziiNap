@@ -722,11 +722,16 @@ class PlayerController extends GetxController
 
     final playbackState = _audioHandler.playbackState.value;
     if (currentSong.value?.id == mediaItem.id) {
-      if (!playbackState.playing &&
-          playbackState.processingState == AudioProcessingState.ready) {
-        await _audioHandler.play();
+      if (playbackState.playing ||
+          playbackState.processingState == AudioProcessingState.loading) {
+        return;
       }
-      return;
+      if (playbackState.processingState == AudioProcessingState.ready) {
+        await _audioHandler.play();
+        return;
+      }
+      // An error/idle state is not an active playback session; fall through
+      // and retry the shared target through the normal recovery-aware path.
     }
 
     final nextQueue = SharedSongQueuePolicy.prioritize(
