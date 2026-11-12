@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../models/playling_from.dart';
-import 'song_sharing_config.dart';
+import '../services/deep_link_service.dart';
 import '../ui/widgets/songinfo_bottom_sheet.dart';
 import './helper.dart';
 import '../ui/widgets/loader.dart';
@@ -16,34 +15,31 @@ import '../ui/widgets/snackbar.dart';
 import '../ui/widgets/common_dialog_widget.dart';
 
 class AppLinksController extends GetxController with ProcessLink {
-  late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void onInit() {
-    initDeepLinks();
     super.onInit();
-  }
+    final deepLinkService = Get.find<DeepLinkService>();
 
-  Future<void> initDeepLinks() async {
-    _appLinks = AppLinks();
+    // The service owns the only app_links listener. Keep the existing
+    // YouTube/import path intact by forwarding non-canonical URLs here.
+    _linkSubscription = deepLinkService.legacyLinks.listen(
+      (uri) => unawaited(filterLinks(uri)),
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('MuziiNap legacy link handling error: $error');
+      },
+    );
 
-    // Check initial link if app was in cold state (terminated)
-    final appLink = await _appLinks.getInitialAppLink();
-    if (appLink != null) {
-      await filterLinks(appLink);
-    }
-
-    // Handle link when app is in warm state (front or background)
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) async {
-      await filterLinks(uri);
-    });
+    // Subscribe before start(): the service installs its runtime listener
+    // before awaiting the cold-start URI.
+    unawaited(deepLinkService.start());
   }
 
   @override
-  void dispose() {
-    _linkSubscription?.cancel();
-    super.dispose();
+  void onClose() {
+    unawaited(_linkSubscription?.cancel() ?? Future<void>.value());
+    super.onClose();
   }
 }
 
@@ -64,15 +60,9 @@ mixin ProcessLink {
       Navigator.of(Get.context!).pop();
     }
 
-    // Canonical website song links are separate from YouTube import URLs.
-    // Parse them with the shared contract before falling through to the
-    // unsupported-link snackbar.
-    final sharedSongId = SongSharingConfig.parseVideoId(uri);
-    if (sharedSongId != null) {
-      await playSong(sharedSongId);
-      return;
-    }
-
+    // Canonical MuziiNap song links are validated and emitted by
+    // DeepLinkService.songRequests. Playback is intentionally deferred to
+    // the next phase; this handler remains responsible for legacy imports.
     if (uri.host == "youtube.com" ||
         uri.host == "music.youtube.com" ||
         uri.host == "youtu.be" ||
@@ -80,24 +70,34 @@ mixin ProcessLink {
         uri.host == "m.youtube.com") {
       printINFO(
           "pathsegmet: ${uri.pathSegments} params:${uri.queryParameters}");
-      if (uri.pathSegments[0] == "playlist" &&
+      if (uri.pathSegments.isNotEmpty &&
+          uri.pathSegments[0] == "playlist" &&
           uri.queryParameters.containsKey("list")) {
         final browseId = uri.queryParameters['list'];
-        await openPlaylistOrAlbum(browseId!);
-      } else if (uri.pathSegments[0] == "shorts") {
+        if (browseId != null && browseId.isNotEmpty) {
+          await openPlaylistOrAlbum(browseId);
+        }
+      } else if (uri.pathSegments.isNotEmpty &&
+          uri.pathSegments[0] == "shorts") {
         ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
             Get.context!, "notaSongVideo".tr,
             size: SanckBarSize.MEDIUM));
-      } else if (uri.pathSegments[0] == "watch") {
+      } else if (uri.pathSegments.isNotEmpty &&
+          uri.pathSegments[0] == "watch") {
         final songId = uri.queryParameters['v'];
-        await playSong(songId!);
-      } else if (uri.pathSegments[0] == "channel") {
-        final browseId = uri.pathSegments[1];
-        await openArtist(browseId);
-      } else if ((uri.queryParameters.isEmpty || uri.query.contains("si=")) &&
+        if (songId != null && songId.isNotEmpty) {
+          await playSong(songId);
+        }
+      } else if (uri.pathSegments.length > 1 &&
+          uri.pathSegments[0] == "channel") {
+        await openArtist(uri.pathSegments[1]);
+      } else if (uri.pathSegments.isNotEmpty &&
+          (uri.queryParameters.isEmpty || uri.query.contains("si=")) &&
           uri.host == "youtu.be") {
         final songId = uri.pathSegments[0];
-        await playSong(songId);
+        if (songId.isNotEmpty) {
+          await playSong(songId);
+        }
       }
     } else {
       ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
