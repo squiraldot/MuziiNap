@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/ui/splash_navigation_guard.dart';
 
 void main() {
   group('SplashNavigationGuard', () {
-    test('falls through when the intro never reports completion', () async {
+    testWidgets('falls through when the intro never reports completion',
+        (tester) async {
       var navigated = false;
       final guard = SplashNavigationGuard(
         onTimeout: () => navigated = true,
@@ -13,13 +12,13 @@ void main() {
       );
 
       guard.arm(const Duration(milliseconds: 10));
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 10));
 
       expect(navigated, isTrue);
       guard.dispose();
     });
 
-    test('does not navigate after the intro completes', () async {
+    testWidgets('does not navigate after the intro completes', (tester) async {
       var navigated = false;
       final guard = SplashNavigationGuard(
         onTimeout: () => navigated = true,
@@ -28,13 +27,14 @@ void main() {
 
       guard.arm(const Duration(milliseconds: 10));
       guard.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 20));
 
       expect(navigated, isFalse);
       guard.dispose();
     });
 
-    test('rearming replaces the previous completion deadline', () async {
+    testWidgets('rearming replaces the previous completion deadline',
+        (tester) async {
       var timeoutCount = 0;
       final guard = SplashNavigationGuard(
         onTimeout: () => timeoutCount++,
@@ -42,17 +42,17 @@ void main() {
       );
 
       guard.arm(const Duration(milliseconds: 10));
-      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await tester.pump(const Duration(milliseconds: 5));
       guard.arm(const Duration(milliseconds: 40));
-      await Future<void>.delayed(const Duration(milliseconds: 15));
+      await tester.pump(const Duration(milliseconds: 15));
 
       expect(timeoutCount, 0);
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 25));
       expect(timeoutCount, 1);
       guard.dispose();
     });
 
-    test('dispose cancels a pending fallback', () async {
+    testWidgets('dispose cancels a pending fallback', (tester) async {
       var navigated = false;
       final guard = SplashNavigationGuard(
         onTimeout: () => navigated = true,
@@ -61,7 +61,7 @@ void main() {
 
       guard.arm(const Duration(milliseconds: 10));
       guard.dispose();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 20));
 
       expect(navigated, isFalse);
     });
