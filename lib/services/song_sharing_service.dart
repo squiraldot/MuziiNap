@@ -13,7 +13,8 @@ class SongSharingService {
   ///
   /// YouTube video IDs are validated before being inserted into the URL path,
   /// so URL-like strings and path separators can never become share targets.
-  String? generateSongLink(MediaItem song) {
+  String? generateSongLink(MediaItem? song) {
+    if (song == null) return null;
     final videoId = song.id;
     if (!_videoIdPattern.hasMatch(videoId)) return null;
 
@@ -22,7 +23,7 @@ class SongSharingService {
 
   /// Shares the canonical MuziiNap URL. Returns false for invalid songs or
   /// when the platform share operation fails.
-  Future<bool> shareSong(MediaItem song) async {
+  Future<bool> shareSong(MediaItem? song) async {
     final link = generateSongLink(song);
     if (link == null) return false;
 
@@ -36,7 +37,7 @@ class SongSharingService {
 
   /// Copies the canonical MuziiNap URL. Returns false for invalid songs or
   /// when the platform clipboard operation fails.
-  Future<bool> copySongLink(MediaItem song) async {
+  Future<bool> copySongLink(MediaItem? song) async {
     final link = generateSongLink(song);
     if (link == null) return false;
 
@@ -49,5 +50,5 @@ class SongSharingService {
   }
 
   /// Returns the exact canonical URL that should be encoded in the song QR.
-  String? generateSongQr(MediaItem song) => generateSongLink(song);
+  String? generateSongQr(MediaItem? song) => generateSongLink(song);
 }
