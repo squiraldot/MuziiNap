@@ -42,6 +42,13 @@ void main() {
       expect(service.generateSongLink(songWithId('')), isNull);
     });
 
+    test('rejects a null song object for every sharing format', () async {
+      expect(service.generateSongLink(null), isNull);
+      expect(service.generateSongQr(null), isNull);
+      expect(await service.shareSong(null), isFalse);
+      expect(await service.copySongLink(null), isFalse);
+    });
+
     test('share and copy operations reject invalid IDs before platform calls',
         () async {
       final invalidSong = songWithId('not-a-video-id');
