@@ -28,6 +28,7 @@ import '../screens/Home/home_screen_controller.dart';
 import '../widgets/sliding_up_panel.dart';
 import '../../models/durationstate.dart';
 import '../../services/music_service.dart';
+import '../../services/media_item_lifecycle_guard.dart';
 import '../../services/song_link_playback_policy.dart';
 import '../widgets/keyboard_shortcuts_menu.dart';
 import '../widgets/lyrics_dialog.dart';
@@ -36,6 +37,8 @@ class PlayerController extends GetxController
   final _audioHandler = Get.find<AudioHandler>();
   final _musicServices = Get.find<MusicServices>();
   final currentQueue = <MediaItem>[].obs;
+  final MediaItemLifecycleGuard _mediaItemLifecycleGuard =
+      MediaItemLifecycleGuard();
 
   final playerPaneOpacity = (1.0).obs;
   // Prevent route and media updates from resurrecting a dismissed mini player.
@@ -540,9 +543,16 @@ class PlayerController extends GetxController
         val.current = oldState.current;
         val.buffered = oldState.buffered;
       });
+      final shouldDismissForEmptyMedia =
+          _mediaItemLifecycleGuard.shouldDismissFor(mediaItem);
       if (mediaItem == null) {
+        // AudioHandler's initial stream value is null before the first song.
+        // It is not a user stop/dismiss action and must not hide the mini player
+        // when a cold-start shared link begins playback.
+        if (!shouldDismissForEmptyMedia) return;
+
         // AudioService.stop() (including the notification's dismiss action)
-        // clears the media item. Keep the in-app mini player in sync.
+        // clears the media item after a real song has been received.
         isMiniPlayerDismissed.value = true;
         currentSong.value = null;
         isPlayerpanelTopVisible.value = false;
