@@ -18,6 +18,8 @@ Example: `https://muziinap-site.vercel.app/song/dQw4w9WgXcQ`
 
 The URL contains no stream URL, expiry data, authentication token, or song metadata. Stream URLs are transient playback details and must never become song identity.
 
+`SongSharingConfig.canonicalUrl(videoId)` validates the 11-character ID and always generates the lowercase canonical HTTPS URL with no explicit port and no trailing slash.
+
 ## Video ID validation
 
 A valid ID is exactly 11 ASCII characters matching `[A-Za-z0-9_-]{11}`. IDs are case-sensitive; consumers must preserve their exact spelling. Do not lowercase, trim, transliterate, or normalize an ID.
@@ -28,10 +30,10 @@ Reject empty IDs, IDs of any other length, whitespace, punctuation outside the a
 
 | Property | Contract |
 | --- | --- |
-| Scheme | HTTPS only |
+| Scheme | HTTPS only; scheme comparison is case-insensitive (`https` and `HTTPS` are accepted) |
 | Host | Exactly `muziinap-site.vercel.app`; DNS host comparison is case-insensitive |
-| Authority | Exact host, optionally with explicit default port `:443`; no credentials or encoded host |
-| Port | HTTPS default port 443 only; non-default or non-canonical port forms rejected |
+| Authority | Exact host, optionally with explicit default port `:443`; authority comparison is case-insensitive; no credentials or encoded host |
+| Port | HTTPS default port 443 only; explicit `:443` is accepted; non-default or non-canonical port forms rejected |
 | Route | Exactly `/song/VIDEO_ID` |
 | Trailing slash | One optional trailing slash accepted by Android parser; canonical generation omits it |
 | Path case | Case-sensitive; `/Song/` is invalid |
@@ -45,7 +47,7 @@ Reject empty IDs, IDs of any other length, whitespace, punctuation outside the a
 | Empty ID | Rejected |
 | Unknown routes | Not a song URL; website shows its not-found/invalid experience and Android rejects safely |
 
-Android validates the original incoming URL string before relying on normalized URI path/authority values. This is important because URI parsers can normalize encoded or dot-segment forms.
+Android validates the original incoming URL string before relying on normalized URI path/authority values. Raw input checks reject percent-encoding, query, and fragment delimiters before URI parsing; the original authority and path are then checked against the exact contract. This prevents URI parser normalization from accepting encoded or dot-segment forms.
 
 A parser must not infer song IDs from arbitrary URL text, query values, YouTube watch URLs, or another host. Existing YouTube URL import is a separate feature and retains its current behavior.
 
@@ -79,7 +81,7 @@ Preset-file sharing and handling are separate from song URL parsing and are not 
 
 ### Automated/source-level verification
 
-- The parser unit tests cover valid canonical links, ID alphabet/length/case, trailing slash, authority/port/credential validation, traversal and encoded inputs, query/fragment rejection, and extra path segments.
+- The parser unit tests cover all supported case variations, explicit default-port handling, ID alphabet/length/case, trailing slash, authority/port/credential validation, traversal and encoded inputs, query/fragment rejection, and extra path segments.
 - Android App Links intent-filter configuration is source-verified in the manifest.
 - Existing YouTube import routing and preset-file intent filters remain in source.
 - GitHub Actions provides the repository's code-quality and release-APK workflows. Their per-commit status must be checked on the commit under review; a previous green run is not evidence for a later commit.

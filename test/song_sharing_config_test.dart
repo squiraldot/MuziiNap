@@ -9,6 +9,25 @@ void main() {
       ), 'dQw4w9WgXcQ');
     });
 
+    test('accepts HTTPS scheme and hostname case-insensitively', () {
+      const urls = [
+        'https://muziinap-site.vercel.app/song/dQw4w9WgXcQ',
+        'HTTPS://muziinap-site.vercel.app/song/dQw4w9WgXcQ',
+        'https://MUZIINAP-SITE.VERCEL.APP/song/dQw4w9WgXcQ',
+        'HTTPS://MUZIINAP-SITE.VERCEL.APP/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:443/song/dQw4w9WgXcQ',
+        'HTTPS://MUZIINAP-SITE.VERCEL.APP:443/song/dQw4w9WgXcQ',
+      ];
+
+      for (final url in urls) {
+        expect(
+          SongSharingConfig.parseVideoId(url),
+          'dQw4w9WgXcQ',
+          reason: 'Should accept $url',
+        );
+      }
+    });
+
     test('accepts one trailing slash and generates slashless canonical URL', () {
       expect(SongSharingConfig.parseVideoId(
         'https://muziinap-site.vercel.app/song/dQw4w9WgXcQ/',
@@ -43,6 +62,7 @@ void main() {
         'http://muziinap-site.vercel.app/song/dQw4w9WgXcQ',
         'ftp://muziinap-site.vercel.app/song/dQw4w9WgXcQ',
         'https://example.com/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:444/song/dQw4w9WgXcQ',
         'https://muziinap-site.vercel.app:8443/song/dQw4w9WgXcQ',
         'https://muziinap-site.vercel.app:0443/song/dQw4w9WgXcQ',
         'https://muziinap-site.vercel.app./song/dQw4w9WgXcQ',
