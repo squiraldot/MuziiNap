@@ -7,7 +7,10 @@ void main() {
   group('SplashNavigationGuard', () {
     test('falls through when the intro never reports completion', () async {
       var navigated = false;
-      final guard = SplashNavigationGuard(onTimeout: () => navigated = true);
+      final guard = SplashNavigationGuard(
+        onTimeout: () => navigated = true,
+        completionGrace: Duration.zero,
+      );
 
       guard.arm(const Duration(milliseconds: 10));
       await Future<void>.delayed(const Duration(milliseconds: 40));
@@ -18,7 +21,10 @@ void main() {
 
     test('does not navigate after the intro completes', () async {
       var navigated = false;
-      final guard = SplashNavigationGuard(onTimeout: () => navigated = true);
+      final guard = SplashNavigationGuard(
+        onTimeout: () => navigated = true,
+        completionGrace: Duration.zero,
+      );
 
       guard.arm(const Duration(milliseconds: 10));
       guard.complete();
@@ -30,7 +36,10 @@ void main() {
 
     test('rearming replaces the previous completion deadline', () async {
       var timeoutCount = 0;
-      final guard = SplashNavigationGuard(onTimeout: () => timeoutCount++);
+      final guard = SplashNavigationGuard(
+        onTimeout: () => timeoutCount++,
+        completionGrace: Duration.zero,
+      );
 
       guard.arm(const Duration(milliseconds: 10));
       await Future<void>.delayed(const Duration(milliseconds: 5));
@@ -45,7 +54,10 @@ void main() {
 
     test('dispose cancels a pending fallback', () async {
       var navigated = false;
-      final guard = SplashNavigationGuard(onTimeout: () => navigated = true);
+      final guard = SplashNavigationGuard(
+        onTimeout: () => navigated = true,
+        completionGrace: Duration.zero,
+      );
 
       guard.arm(const Duration(milliseconds: 10));
       guard.dispose();
