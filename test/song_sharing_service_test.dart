@@ -42,6 +42,14 @@ void main() {
       expect(service.generateSongLink(songWithId('')), isNull);
     });
 
+    test('share and copy operations reject invalid IDs before platform calls',
+        () async {
+      final invalidSong = songWithId('not-a-video-id');
+
+      expect(await service.shareSong(invalidSong), isFalse);
+      expect(await service.copySongLink(invalidSong), isFalse);
+    });
+
     test('rejects whitespace and malformed video IDs', () {
       for (final id in [
         ' dQw4w9WgXcQ',
