@@ -3,11 +3,10 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter/services.dart';
 
 import '../../services/downloader.dart';
+import '../../services/song_sharing_service.dart';
 import '../screens/Playlist/playlist_screen_controller.dart';
 import '../screens/Settings/settings_screen_controller.dart';
 import '../../utils/helper.dart';
@@ -330,9 +329,18 @@ class SongInfoBottomSheet extends StatelessWidget {
               visualDensity: const VisualDensity(vertical: -1),
               leading: const Icon(Icons.share),
               title: Text("shareSong".tr),
-              onTap: () {
+              onTap: () async {
+                final sharingService = const SongSharingService();
+                if (sharingService.generateSongLink(song) == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(snackbar(
+                    context,
+                    "Unable to share this song",
+                    size: SanckBarSize.MEDIUM,
+                  ));
+                  return;
+                }
                 Navigator.of(context).pop();
-                Share.share("https://youtube.com/watch?v=${song.id}");
+                await sharingService.shareSong(song);
               },
             ),
             ListTile(
@@ -340,10 +348,16 @@ class SongInfoBottomSheet extends StatelessWidget {
               visualDensity: const VisualDensity(vertical: -1),
               leading: const Icon(Icons.copy),
               title: const Text("Copy Link"),
-              onTap: () {
+              onTap: () async {
+                final sharingService = const SongSharingService();
+                final copied = await sharingService.copySongLink(song);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(snackbar(
+                  context,
+                  copied ? "Link Copied!" : "Unable to copy song link",
+                  size: SanckBarSize.MEDIUM,
+                ));
                 Navigator.of(context).pop();
-                Clipboard.setData(ClipboardData(text: "https://youtube.com/watch?v=${song.id}"));
-                ScaffoldMessenger.of(context).showSnackBar(snackbar(context, "Link Copied!", size: SanckBarSize.MEDIUM));
               },
             ),
             ListTile(
@@ -352,8 +366,17 @@ class SongInfoBottomSheet extends StatelessWidget {
               leading: const Icon(Icons.qr_code),
               title: const Text("QR Code"),
               onTap: () {
+                final link = const SongSharingService().generateSongQr(song);
+                if (link == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(snackbar(
+                    context,
+                    "Unable to generate song QR code",
+                    size: SanckBarSize.MEDIUM,
+                  ));
+                  return;
+                }
                 Navigator.of(context).pop();
-                showQrCodeDialog(context, "https://youtube.com/watch?v=${song.id}", song.title);
+                showQrCodeDialog(context, link, song.title);
               },
             ),
                   ],
