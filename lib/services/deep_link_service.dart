@@ -78,7 +78,11 @@ class DeepLinkService {
     }
 
     final uri = Uri.tryParse(rawUrl);
-    if (uri == null || _isDuplicate('uri:$rawUrl')) return;
+    if (uri == null) return;
+    // Never reinterpret a malformed link on our own origin as a legacy
+    // YouTube/import URL after canonical validation has rejected it.
+    if (uri.host.toLowerCase() == SongSharingConfig.domain) return;
+    if (_isDuplicate('uri:$rawUrl')) return;
     _legacyLinks.add(uri);
   }
 

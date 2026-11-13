@@ -40,7 +40,14 @@ class SongSharingConfig {
     final authority = rawUrl.substring(schemeSeparator + 3, pathStart);
     if (authority.contains('@')) return null;
     final rawPath = rawUrl.substring(pathStart);
-    final match = RegExp(r'^/song/([A-Za-z0-9_-]{11})/?$')
+    final match = RegExp('^${RegExp.escape(routePrefix)}([A-Za-z0-9_-]{11})/?
+    if (match == null) return null;
+
+    final videoId = match.group(1)!;
+    return isValidVideoId(videoId) ? videoId : null;
+  }
+}
+)
         .firstMatch(rawPath);
     if (match == null) return null;
 

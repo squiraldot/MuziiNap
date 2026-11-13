@@ -148,13 +148,13 @@ void main() {
 
     test('delivers multiple distinct incoming song links in order', () async {
       final requests = <SongLinkRequest>[];
-      final subscription = service.songRequests.listen(requests.add);
       final delivered = Completer<void>();
-
-      await service.start();
-      service.songRequests.listen((_) {
+      final subscription = service.songRequests.listen((request) {
+        requests.add(request);
         if (requests.length == 2 && !delivered.isCompleted) delivered.complete();
       });
+
+      await service.start();
       source.controller.add(_canonical);
       source.controller.add(
         'https://muziinap-site.vercel.app/song/aqz-KE-bpKQ',
