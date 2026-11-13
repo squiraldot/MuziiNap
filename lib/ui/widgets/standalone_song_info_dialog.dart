@@ -2,14 +2,13 @@ import 'dart:ui';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/constant.dart';
 import '../../services/downloader.dart';
+import '../../services/song_sharing_service.dart';
 import '../navigator.dart';
 import '../player/player_controller.dart';
 import '../widgets/add_to_playlist.dart';
@@ -250,27 +249,33 @@ class StandaloneSongInfoDialog extends StatelessWidget {
                               'shareSong',
                               'Share this song',
                             ),
-                            onTap: () {
+                            onTap: () async {
+                              final sharingService = const SongSharingService();
+                              if (sharingService.generateSongLink(song) == null) {
+                                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                  snackbar(
+                                    context,
+                                    'Unable to share this song',
+                                    size: SanckBarSize.MEDIUM,
+                                  ),
+                                );
+                                return;
+                              }
                               Navigator.of(context).pop();
-                              Share.share(
-                                'https://youtube.com/watch?v=${song.id}',
-                              );
+                              await sharingService.shareSong(song);
                             },
                           ),
                           _ActionTile(
                             icon: Icons.copy,
                             title: 'Copy Link',
                             onTap: () async {
-                              await Clipboard.setData(
-                                ClipboardData(
-                                  text: 'https://youtube.com/watch?v=${song.id}',
-                                ),
-                              );
+                              final copied = await const SongSharingService()
+                                  .copySongLink(song);
                               if (!context.mounted) return;
                               ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                                 snackbar(
                                   context,
-                                  'Link Copied!',
+                                  copied ? 'Link Copied!' : 'Unable to copy song link',
                                   size: SanckBarSize.MEDIUM,
                                 ),
                               );
@@ -282,12 +287,24 @@ class StandaloneSongInfoDialog extends StatelessWidget {
                             onTap: () {
                               final navigator =
                                   Navigator.of(context, rootNavigator: true);
+                              final link = const SongSharingService()
+                                  .generateSongQr(song);
+                              if (link == null) {
+                                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                  snackbar(
+                                    context,
+                                    'Unable to generate song QR code',
+                                    size: SanckBarSize.MEDIUM,
+                                  ),
+                                );
+                                return;
+                              }
                               navigator.pop();
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (!navigator.mounted) return;
                                 showQrCodeDialog(
                                   navigator.context,
-                                  'https://youtube.com/watch?v=${song.id}',
+                                  link,
                                   song.title,
                                 );
                               });
