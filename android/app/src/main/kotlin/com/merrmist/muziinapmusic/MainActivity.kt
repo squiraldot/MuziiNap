@@ -90,8 +90,9 @@ class MainActivity : AudioServiceActivity() {
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     deepLinkEventSink = events
+                    if (events == null) return
                     while (pendingDeepLinks.isNotEmpty()) {
-                        events?.success(pendingDeepLinks.removeFirst())
+                        events.success(pendingDeepLinks.removeFirst())
                     }
                 }
 
