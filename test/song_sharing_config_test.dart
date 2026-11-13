@@ -23,6 +23,12 @@ void main() {
       ), 'aZ09_-BcDeF');
     });
 
+    test('accepts the explicit default HTTPS port only', () {
+      expect(SongSharingConfig.parseVideoId(
+        'https://MUZIINAP-SITE.VERCEL.APP:443/song/aZ09_-xYz12',
+      ), 'aZ09_-xYz12');
+    });
+
     test('rejects empty, short, long and malformed identifiers', () {
       for (final id in ['', 'short', 'dQw4w9WgX', 'dQw4w9WgXcQx',
         'dQw4w9WgX!Q', 'dQw4w9WgX Q', 'dQw4w9WgX%2F']) {
@@ -38,7 +44,52 @@ void main() {
         'ftp://muziinap-site.vercel.app/song/dQw4w9WgXcQ',
         'https://example.com/song/dQw4w9WgXcQ',
         'https://muziinap-site.vercel.app:8443/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:0443/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app./song/dQw4w9WgXcQ',
         'https://user@muziinap-site.vercel.app/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:443@evil.example/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:443:443/song/dQw4w9WgXcQ',
+      ]) {
+        expect(SongSharingConfig.parseVideoId(url), isNull,
+          reason: 'Should reject $url');
+      }
+    });
+
+    test('rejects the path traversal adversarial URL', () {
+      expect(
+        SongSharingConfig.parseVideoId(
+          'https://muziinap-site.vercel.app/song/../song/dQw4w9WgXcQ',
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects percent-encoded hostname adversarial URL', () {
+      expect(
+        SongSharingConfig.parseVideoId(
+          'https://%6duziinap-site.vercel.app/song/dQw4w9WgXcQ',
+        ),
+        isNull,
+      );
+    });
+
+    test('rejects encoded separators and encoded dot segments', () {
+      for (final url in [
+        'https://muziinap-site.vercel.app/song/dQw4w9WgXc%2F',
+        'https://muziinap-site.vercel.app/song/%2E%2E/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app%2F.song/dQw4w9WgXcQ',
+      ]) {
+        expect(SongSharingConfig.parseVideoId(url), isNull,
+          reason: 'Should reject $url');
+      }
+    });
+
+    test('rejects malformed authorities and backslash path forms', () {
+      for (final url in [
+        'https:///muziinap-site.vercel.app/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app:/song/dQw4w9WgXcQ',
+        'https://muziinap-site.vercel.app\\song\\dQw4w9WgXcQ',
+        'https://[malformed/song/dQw4w9WgXcQ',
       ]) {
         expect(SongSharingConfig.parseVideoId(url), isNull,
           reason: 'Should reject $url');

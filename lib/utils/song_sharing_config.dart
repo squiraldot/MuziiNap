@@ -18,6 +18,8 @@ class SongSharingConfig {
 
   /// Parses original Android Intent.dataString text before Uri normalization.
   static String? parseVideoId(String rawUrl) {
+    // Canonical links use literal ASCII only. Reject escapes before Uri can
+    // normalize encoded authorities, separators, or dot segments.
     if (rawUrl.contains('%') || rawUrl.contains('?') || rawUrl.contains('#')) {
       return null;
     }
@@ -35,10 +37,21 @@ class SongSharingConfig {
 
     final schemeSeparator = rawUrl.indexOf('://');
     if (schemeSeparator < 0) return null;
-    final pathStart = rawUrl.indexOf('/', schemeSeparator + 3);
+    final authorityStart = schemeSeparator + 3;
+    final pathStart = rawUrl.indexOf('/', authorityStart);
     if (pathStart < 0) return null;
-    final authority = rawUrl.substring(schemeSeparator + 3, pathStart);
-    if (authority.contains('@')) return null;
+
+    // Validate the original authority, not only Uri.host. This prevents
+    // parser normalization from accepting encoded hosts, non-canonical port
+    // spellings, or authority syntax that resolves to the expected host.
+    final authority = rawUrl.substring(authorityStart, pathStart);
+    final normalizedAuthority = authority.toLowerCase();
+    if (authority.contains('@') ||
+        (normalizedAuthority != domain &&
+            normalizedAuthority != '$domain:443')) {
+      return null;
+    }
+
     final rawPath = rawUrl.substring(pathStart);
     final match = RegExp(
       '^' + RegExp.escape(routePrefix) + r'([A-Za-z0-9_-]{11})/?$',
