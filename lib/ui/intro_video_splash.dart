@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import 'home.dart';
+import 'splash_navigation_guard.dart';
 
 /// Plays the bundled MuziiNap brand intro before entering the existing app.
 class IntroVideoSplash extends StatefulWidget {
@@ -17,34 +18,47 @@ class IntroVideoSplash extends StatefulWidget {
 class _IntroVideoSplashState extends State<IntroVideoSplash>
     with WidgetsBindingObserver {
   VideoPlayerController? _controller;
+  late final SplashNavigationGuard _navigationGuard;
   bool _hasNavigated = false;
   bool _wasPlayingBeforePause = false;
 
   @override
   void initState() {
     super.initState();
+    _navigationGuard = SplashNavigationGuard(onTimeout: _openApp);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_startIntro());
   }
 
   Future<void> _startIntro() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    if (!mounted || _hasNavigated) return;
-    final controller = VideoPlayerController.asset(
-      'assets/videos/muziinap_intro.MP4',
-    );
-    _controller = controller;
-    controller.addListener(_handlePlaybackUpdate);
-
     try {
-      await controller.initialize();
+      // Platform-channel initialization must never hold the app on the intro.
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky)
+          .timeout(const Duration(seconds: 3));
       if (!mounted || _hasNavigated) return;
-      await controller.setLooping(false);
-      await controller.seekTo(Duration.zero);
-      await controller.play();
-      if (mounted) setState(() {});
+
+      final controller = VideoPlayerController.asset(
+        'assets/videos/muziinap_intro.MP4',
+      );
+      _controller = controller;
+      controller.addListener(_handlePlaybackUpdate);
+
+      // A broken codec, unavailable surface, or stalled platform channel must
+      // fall through to Home instead of leaving a permanent black splash.
+      await controller.initialize().timeout(const Duration(seconds: 12));
+      if (!mounted || _hasNavigated) return;
+
+      await controller.setLooping(false).timeout(const Duration(seconds: 3));
+      await controller.seekTo(Duration.zero).timeout(const Duration(seconds: 3));
+      await controller.play().timeout(const Duration(seconds: 5));
+      if (!mounted || _hasNavigated) return;
+
+      // VideoPlayer completion callbacks are not guaranteed on every Android
+      // cold-start/device lifecycle path. Duration is an independent fallback.
+      _navigationGuard.arm(controller.value.duration);
+      setState(() {});
     } catch (error, stackTrace) {
-      debugPrint('MuziiNap intro video failed: $error');
+      debugPrint('MuziiNap intro video startup failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       _openApp();
     }
@@ -54,7 +68,9 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) return;
     if (controller.value.hasError) {
-      debugPrint('MuziiNap intro playback error: ${controller.value.errorDescription}');
+      debugPrint(
+        'MuziiNap intro playback error: ${controller.value.errorDescription}',
+      );
       _openApp();
     } else if (controller.value.isCompleted) {
       _openApp();
@@ -64,6 +80,7 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
   void _openApp() {
     if (!mounted || _hasNavigated) return;
     _hasNavigated = true;
+    _navigationGuard.complete();
     unawaited(_restoreSystemUi());
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const Home()),
@@ -71,7 +88,12 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
   }
 
   Future<void> _restoreSystemUi() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    try {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)
+          .timeout(const Duration(seconds: 3));
+    } catch (error) {
+      debugPrint('MuziiNap system UI restoration failed: $error');
+    }
   }
 
   @override
@@ -98,6 +120,7 @@ class _IntroVideoSplashState extends State<IntroVideoSplash>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _navigationGuard.dispose();
     final controller = _controller;
     if (controller != null) {
       controller.removeListener(_handlePlaybackUpdate);
