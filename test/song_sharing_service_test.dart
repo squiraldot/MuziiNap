@@ -2,6 +2,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../lib/services/song_sharing_service.dart';
+import '../lib/utils/song_sharing_config.dart';
 
 void main() {
   const service = SongSharingService();
@@ -21,6 +22,12 @@ void main() {
         service.generateSongLink(songWithId(videoId)),
         canonicalLink,
       );
+    });
+
+    test('uses SongSharingConfig as the single canonical URL authority', () {
+      final song = songWithId(videoId);
+      expect(service.generateSongLink(song), SongSharingConfig.canonicalUrl(videoId));
+      expect(service.generateSongQr(song), SongSharingConfig.canonicalUrl(videoId));
     });
 
     test('generates the same canonical URL for QR content', () {

@@ -136,10 +136,15 @@ void main() {
       coordinator.onClose();
     });
 
-    test('late clear completion from an older track cannot invalidate the active lookup', () async {
-      final oldClear = Completer<void>();
-      final currentClear = Completer<void>();
+    test('serializes track clears and suppresses stale lyrics responses', () async {
+      final oldClearGate = Completer<void>();
+      final currentClearGate = Completer<void>();
+      final oldClearStarted = Completer<void>();
+      final currentClearStarted = Completer<void>();
+      final oldLyrics = Completer<Map<String, dynamic>?>();
       final currentLyrics = Completer<Map<String, dynamic>?>();
+      final oldRequestStarted = Completer<void>();
+      final currentRequestStarted = Completer<void>();
       var clearCount = 0;
       final requested = <String>[];
       final handler = _FakeAudioHandler(
@@ -154,37 +159,53 @@ void main() {
         widgetPublisher: (previous, current, next, index) async {
           if (index == -1) {
             clearCount++;
-            if (clearCount == 2) await oldClear.future;
-            if (clearCount == 3) await currentClear.future;
+            if (clearCount == 2) {
+              oldClearStarted.complete();
+              await oldClearGate.future;
+            }
+            if (clearCount == 3) {
+              currentClearStarted.complete();
+              await currentClearGate.future;
+            }
           } else {
             published.add([previous, current, next, index]);
           }
         },
         lyricsLoader: (track, duration, {required bool forceReload}) {
           requested.add(track.id);
-          if (track.id == 'current') return currentLyrics.future;
-          return Future.value({'synced': '[00:00.00]old'});
+          if (track.id == 'old') {
+            if (!oldRequestStarted.isCompleted) oldRequestStarted.complete();
+            return oldLyrics.future;
+          }
+          if (!currentRequestStarted.isCompleted) {
+            currentRequestStarted.complete();
+          }
+          return currentLyrics.future;
         },
       );
 
       await coordinator.start();
       mediaItems.add(song('old'));
-      await Future<void>.delayed(Duration.zero);
-      mediaItems.add(song('current'));
-      await Future<void>.delayed(Duration.zero);
+      await oldClearStarted.future.timeout(const Duration(seconds: 1));
+      await oldRequestStarted.future.timeout(const Duration(seconds: 1));
 
-      // Complete the newer track's clear first, then leave its lyrics lookup
-      // in flight while the older track's delayed clear completes.
-      currentClear.complete();
-      await Future<void>.delayed(Duration.zero);
-      oldClear.complete();
-      await Future<void>.delayed(Duration.zero);
+      mediaItems.add(song('current'));
+      await currentRequestStarted.future.timeout(const Duration(seconds: 1));
+
+      // The queue prevents the current clear from overtaking the older clear.
+      oldClearGate.complete();
+      await currentClearStarted.future.timeout(const Duration(seconds: 1));
+      currentClearGate.complete();
+
+      // Complete the old request only after the active track has changed.
+      oldLyrics.complete({'synced': '[00:00.00]old'});
       currentLyrics.complete({'synced': '[00:00.00]current'});
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 30));
 
       expect(requested, ['old', 'current']);
       expect(published.any((line) => line[1] == 'current'), isTrue);
       expect(published.any((line) => line[1] == 'old'), isFalse);
+      expect(clearCount, 3);
       coordinator.onClose();
     });
 

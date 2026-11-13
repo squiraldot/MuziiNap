@@ -1,42 +1,31 @@
 import 'dart:async';
 
-import 'package:app_links/app_links.dart';
+import 'package:flutter/services.dart';
 
 import '../utils/song_sharing_config.dart';
 
-/// Testable boundary around the app_links plugin.
+/// Testable boundary around Android's raw-intent event channel.
 abstract interface class AppLinkSource {
-  Future<Uri?> getInitialLink();
-
-  Stream<Uri> get uriLinkStream;
+  Stream<String> get linkStream;
 }
 
 class PluginAppLinkSource implements AppLinkSource {
-  PluginAppLinkSource() : _appLinks = AppLinks();
-
-  final AppLinks _appLinks;
+  static const EventChannel _channel = EventChannel('muziinap/raw_deep_links');
 
   @override
-  Future<Uri?> getInitialLink() => _appLinks.getInitialAppLink();
-
-  @override
-  Stream<Uri> get uriLinkStream => _appLinks.uriLinkStream;
+  Stream<String> get linkStream => _channel
+      .receiveBroadcastStream()
+      .where((event) => event is String)
+      .cast<String>();
 }
 
-/// A validated canonical song-link request. This is a routing event only;
-/// playback is intentionally owned by a later application-layer phase.
 class SongLinkRequest {
-  const SongLinkRequest({
-    required this.videoId,
-    required this.uri,
-  });
+  const SongLinkRequest({required this.videoId, required this.uri});
 
   final String videoId;
   final Uri uri;
 }
 
-/// Owns the app_links plugin's single incoming-link listener and separates
-/// canonical MuziiNap song requests from legacy URLs (including YouTube imports).
 class DeepLinkService {
   DeepLinkService({
     AppLinkSource? source,
@@ -48,70 +37,48 @@ class DeepLinkService {
   final AppLinkSource _source;
   final DateTime Function() _clock;
   final Duration duplicateWindow;
-
   final StreamController<SongLinkRequest> _songRequests =
       StreamController<SongLinkRequest>.broadcast();
   final StreamController<Uri> _legacyLinks =
       StreamController<Uri>.broadcast();
   final Map<String, DateTime> _recentEvents = <String, DateTime>{};
 
-  StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<String>? _linkSubscription;
   Future<void>? _startFuture;
   bool _disposed = false;
 
-  /// Valid canonical song requests for the application routing layer.
   Stream<SongLinkRequest> get songRequests => _songRequests.stream;
-
-  /// Non-canonical links delegated to the existing YouTube/import handler.
   Stream<Uri> get legacyLinks => _legacyLinks.stream;
-
   bool get isStarted => _startFuture != null;
 
-  /// Starts the runtime listener before awaiting the initial URI. This avoids
-  /// a gap in which an incoming link could be lost during cold-start setup.
+  /// Installs the listener before Android drains queued cold-start intents.
   Future<void> start() => _startFuture ??= _startInternal();
 
   Future<void> _startInternal() async {
     if (_disposed) return;
-
-    _linkSubscription = _source.uriLinkStream.listen(
-      _handleUri,
+    _linkSubscription = _source.linkStream.listen(
+      _handleRawUrl,
       onError: (Object error, StackTrace stackTrace) {
-        // A malformed platform event must not terminate future link delivery.
         // ignore: avoid_print
         print('MuziiNap deep-link stream error: $error');
       },
     );
-
-    try {
-      final initialUri = await _source.getInitialLink();
-      if (!_disposed && initialUri != null) {
-        _handleUri(initialUri);
-      }
-    } catch (error) {
-      // Initial-link retrieval can fail independently of the runtime stream.
-      // Keep the stream active so later incoming links still work.
-      // ignore: avoid_print
-      print('MuziiNap initial deep-link retrieval failed: $error');
-    }
   }
 
-  void _handleUri(Uri uri) {
+  void _handleRawUrl(String rawUrl) {
     if (_disposed) return;
-
-    final videoId = SongSharingConfig.parseVideoId(uri);
+    final videoId = SongSharingConfig.parseVideoId(rawUrl);
     if (videoId != null) {
       if (_isDuplicate('song:$videoId')) return;
-      _songRequests.add(
-        SongLinkRequest(
-          videoId: videoId,
-          uri: Uri.parse(SongSharingConfig.canonicalUrl(videoId)),
-        ),
-      );
+      _songRequests.add(SongLinkRequest(
+        videoId: videoId,
+        uri: Uri.parse(SongSharingConfig.canonicalUrl(videoId)),
+      ));
       return;
     }
 
-    if (_isDuplicate('uri:${uri.toString()}')) return;
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || _isDuplicate('uri:$rawUrl')) return;
     _legacyLinks.add(uri);
   }
 
@@ -120,12 +87,10 @@ class DeepLinkService {
     _recentEvents.removeWhere(
       (_, seenAt) => now.difference(seenAt) > duplicateWindow,
     );
-
     final previous = _recentEvents[key];
     if (previous != null && now.difference(previous) <= duplicateWindow) {
       return true;
     }
-
     _recentEvents[key] = now;
     return false;
   }

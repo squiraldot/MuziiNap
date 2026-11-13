@@ -2,12 +2,11 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../utils/song_sharing_config.dart';
+
 /// Builds and dispatches canonical MuziiNap links for individual songs.
 class SongSharingService {
   const SongSharingService();
-
-  static const String _host = 'muziinap-site.vercel.app';
-  static final RegExp _videoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
 
   /// Returns the canonical song URL, or null when [song] has an invalid ID.
   ///
@@ -16,9 +15,9 @@ class SongSharingService {
   String? generateSongLink(MediaItem? song) {
     if (song == null) return null;
     final videoId = song.id;
-    if (!_videoIdPattern.hasMatch(videoId)) return null;
+    if (!SongSharingConfig.isValidVideoId(videoId)) return null;
 
-    return Uri.https(_host, '/song/$videoId').toString();
+    return SongSharingConfig.canonicalUrl(videoId);
   }
 
   /// Shares the canonical MuziiNap URL. Returns false for invalid songs or

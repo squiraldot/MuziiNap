@@ -201,14 +201,14 @@ void main() {
   });
 
   group('Adaptive Android buffer configuration', () {
-    test('uses fast-start 30 second buffer on capable Wi-Fi devices', () {
+    test('keeps the capable Wi-Fi minimum above the rebuffer reserve', () {
       const profile = DeviceStreamProfile(
         androidApiLevel: 35,
         isLowRamDevice: false,
         networkType: DeviceNetworkType.wifi,
       );
       final config = profile.androidLoadControl;
-      expect(config.minBufferDuration, const Duration(milliseconds: 1500));
+      expect(config.minBufferDuration, const Duration(seconds: 2));
       expect(config.maxBufferDuration, const Duration(seconds: 30));
       expect(config.bufferForPlaybackDuration, const Duration(seconds: 1));
       expect(

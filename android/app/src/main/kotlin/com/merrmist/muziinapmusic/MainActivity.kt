@@ -13,6 +13,7 @@ import android.media.audiofx.Visualizer
 import android.util.Base64
 import org.json.JSONObject
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.Keep
@@ -27,6 +28,9 @@ import kotlin.math.hypot
 
 class MainActivity : AudioServiceActivity() {
     private val spectrumChannel = "muziinap/spectrum_analyzer"
+    private val deepLinkChannel = "muziinap/raw_deep_links"
+    private var deepLinkEventSink: EventChannel.EventSink? = null
+    private val pendingDeepLinks = java.util.ArrayDeque<String>()
     private val downloadNotificationChannel = "muziinap/download_notifications"
     private val downloadNotificationId = 73041
     // Prevent a delayed dismissal for one song from removing the next song's
@@ -73,8 +77,28 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Retain the unparsed Android URL before Dart Uri normalization.
+        intent?.dataString?.let(pendingDeepLinks::addLast)
+        super.onCreate(savedInstanceState)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, deepLinkChannel)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    deepLinkEventSink = events
+                    while (pendingDeepLinks.isNotEmpty()) {
+                        events?.success(pendingDeepLinks.removeFirst())
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    deepLinkEventSink = null
+                }
+            })
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/notification_navigation")
             .setMethodCallHandler { call, result ->
@@ -412,6 +436,10 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.dataString?.let { rawUrl ->
+            val sink = deepLinkEventSink
+            if (sink != null) sink.success(rawUrl) else pendingDeepLinks.addLast(rawUrl)
+        }
         handlePresetIntent(intent)
     }
 
