@@ -155,7 +155,7 @@ class MusicServices extends getx.GetxService {
           'id': visitorData['id'],
           'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2590200
         });
-        printINFO("Got Visitor id ($visitorData['id']) from Box");
+        printINFO("Restored YouTube visitor context from local preferences.");
         return;
       }
     }
@@ -163,7 +163,7 @@ class MusicServices extends getx.GetxService {
     final visitorId = await genrateVisitorId();
     if (visitorId != null) {
       _headers['X-Goog-Visitor-Id'] = visitorId;
-      printINFO("New Visitor id generated ($visitorId)");
+      printINFO("Generated a new YouTube visitor context.");
       appPrefsBox.put("visitorId", {
         'id': visitorId,
         'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 2592000
@@ -367,7 +367,7 @@ class MusicServices extends getx.GetxService {
       }
       throw NetworkError();
     } on DioException catch (e) {
-      printINFO("Error $e");
+      printINFO("InnerTube request failed (${e.response?.statusCode ?? 'network error'}).");
       throw NetworkError();
     }
   }
