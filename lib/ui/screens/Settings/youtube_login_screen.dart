@@ -159,7 +159,7 @@ class _YoutubeLoginScreenState extends State<YoutubeLoginScreen> {
 
       final sessionValid = await musicServices.validateYouTubeSession();
       if (!sessionValid) {
-        musicServices.clearAuthCookies();
+        await musicServices.clearAuthCookies();
         _loginCompleting = false;
         if (mounted) {
           Get.snackbar(
@@ -183,15 +183,7 @@ class _YoutubeLoginScreenState extends State<YoutubeLoginScreen> {
         sessionContext['dataSyncId']?.toString(),
         authUser: sessionContext['authUser']?.toString(),
       );
-      final accounts = <String, dynamic>{};
-      final storedAccounts = box.get('yt_accounts');
-      if (storedAccounts is Map) {
-        accounts.addAll(
-          storedAccounts.map(
-            (key, value) => MapEntry(key.toString(), value),
-          ),
-        );
-      }
+      final accounts = CredentialVault.instance.youtubeAccounts;
       accounts[identity.accountKey] = {
         'cookies': cookies,
         'visitorData': sessionContext['visitorData']?.toString(),
