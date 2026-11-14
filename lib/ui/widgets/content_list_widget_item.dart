@@ -3,7 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:get/get.dart';
 
 import '../navigator.dart';
-import '../../../models/album.dart';
+import '../../models/album.dart';
 import 'image_widget.dart';
 
 class ContentListItem extends StatefulWidget {
