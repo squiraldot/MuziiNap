@@ -36,20 +36,15 @@ android {
     compileSdkVersion flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
-
     buildFeatures { buildConfig true }
 
     def trustedReleaseCertFingerprints = (
         [System.getenv('ANDROID_EXPECTED_CERT_SHA256') ?: ''] +
-        (System.getenv('ANDROID_TRUSTED_CERT_SHA256S') ?: '').split('[,;\\s]+').toList()
+        (System.getenv('ANDROID_TRUSTED_CERT_SHA256S') ?: '').split(Regex('[,;\\s]+')).toList()
     ).collect { value -> value.replaceAll('[^A-Fa-f0-9]', '').toUpperCase() }
      .findAll { value -> value ==~ /[A-F0-9]{64}/ }
      .unique()
      .join(',')
-
-    defaultConfig {
-        buildConfigField 'String', 'TRUSTED_RELEASE_CERT_SHA256S', '"${trustedReleaseCertFingerprints}"'
-    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -71,6 +66,7 @@ android {
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        buildConfigField 'String', 'TRUSTED_RELEASE_CERT_SHA256S', "\"${trustedReleaseCertFingerprints}\""
     }
 
     signingConfigs {
