@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:hive/hive.dart';
 import '../../../services/music_service.dart';
+import '../../../services/credential_vault.dart';
 import '../Home/home_screen_controller.dart';
 import '../Library/library_controller.dart';
 import '../../../utils/youtube_login_utils.dart';
@@ -202,10 +203,24 @@ class _YoutubeLoginScreenState extends State<YoutubeLoginScreen> {
         'accountPhotoUrl': accountInfo['accountPhotoUrl'],
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       };
-      await box.put('yt_accounts', accounts);
+      final credentialVault = CredentialVault.instance;
+      await credentialVault.saveYouTubeAccounts(
+        accounts,
+        legacyBox: box,
+      );
+      await credentialVault.saveActiveSession(accounts[identity.accountKey]);
       await box.put('yt_active_account_key', identity.accountKey);
-      await box.put('yt_cookies', cookies);
       await box.put('yt_logged_in', true);
+      // Remove legacy plaintext copies left by older app versions.
+      for (final key in const [
+        'yt_cookies',
+        'yt_visitor_data',
+        'yt_data_sync_id',
+        'yt_auth_user',
+        'yt_identity_token',
+      ]) {
+        await box.delete(key);
+      }
 
       final accountName = accountInfo['accountName']?.toString().trim() ?? '';
       final accountPhoto = accountInfo['accountPhotoUrl']?.toString().trim() ?? '';
