@@ -41,7 +41,7 @@ class PipedServices extends GetxService {
     if (Hive.isBoxOpen('AppPrefs')) {
       final appPrefsBox = Hive.box(appPrefsBoxName);
       final piped = appPrefsBox.get('piped') ??
-          {"isLoggedIn": false, "token": "", "instApiUrl": ""};
+          {"isLoggedIn": false, "instApiUrl": ""};
       final token = CredentialVault.instance.pipedToken;
       _isLoggedIn = piped["isLoggedIn"] == true && token != null;
       if (isLoggedIn) {
