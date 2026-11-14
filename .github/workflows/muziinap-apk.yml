@@ -192,10 +192,14 @@ jobs:
           test -s "$APK"
           test -s "$NATIVE_SYMBOLS" || { echo "::error::AGP native-debug-symbols.zip is missing or empty."; exit 1; }
 
-          APK_ABIS="$(unzip -Z1 "$APK" | sed -n 's#^lib/\\([^/]*\\)/[^/]*\\.so$#\\1#p' | sort -u)"
+          APK_ABIS="$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so$/ { print $2 }' | sort -u)"
           test -n "$APK_ABIS" || { echo "::error::No native Android ABI libraries found in the release APK."; exit 1; }
           SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
-          printf '%s\\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\\.dbg
+          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
       - name: Upload MuziiNap APK
         uses: actions/upload-artifact@v7
         with:
@@ -217,7 +221,7 @@ jobs:
           }
 
           for abi in $APK_ABIS; do
-            printf '%s\\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)${abi}/.*\\.dbg$" || {
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)${abi}/.*\.dbg$" || {
               echo "::error::No native debug symbols captured for APK ABI: $abi"
               exit 1
             }
@@ -226,19 +230,23 @@ jobs:
           mkdir -p "$SYMBOLS_DIR/native"
           cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/native-debug-symbols.zip"
           {
-            echo "Repository: ${GITHUB_REPOSITORY}"
-            echo "Commit SHA: ${GITHUB_SHA}"
-            echo "App version: ${APP_VERSION}"
-            echo "Build ID: ${BUILD_ID}"
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Commit SHA: $GITHUB_SHA"
+            echo "App version: $APP_VERSION"
+            echo "Build ID: $BUILD_ID"
             echo "NDK: 27.0.12077973"
             echo "Android Gradle Plugin: 8.11.1"
             echo "Debug symbol level: FULL"
             echo
             echo "Packaged ABIs:"
-            printf '%s\\n' "$APK_ABIS"
+            printf '%s\n' "$APK_ABIS"
             echo
             echo "Packaged native libraries:"
-            unzip -Z1 "$APK" | grep -E '^lib/.+\\.so
+            unzip -Z1 "$APK" | grep -E '^lib/.+\.so        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
       - name: Upload MuziiNap APK
         uses: actions/upload-artifact@v7
         with:
@@ -257,7 +265,11 @@ jobs:
  || true
             echo
             echo "Captured native debug-symbol entries:"
-            printf '%s\\n' "$SYMBOL_ENTRIES" | grep -E '(^|/)[^/]+\\.dbg
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -E '(^|/)[^/]+\.dbg        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
       - name: Upload MuziiNap APK
         uses: actions/upload-artifact@v7
         with:
