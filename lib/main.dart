@@ -267,6 +267,7 @@ initHive() async {
         .migrateLegacyCredentials(Hive.box(appPrefsBoxName));
   } catch (_) {
     // Fail closed for authenticated services but keep local playback available.
+    await Hive.box(appPrefsBoxName).put('yt_logged_in', false);
     debugPrint('Secure credential migration is pending; saved accounts are unavailable until storage recovers.');
   }
 }
