@@ -3,9 +3,12 @@
     <cloud-backup>
         <!-- Do not restore Keystore-wrapped credential blobs without their key. -->
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="AppPrefs.hive" />
         <exclude domain="file" path="app_flutter/AppPrefs.hive" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="AppPrefs.hive" />
+        <exclude domain="file" path="app_flutter/AppPrefs.hive" />
     </device-transfer>
 </data-extraction-rules>
