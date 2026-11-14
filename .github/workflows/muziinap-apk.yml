@@ -96,7 +96,7 @@ jobs:
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
           test -n "$SDKMANAGER"
 
-          NDK_DIR="$SDK_ROOT/ndk/27.0.12077973"
+          NDK_DIR="$SDK_ROOT/ndk/28.2.13676358"
           # Clear stale SDK Manager downloads and partial NDK extraction.
           rm -rf "$SDK_ROOT/ndk" "$SDK_ROOT/.temp" "$SDK_ROOT/.downloadIntermediates" "$HOME/.android/cache"
 
@@ -108,11 +108,11 @@ jobs:
           set -o pipefail
 
           for attempt in 1 2 3; do
-            echo "Installing NDK 27.0.12077973 (attempt $attempt/3)"
-            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973"; then
+            echo "Installing NDK 28.2.13676358 (attempt $attempt/3)"
+            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;28.2.13676358"; then
               if [ -f "$NDK_DIR/source.properties" ] && [ -x "$NDK_DIR/ndk-build" ]; then
-                grep -F "Pkg.Revision = 27.0.12077973" "$NDK_DIR/source.properties"
-                echo "NDK 27.0.12077973 installed and verified."
+                grep -F "Pkg.Revision = 28.2.13676358" "$NDK_DIR/source.properties"
+                echo "NDK 28.2.13676358 installed and verified."
                 exit 0
               fi
               echo "::warning::sdkmanager returned success but NDK files are incomplete."
@@ -220,7 +220,7 @@ jobs:
             echo "Commit SHA: $GITHUB_SHA"
             echo "App version: $APP_VERSION"
             echo "Build ID: $BUILD_ID"
-            echo "NDK: 27.0.12077973"
+            echo "NDK: 28.2.13676358"
             echo "Android Gradle Plugin: 8.11.1"
             echo "Debug symbol level: FULL"
             echo

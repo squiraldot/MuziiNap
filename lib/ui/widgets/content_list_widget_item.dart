@@ -186,7 +186,7 @@ class _ContentListItemState extends State<ContentListItem> {
                     isAlbum
                         ? isLibraryItem
                             ? ""
-                            : "${content.artists[0]['name'] ?? ""} | ${content.year ?? ""}"
+                            : "${content.artists?.isNotEmpty == true ? content.artists!.first['name'] ?? "" : ""} | ${content.year ?? ""}"
                         : isLibraryItem
                             ? ""
                             : content.description ?? "",

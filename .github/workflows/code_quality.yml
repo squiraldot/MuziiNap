@@ -55,13 +55,13 @@ jobs:
           yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses
           set -o pipefail
 
-          NDK_DIR="$SDK_ROOT/ndk/27.0.12077973"
+          NDK_DIR="$SDK_ROOT/ndk/28.2.13676358"
           for attempt in 1 2 3; do
-            echo "Installing NDK 27.0.12077973 (attempt $attempt/3)"
-            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.0.12077973" &&
+            echo "Installing NDK 28.2.13676358 (attempt $attempt/3)"
+            if "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;28.2.13676358" &&
                test -f "$NDK_DIR/source.properties" &&
                test -x "$NDK_DIR/ndk-build" &&
-               grep -Fq "Pkg.Revision = 27.0.12077973" "$NDK_DIR/source.properties"; then
+               grep -Fq "Pkg.Revision = 28.2.13676358" "$NDK_DIR/source.properties"; then
               echo "Pinned NDK installed and verified."
               exit 0
             fi
