@@ -222,17 +222,6 @@ class _YoutubeLoginScreenState extends State<YoutubeLoginScreen> {
       if (accountPhoto.isNotEmpty) {
         await box.put('AccountThumbUrl', accountPhoto);
       }
-      if (sessionContext['visitorData']?.toString().trim().isNotEmpty == true) {
-        await box.put('yt_visitor_data', sessionContext['visitorData'].toString());
-      }
-      if (sessionContext['dataSyncId']?.toString().trim().isNotEmpty == true) {
-        await box.put('yt_data_sync_id', sessionContext['dataSyncId'].toString());
-      }
-      await box.put('yt_auth_user', sessionContext['authUser']?.toString() ?? '0');
-      if (sessionContext['identityToken']?.toString().trim().isNotEmpty == true) {
-        await box.put('yt_identity_token', sessionContext['identityToken'].toString());
-      }
-
       try {
         if (Get.isRegistered<HomeScreenController>()) {
           await Get.find<HomeScreenController>().refreshHome();
