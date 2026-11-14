@@ -36,14 +36,17 @@ internal object ApkIntegrityVerifier {
     }
 
     private fun installedSignerFingerprints(context: Context): Set<String> {
-        val signatures: Array<Signature> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        // PackageManager exposes platform arrays with projected/nullability types;
+        // normalize both API paths to List<Signature> before hashing.
+        val signatures: List<Signature> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
             val signingInfo = info.signingInfo ?: return emptySet()
-            if (signingInfo.hasMultipleSigners()) signingInfo.apkContentsSigners
-            else signingInfo.signingCertificateHistory
+            if (signingInfo.hasMultipleSigners()) signingInfo.apkContentsSigners.toList()
+            else signingInfo.signingCertificateHistory.toList()
         } else {
             @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES).signatures.orEmpty()
+            context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+                .signatures.orEmpty().toList()
         }
         val digest = MessageDigest.getInstance("SHA-256")
         return signatures.map { signature ->
