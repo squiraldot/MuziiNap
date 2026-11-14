@@ -31,7 +31,7 @@ No `abiFilters` or target-platform restriction is added. CI derives the ABI set 
 
 ## Build and verification
 
-The `MuziiNap Android APK` workflow on `dev` verifies the universal APK. The `Release Workflow` also runs on `dev` and verifies the universal plus armv7, arm64, and x86_64 APKs; it captures native debug-symbol archives for both universal and split-ABI builds inside the encrypted symbols bundle.
+The `MuziiNap Android APK` workflow on `dev` verifies the universal APK and captures its native debug-symbol archive in the encrypted symbols bundle. The separate `Release Workflow` is configured for `main` pushes and version tags; it was not executed on `dev` during this audit. Its universal and split-ABI release outputs therefore remain unverified on `dev`.
 
 The code-quality workflow runs Android debug compilation and existing Kotlin DSP unit tests. CI build evidence must be read from the workflow run after this commit; a repository edit alone is not evidence of a successful native build.
 

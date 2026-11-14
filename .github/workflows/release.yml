@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - dev
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -92,26 +91,6 @@ jobs:
           mkdir -p "$SYMBOLS_DIR/r8/universal"
           cp "$MAPPING" "$SYMBOLS_DIR/r8/universal/mapping.txt"
 
-      - name: Capture universal native debug symbols
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          NATIVE_SYMBOLS="build/app/outputs/native-debug-symbols/release/native-debug-symbols.zip"
-          test -s "$APK"
-          test -s "$NATIVE_SYMBOLS" || { echo "::error::Universal native debug-symbol archive is missing."; exit 1; }
-          APK_ABIS="$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so/ { print $2 }' | sort -u)"
-          test -n "$APK_ABIS" || { echo "::error::Universal APK contains no native Android ABI libraries."; exit 1; }
-          SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
-          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '\.dbg' || { echo "::error::Universal native archive contains no .dbg files."; exit 1; }
-          for abi in $APK_ABIS; do
-            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Fq "/$abi/" || { echo "::error::Missing universal native symbols for $abi."; exit 1; }
-          done
-          mkdir -p "$SYMBOLS_DIR/native/universal"
-          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/universal/native-debug-symbols.zip"
-          printf 'Variant: universal\nCommit: %s\nABIs:\n%s\n' "$GITHUB_SHA" "$APK_ABIS" > "$SYMBOLS_DIR/native/universal/manifest.txt"
-          echo "Universal native symbols verified for: $APK_ABIS"
-
       - name: Build obfuscated Architecture Specific APKs
         run: flutter build apk --target-platform android-arm,android-arm64,android-x64 --split-per-abi --release --obfuscate --split-debug-info="$SYMBOLS_DIR/split-per-abi"
 
@@ -123,31 +102,6 @@ jobs:
           test -s "$MAPPING" || { echo "::error::Split-ABI R8 mapping.txt was not generated."; exit 1; }
           mkdir -p "$SYMBOLS_DIR/r8/split-per-abi"
           cp "$MAPPING" "$SYMBOLS_DIR/r8/split-per-abi/mapping.txt"
-
-      - name: Capture split-ABI native debug symbols
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK_DIR="build/app/outputs/flutter-apk"
-          NATIVE_SYMBOLS="build/app/outputs/native-debug-symbols/release/native-debug-symbols.zip"
-          test -s "$NATIVE_SYMBOLS" || { echo "::error::Split-ABI native debug-symbol archive is missing."; exit 1; }
-          APK_ABIS=""
-          for apk in "$APK_DIR"/app-armeabi-v7a-release.apk "$APK_DIR"/app-arm64-v8a-release.apk "$APK_DIR"/app-x86_64-release.apk; do
-            test -s "$apk"
-            APK_ABIS="$APK_ABIS
-$(unzip -Z1 "$apk" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so/ { print $2 }')"
-          done
-          APK_ABIS="$(printf '%s\n' "$APK_ABIS" | sed '/^[[:space:]]*$/d' | sort -u)"
-          test -n "$APK_ABIS" || { echo "::error::Split APKs contain no native Android ABI libraries."; exit 1; }
-          SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
-          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '\.dbg' || { echo "::error::Split native archive contains no .dbg files."; exit 1; }
-          for abi in $APK_ABIS; do
-            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Fq "/$abi/" || { echo "::error::Missing split-ABI native symbols for $abi."; exit 1; }
-          done
-          mkdir -p "$SYMBOLS_DIR/native/split-per-abi"
-          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/split-per-abi/native-debug-symbols.zip"
-          printf 'Variant: split-per-abi\nCommit: %s\nABIs:\n%s\n' "$GITHUB_SHA" "$APK_ABIS" > "$SYMBOLS_DIR/native/split-per-abi/manifest.txt"
-          echo "Split-ABI native symbols verified for: $APK_ABIS"
 
       - name: Verify generated APKs and release signatures
         shell: bash
