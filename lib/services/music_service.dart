@@ -215,17 +215,16 @@ class MusicServices extends getx.GetxService {
     }
     _headers['X-Origin'] = 'https://music.youtube.com';
 
-    await CredentialVault.instance.saveActiveSession({
-      ...CredentialVault.instance.activeSession,
-      'cookies': normalizedCookies,
-      if (visitorData != null) 'visitorData': visitorData.trim(),
-      if (dataSyncId != null) 'dataSyncId': dataSyncId.trim(),
-      'authUser': identity.authUser,
-      if (identityToken != null && identityToken.trim().isNotEmpty)
-        'identityToken': identityToken.trim(),
-    });
-
     try {
+      await CredentialVault.instance.saveActiveSession({
+        ...CredentialVault.instance.activeSession,
+        'cookies': normalizedCookies,
+        if (visitorData != null) 'visitorData': visitorData.trim(),
+        if (dataSyncId != null) 'dataSyncId': dataSyncId.trim(),
+        'authUser': identity.authUser,
+        if (identityToken != null && identityToken.trim().isNotEmpty)
+          'identityToken': identityToken.trim(),
+      });
       final sessionManager = InnerTubeSessionManager();
       await sessionManager.storeCookies(normalizedCookies);
       _headers.addAll(
@@ -236,6 +235,10 @@ class MusicServices extends getx.GetxService {
     } on InnerTubeSessionException catch (error) {
       _headers.remove('authorization');
       printINFO('YouTube session rejected: ${error.code.name}');
+      return false;
+    } catch (_) {
+      _headers.remove('authorization');
+      printINFO('YouTube session could not be stored securely.');
       return false;
     }
   }
