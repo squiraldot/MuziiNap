@@ -38,13 +38,12 @@ android {
 
     buildFeatures { buildConfig true }
 
-    def trustedReleaseCertFingerprints = (
-        [System.getenv('ANDROID_EXPECTED_CERT_SHA256') ?: ''] +
-        (System.getenv('ANDROID_TRUSTED_CERT_SHA256S') ?: '').split('[,;\\s]+').toList()
-    ).collect { value -> value.replaceAll('[^A-Fa-f0-9]', '').toUpperCase() }
-     .findAll { value -> value ==~ /[A-F0-9]{64}/ }
-     .unique()
-     .join(',')
+    def trustedReleaseCertFingerprints = (System.getenv('ANDROID_EXPECTED_CERT_SHA256') ?: '')
+        .replaceAll('[^A-Fa-f0-9]', '')
+        .toUpperCase()
+    if (trustedReleaseCertFingerprints && !(trustedReleaseCertFingerprints ==~ /[A-F0-9]{64}/)) {
+        throw new GradleException('ANDROID_EXPECTED_CERT_SHA256 must be a SHA-256 certificate fingerprint.')
+    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

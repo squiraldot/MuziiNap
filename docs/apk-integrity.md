@@ -17,7 +17,6 @@ This implementation performs a local Android package/signing identity check. It 
 - Both release workflows restore the existing Actions keystore and derive its SHA-256 certificate fingerprint from the public certificate.
 - The fingerprint is injected into generated `BuildConfig.TRUSTED_RELEASE_CERT_SHA256S`; no private key or keystore is packaged.
 - CI verifies each release APK with `apksigner` and compares its signer fingerprint with the restored CI keystore.
-- Optional `ANDROID_TRUSTED_CERT_SHA256S` accepts comma-, semicolon-, or whitespace-separated historical SHA-256 fingerprints for a planned signing-lineage transition.
 
 The fingerprint is public identity data, not a secret. Its exact value is derived at workflow runtime and is visible in APK signature metadata and generated build configuration.
 
@@ -46,7 +45,7 @@ Play Integrity is not integrated. If Play distribution is introduced, integrate 
 
 ## Key rotation
 
-Use Android's supported signing lineage for a legitimate signing-key upgrade. The verifier checks the platform-provided signing history on API 28+ for single-signer packages. The optional historical fingerprint list supports controlled transitions. Keep the existing signing identity and lineage secure; do not rotate merely to silence a mismatch.
+Use Android's supported signing lineage for a legitimate signing-key upgrade. The verifier checks the platform-provided signing history on API 28+ for single-signer packages. Each build pins the certificate used by the CI signing keystore, so a properly lineage-signed new release receives its new certificate pin while Android exposes the validated signing history. Keep the existing signing identity and lineage secure; do not rotate merely to silence a mismatch.
 
 ## Verification and testing
 

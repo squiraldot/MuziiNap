@@ -25,7 +25,6 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/.music-release.jks
-      ANDROID_TRUSTED_CERT_SHA256S: ${{ vars.ANDROID_TRUSTED_CERT_SHA256S }}
       SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
     steps:
       - uses: actions/checkout@v4
