@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Android release build security
+
+- Added official Dart AOT obfuscation to Android release APK build paths, with per-build symbol generation, encrypted CI retention, and crash-symbolication documentation.
+
 ### Documentation and maintenance
 
 - Standardized repository guidance around `dev` as the official maintenance/development branch and `main` as the release/integration branch.

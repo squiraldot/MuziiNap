@@ -80,6 +80,7 @@ For release-equivalent signing checks, use CI and its configured Android signing
 - .github/workflows/code_quality.yml — analyzer and Flutter tests
 - .github/workflows/muziinap-apk.yml — Android APK build, analysis, and signature verification
 - .github/workflows/release.yml — Android APK variants, checksum verification, and tag-triggered GitHub Release publication
+- `docs/dart-aot-obfuscation.md` — Android release obfuscation, encrypted symbol retention, and crash symbolication
 
 Check the actual workflow run for the commit being evaluated before describing CI as passing. A successful CI run does not replace real-device testing.
 

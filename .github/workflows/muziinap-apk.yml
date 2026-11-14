@@ -25,6 +25,7 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/.music-release.jks
+      SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -137,8 +138,22 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos lib test
 
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Prepare unique release build identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_VERSION="$(awk -F': ' '$1 == "version" {print $2; exit}' pubspec.yaml)"
+          test -n "$APP_VERSION"
+          BUILD_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          SYMBOLS_DIR="build/obfuscation-symbols/${GITHUB_SHA}/${APP_VERSION}/${BUILD_ID}"
+          {
+            echo "APP_VERSION=$APP_VERSION"
+            echo "BUILD_ID=$BUILD_ID"
+            echo "SYMBOLS_DIR=$SYMBOLS_DIR"
+          } >> "$GITHUB_ENV"
+
+      - name: Build obfuscated release APK
+        run: flutter build apk --release --obfuscate --split-debug-info="$SYMBOLS_DIR/universal"
 
       - name: Verify APK and release signature
         shell: bash
@@ -151,8 +166,18 @@ jobs:
           APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -n "$APKSIGNER"
           "$APKSIGNER" verify --verbose "$APK"
-          echo "APK passed Android signature verification."
+          if unzip -Z1 "$APK" | grep -Eq '(^|/)[^/]+\.symbols$'; then
+            echo "::error::Dart symbol files must not be packaged inside the APK."
+            exit 1
+          fi
+          echo "APK passed Android signature verification and contains no Dart symbol files."
           ls -lh "$APK"
+
+      - name: Encrypt and verify Dart AOT symbols
+        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
 
       - name: Upload MuziiNap APK
         uses: actions/upload-artifact@v7
@@ -161,3 +186,11 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload encrypted Dart AOT symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/secure-symbols/*.gpg
+          if-no-files-found: error
+          retention-days: 90

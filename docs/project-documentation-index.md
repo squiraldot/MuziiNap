@@ -16,6 +16,7 @@ This index inventories the repository's human-readable documentation and records
 | `CHANGELOG.md` | Release-facing change history | Add new work under Unreleased; preserve historical entries |
 | `docs/maintenance-branch-policy.md` | Official branch roles and automation policy | Update when branch/release policy changes |
 | `docs/song-sharing-url-contract.md` | Canonical song URL and Android App Links contract | Update with source/contract changes and new verification evidence |
+| `docs/dart-aot-obfuscation.md` | Android release AOT obfuscation, encrypted symbol retention, and crash recovery | Keep aligned with release workflows, artifact retention, and symbolication procedure |
 | `fastlane/metadata/android/en-US/title.txt` | Store listing title | Change only when the approved product title changes |
 | `fastlane/metadata/android/en-US/short_description.txt` | Store listing short description | Keep within store limits and aligned with product |
 | `fastlane/metadata/android/en-US/full_description.txt` | Store listing feature description | Keep claims supportable by current app behavior |
