@@ -15,6 +15,7 @@ import '../../../utils/home_history.dart';
 import '../../../utils/youtube_auth.dart';
 import '../../../models/home_mood.dart';
 import '../../../services/music_service.dart';
+import '../../../services/credential_vault.dart';
 import '../Settings/settings_screen_controller.dart';
 
 class HomeScreenController extends GetxController with WidgetsBindingObserver {
@@ -139,9 +140,26 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
     );
   }
 
+  Map<String, dynamic> _safeYouTubeAccountMetadata(
+    Map<String, dynamic> account,
+  ) {
+    final safe = Map<String, dynamic>.from(account);
+    for (final key in const [
+      'cookies',
+      'visitorData',
+      'dataSyncId',
+      'authUser',
+      'identityToken',
+    ]) {
+      safe.remove(key);
+    }
+    return safe;
+  }
+
   Future<void> _ensureActiveYouTubeAccountInfo() async {
     final box = Hive.box(appPrefsBoxName);
-    final stored = box.get('yt_accounts');
+    final vault = CredentialVault.instance;
+    final stored = vault.youtubeAccounts;
 
     final accounts = <String, dynamic>{};
     if (stored is Map) {
@@ -161,22 +179,18 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       // Recover older/single-account sessions which have cookies but no
       // account-record key. This is the important compatibility path for
       // users who logged in before multi-account persistence was introduced.
-      final cookies = box.get('yt_cookies')?.toString();
+      final activeSession = vault.activeSession;
+      final cookies = activeSession['cookies']?.toString();
       if (cookies != null && cookies.trim().isNotEmpty) {
         final identity = YouTubeSessionIdentity.fromDataSyncId(
-          box.get('yt_data_sync_id')?.toString(),
-          authUser: box.get('yt_auth_user')?.toString(),
+          activeSession['dataSyncId']?.toString(),
+          authUser: activeSession['authUser']?.toString(),
         );
         activeKey = identity.accountKey;
-        current = <String, dynamic>{
-          'cookies': cookies,
-          'visitorData': box.get('yt_visitor_data')?.toString(),
-          'dataSyncId': box.get('yt_data_sync_id')?.toString(),
-          'authUser': identity.authUser,
-          'identityToken': box.get('yt_identity_token')?.toString(),
-        };
+        current = Map<String, dynamic>.from(activeSession);
+        current['authUser'] = identity.authUser;
         accounts[activeKey] = current;
-        await box.put('yt_accounts', accounts);
+        await vault.saveYouTubeAccounts(accounts, legacyBox: box);
         await box.put('yt_active_account_key', activeKey);
       }
     }
@@ -208,7 +222,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
     final currentPhoto = current['accountPhotoUrl']?.toString().trim() ?? '';
 
     if (currentName.isNotEmpty && currentPhoto.isNotEmpty) {
-      youtubeAccount.assignAll(current);
+      youtubeAccount.assignAll(_safeYouTubeAccountMetadata(current));
       return;
     }
 
@@ -229,7 +243,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       };
 
       accounts[activeKey] = updated;
-      await box.put('yt_accounts', accounts);
+      await vault.saveYouTubeAccounts(accounts, legacyBox: box);
       await box.put('yt_active_account_key', activeKey);
 
       final accountName = updated['accountName']?.toString().trim() ?? '';
@@ -241,7 +255,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         await box.put('AccountThumbUrl', accountPhoto);
       }
 
-      youtubeAccount.assignAll(updated);
+      youtubeAccount.assignAll(_safeYouTubeAccountMetadata(updated));
     } catch (e) {
       // Keep whatever metadata was already persisted. The session itself is
       // still valid, so the Home screen should not crash or hide the account.
