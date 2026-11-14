@@ -56,7 +56,7 @@ internal object ApkIntegrityPolicy {
     enum class Status { TRUSTED_RELEASE, DEBUG_BUILD, UNCONFIGURED, PACKAGE_ID_MISMATCH, SIGNATURE_MISMATCH }
 
     fun normalizeFingerprints(value: String): Set<String> =
-        value.split(',', ';', '\\n', '\\r', ' ', '\\t')
+        value.split(Regex("[,;\\s]+"))
             .map { it.replace(":", "").trim().uppercase() }
             .filter { it.matches(Regex("[A-F0-9]{64}")) }
             .toSet()

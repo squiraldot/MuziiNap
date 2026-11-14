@@ -40,7 +40,7 @@ android {
 
     def trustedReleaseCertFingerprints = (
         [System.getenv('ANDROID_EXPECTED_CERT_SHA256') ?: ''] +
-        (System.getenv('ANDROID_TRUSTED_CERT_SHA256S') ?: '').split(Regex('[,;\\s]+')).toList()
+        (System.getenv('ANDROID_TRUSTED_CERT_SHA256S') ?: '').split('[,;\\s]+').toList()
     ).collect { value -> value.replaceAll('[^A-Fa-f0-9]', '').toUpperCase() }
      .findAll { value -> value ==~ /[A-F0-9]{64}/ }
      .unique()
