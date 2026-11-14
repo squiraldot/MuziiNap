@@ -378,7 +378,7 @@ class SettingsScreenController extends GetxController {
   }
 
   Future<void> unlinkPiped() async {
-    Get.find<PipedServices>().logout();
+    await Get.find<PipedServices>().logout();
     isLinkedWithPiped.value = false;
     Get.find<LibraryPlaylistsController>().removePipedPlaylists();
     final box = await Hive.openBox('blacklistedPlaylist');
