@@ -95,6 +95,10 @@ Check the actual workflow run for the commit being evaluated before describing C
 
 See [APK integrity and signing verification](docs/apk-integrity.md) for release certificate pinning, sideloading behavior, failure policy, and verification limits.
 
+## Backend and credential security
+
+See [Layer 05 backend security and secret protection](docs/backend-security-layer-05.md) for the sanitized credential inventory, GitHub Actions secret handling, rotation guidance, and unresolved secure-storage work.
+
 ## Song sharing and deep links
 
 Android song sharing uses the canonical URL format:
