@@ -35,7 +35,7 @@ Do not upload plaintext `mapping.txt` files or commit them to the repository.
 3. Decrypt and extract the archive:
 
 ```bash
-printf '%s\\n' "$SYMBOLS_ENCRYPTION_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+printf '%s\n' "$SYMBOLS_ENCRYPTION_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
   --decrypt --output muziinap-symbols.tar.gz muziinap-symbols-<commit>-<version>-<run-id>-<attempt>.tar.gz.gpg
 tar -xzf muziinap-symbols.tar.gz
 ```
