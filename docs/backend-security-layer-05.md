@@ -29,7 +29,7 @@ Actual credential values are intentionally omitted.
 
 ## Secure-storage implementation
 
-- Added `flutter_secure_storage: ^11.2.0`.
+- Added `flutter_secure_storage: ^10.3.4` (compatible with the repository's existing `device_info_plus` dependency).
 - Added `lib/services/credential_vault.dart` as the single credential boundary.
 - Android secure storage uses the plugin's default RSA-OAEP key wrapping and AES-GCM data encryption. The encryption key is protected by Android Keystore; no universal key is embedded in Dart, Kotlin, assets, or build configuration.
 - YouTube account records, active session cookies/context, and the Piped bearer token are stored in secure storage.
