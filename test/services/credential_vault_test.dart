@@ -103,6 +103,19 @@ void main() {
     expect(vault.isReady, isFalse);
   });
 
+  test('Piped bearer tokens are stored and cleared only through the secure backend', () async {
+    await vault.migrateLegacyCredentials(box);
+    await vault.savePipedToken('piped-access-token');
+
+    expect(vault.pipedToken, 'piped-access-token');
+    expect(backend.values['muziinap.piped.token.v1'], 'piped-access-token');
+    expect(box.get('piped'), isNull);
+
+    await vault.clearPipedToken();
+    expect(vault.pipedToken, isNull);
+    expect(backend.values.containsKey('muziinap.piped.token.v1'), isFalse);
+  });
+
   test('secure account updates keep sensitive fields out of Hive metadata', () async {
     await vault.migrateLegacyCredentials(box);
 
