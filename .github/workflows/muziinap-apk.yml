@@ -195,27 +195,7 @@ jobs:
           APK_ABIS="$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so$/ { print $2 }' | sort -u)"
           test -n "$APK_ABIS" || { echo "::error::No native Android ABI libraries found in the release APK."; exit 1; }
           SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
-          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg        shell: bash
-        env:
-          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
-        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
-
-      - name: Upload MuziiNap APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload encrypted Dart, R8 and native symbols
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-private-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/secure-symbols/*.gpg
-          if-no-files-found: error
-          retention-days: 90
- || {
+          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg$' || {
             echo "::error::Native symbols archive contains no extracted .dbg files (a dependency may already be stripped)."
             exit 1
           }
@@ -242,50 +222,10 @@ jobs:
             printf '%s\n' "$APK_ABIS"
             echo
             echo "Packaged native libraries:"
-            unzip -Z1 "$APK" | grep -E '^lib/.+\.so        shell: bash
-        env:
-          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
-        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
-
-      - name: Upload MuziiNap APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload encrypted Dart AOT symbols
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/secure-symbols/*.gpg
-          if-no-files-found: error
-          retention-days: 90
- || true
+            unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true
             echo
             echo "Captured native debug-symbol entries:"
-            printf '%s\n' "$SYMBOL_ENTRIES" | grep -E '(^|/)[^/]+\.dbg        shell: bash
-        env:
-          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
-        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
-
-      - name: Upload MuziiNap APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload encrypted Dart AOT symbols
-        uses: actions/upload-artifact@v7
-        with:
-          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: build/secure-symbols/*.gpg
-          if-no-files-found: error
-          retention-days: 90
-
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -E '(^|/)[^/]+\.dbg$'
           } > "$SYMBOLS_DIR/native/native-symbols-manifest.txt"
           test -s "$SYMBOLS_DIR/native/native-symbols-manifest.txt"
           echo "Native debug symbols verified for all APK ABIs: $APK_ABIS"
@@ -304,10 +244,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload encrypted Dart AOT symbols
+      - name: Upload encrypted Dart, R8 and native symbols
         uses: actions/upload-artifact@v7
         with:
-          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: muziinap-private-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/secure-symbols/*.gpg
           if-no-files-found: error
           retention-days: 90
