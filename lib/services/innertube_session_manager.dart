@@ -4,19 +4,18 @@ import 'package:crypto/crypto.dart';
 import 'package:hive/hive.dart';
 
 import 'constant.dart';
+import 'credential_vault.dart';
 
 /// Builds authenticated headers for YouTube Music WEB_REMIX requests.
 ///
-/// Cookies are stored in the app's existing Hive preferences box to preserve
-/// compatibility with the current multi-account login flow. Hive boxes opened
-/// without an encryption cipher are not encrypted at rest; applications that
-/// require OS-keystore-backed encryption should inject a secure storage
-/// adapter rather than treating this local persistence as encrypted.
+/// Session cookies are kept in [CredentialVault], backed by Android Keystore.
 class InnerTubeSessionManager {
-  InnerTubeSessionManager({Box<dynamic>? box})
-      : _box = box ?? Hive.box(appPrefsBoxName);
+  InnerTubeSessionManager({
+    Box<dynamic>? box,
+    CredentialVault? credentialVault,
+  })  : _box = box ?? Hive.box(appPrefsBoxName),
+        _vault = credentialVault ?? CredentialVault.instance;
 
-  static const String _cookieKey = 'yt_cookies';
   static const String _expiryKey = 'yt_cookie_expires_at';
   static const String _clientVersion = '1.20260707.12.00';
   static const String _userAgent =
@@ -30,6 +29,7 @@ class InnerTubeSessionManager {
   };
 
   final Box<dynamic> _box;
+  final CredentialVault _vault;
 
   /// Saves a normalized Cookie header. [expiresAt] is optional because
   /// WebView's Cookie objects do not expose the original Set-Cookie expiry.
@@ -71,7 +71,10 @@ class InnerTubeSessionManager {
       );
     }
 
-    await _box.put(_cookieKey, normalized);
+    await _vault.saveActiveSession({
+      ..._vault.activeSession,
+      'cookies': normalized,
+    });
     if (expiresAt == null) {
       await _box.delete(_expiryKey);
     } else {
@@ -88,7 +91,7 @@ class InnerTubeSessionManager {
       storeCookies(cookies, expiresAt: expiresAt);
 
   Future<void> clearCookies() async {
-    await _box.delete(_cookieKey);
+    await _vault.clearActiveSession();
     await _box.delete(_expiryKey);
   }
 
@@ -118,7 +121,7 @@ class InnerTubeSessionManager {
       );
     }
 
-    final cookies = _box.get(_cookieKey);
+    final cookies = _vault.activeSession['cookies'];
     if (cookies is! String || cookies.trim().isEmpty) {
       throw const InnerTubeSessionException(
         InnerTubeSessionError.missingCookie,
