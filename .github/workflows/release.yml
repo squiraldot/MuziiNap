@@ -122,7 +122,7 @@ jobs:
             "$APKSIGNER" verify --verbose "$apk"
             ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
             test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo "::error::Unexpected signer for $apk"; exit 1; }
-            if unzip -Z1 "$apk" | grep -Eq '(^|/)[^/]+\.symbols
+          if unzip -Z1 "$APK" | grep -Eq '(^|/)[^/]+\\.symbols$'; then
               echo "::error::Dart symbol files must not be packaged inside $apk."
               exit 1
             fi
