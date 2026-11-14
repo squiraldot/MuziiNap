@@ -79,8 +79,26 @@ jobs:
       - name: Build obfuscated Universal APK
         run: flutter build apk --release --obfuscate --split-debug-info="$SYMBOLS_DIR/universal"
 
+      - name: Preserve universal R8 mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAPPING="android/app/build/outputs/mapping/release/mapping.txt"
+          test -s "$MAPPING" || { echo "::error::Universal R8 mapping.txt was not generated."; exit 1; }
+          mkdir -p "$SYMBOLS_DIR/r8/universal"
+          cp "$MAPPING" "$SYMBOLS_DIR/r8/universal/mapping.txt"
+
       - name: Build obfuscated Architecture Specific APKs
         run: flutter build apk --target-platform android-arm,android-arm64,android-x64 --split-per-abi --release --obfuscate --split-debug-info="$SYMBOLS_DIR/split-per-abi"
+
+      - name: Preserve split-ABI R8 mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAPPING="android/app/build/outputs/mapping/release/mapping.txt"
+          test -s "$MAPPING" || { echo "::error::Split-ABI R8 mapping.txt was not generated."; exit 1; }
+          mkdir -p "$SYMBOLS_DIR/r8/split-per-abi"
+          cp "$MAPPING" "$SYMBOLS_DIR/r8/split-per-abi/mapping.txt"
 
       - name: Verify generated APKs and release signatures
         shell: bash
