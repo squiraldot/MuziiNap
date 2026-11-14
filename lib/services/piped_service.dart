@@ -45,7 +45,9 @@ class PipedServices extends GetxService {
       if (isLoggedIn) {
         _headers["Authorization"] = piped['token'];
         try {
-          _insApiUrl = normalizePipedInstanceUrl(piped["instApiUrl"].toString());
+          _insApiUrl = normalizePipedInstanceUrl(
+            piped["instApiUrl"].toString(),
+          );
         } on ArgumentError {
           _headers.clear();
           _isLoggedIn = false;
@@ -62,7 +64,10 @@ class PipedServices extends GetxService {
     try {
       normalizedInstanceUrl = normalizePipedInstanceUrl(insApiUrl);
     } on ArgumentError {
-      return Res(0, errorMessage: 'A valid HTTPS Piped instance URL is required.');
+      return Res(
+        0,
+        errorMessage: 'A valid HTTPS Piped instance URL is required.',
+      );
     }
     final url = Uri.parse('$normalizedInstanceUrl/login');
     try {
@@ -71,13 +76,19 @@ class PipedServices extends GetxService {
         data: {"username": userName, "password": password},
       );
       final data = response.data;
+      if (data is Map && data['error'] is String) {
+        return Res(0, errorMessage: data['error'] as String);
+      }
       if (data is! Map ||
           data['token'] is! String ||
           (data['token'] as String).isEmpty) {
-        return Res(0, errorMessage: 'The Piped instance returned an invalid login response.');
+        return Res(
+          0,
+          errorMessage: 'The Piped instance returned an invalid login response.',
+        );
       }
       final appPrefsBox = Hive.box(appPrefsBoxName);
-      appPrefsBox.put("piped", {
+      await appPrefsBox.put("piped", {
         "isLoggedIn": true,
         "token": data['token'],
         "instApiUrl": normalizedInstanceUrl
@@ -86,19 +97,19 @@ class PipedServices extends GetxService {
       _isLoggedIn = true;
       _insApiUrl = normalizedInstanceUrl;
 
-      if (response.data.runtimeType.toString() == "_Map<String, dynamic>" &&
-          response.data.containsKey("error")) {
-        return Res(0, errorMessage: response.data['error']);
-      }
-
       // Never log the returned bearer token or other authentication material.
       printINFO("Piped login successful.");
       return Res(1, response: response.data);
     } on DioException catch (e) {
       // Dio messages can include request URLs; keep credentials and URL query
       // parameters out of diagnostic logs and user-visible error details.
-      printERROR('Piped login request failed (${e.response?.statusCode ?? 'network error'}).');
-      return Res(0, errorMessage: 'Piped login request failed. Please check the instance and try again.');
+      printERROR(
+        'Piped login request failed (${e.response?.statusCode ?? 'network error'}).',
+      );
+      return Res(
+        0,
+        errorMessage: 'Piped login request failed. Please check the instance and try again.',
+      );
     }
   }
 
