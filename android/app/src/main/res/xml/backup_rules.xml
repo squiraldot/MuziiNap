@@ -2,5 +2,6 @@
 <full-backup-content>
     <!-- Secure-storage ciphertext is device-bound to Android Keystore keys. -->
     <exclude domain="sharedpref" path="." />
+    <exclude domain="file" path="AppPrefs.hive" />
     <exclude domain="file" path="app_flutter/AppPrefs.hive" />
 </full-backup-content>
