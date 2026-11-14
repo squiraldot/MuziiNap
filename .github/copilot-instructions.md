@@ -2,14 +2,19 @@
 
 These instructions describe the current repository configuration. If documentation conflicts with source, pubspec.yaml, Android Gradle files, or active GitHub Actions workflows, verify the source of truth and update this document instead of guessing.
 
-## Project identity and target
+## Repository and branch policy
 
 - Repository: squiraldot/MuziiNap
-- Current work branch: feature/advanced-equalizer
+- **Official maintenance and day-to-day development branch: `dev`**
+- `main` is the release/integration branch. Routine maintenance belongs on `dev`; promote reviewed release-ready changes to `main` through the agreed release process.
+- GitHub's current default branch remains `main`; this is separate from the maintenance-branch policy.
+- Do not create, rename, delete, or force-move branches unless explicitly authorized.
+
+## Project identity and target
 - App: MuziiNap, an Android-only Flutter music app
 - Dart package name: muziinap
 - Android namespace and application ID: com.merrmist.muziinapmusic
-- Dart SDK constraint: >=3.1.5 <4.0.0
+- Dart SDK constraint: >=3.11.0 <4.0.0
 - CI Flutter version: 3.47.5
 - Java: 17
 - Keep the Android application ID, namespace, signing identity expectations, and persisted-data compatibility stable unless explicitly authorized.
@@ -43,7 +48,7 @@ Follow existing patterns and inspect actual call sites before changing architect
 
 ## Non-negotiable compatibility and safety rules
 
-1. Work only on feature/advanced-equalizer for the current work. Do not switch to or modify main, and do not create a new branch.
+1. Keep routine maintenance and development on `dev`; do not use `main` for ordinary maintenance.
 2. Never change the Android application ID or namespace casually; existing installations and release updates depend on stable identifiers.
 3. Preserve legacy Hive preference keys, saved-data schemas, equalizer preset formats, and author aliases when changing user-facing branding. These are compatibility identifiers.
 4. Do not modify YouTube account/login code unless a blocking issue requires it; explain the need and scope first.
@@ -97,6 +102,34 @@ For release or native changes, additionally inspect CI APK-signature verificatio
 - The optional git-sync.sh helper stages all local changes and can offer to replace an existing remote tag. Inspect its prompts carefully; do not run it blindly.
 - Update README.md and CHANGELOG.md when user-facing features or release-relevant behavior changes.
 - Release preparation must keep pubspec.yaml, changelog, in-app version information, and the tag consistent.
+
+## Song sharing and Android App Links
+
+The Android canonical song URL contract is documented in `docs/song-sharing-url-contract.md`.
+
+- Canonical URL: `https://muziinap-site.vercel.app/song/VIDEO_ID`.
+- The exact, case-sensitive 11-character YouTube video ID is the song identity.
+- URL generation/parsing: `lib/utils/song_sharing_config.dart`; share/copy/QR generation: `lib/services/song_sharing_service.dart`.
+- Native raw-intent bridge: `MainActivity.kt`, channel `muziinap/raw_deep_links`; Dart event handling: `lib/services/deep_link_service.dart`.
+- Playback coordination: `lib/services/song_link_playback_coordinator.dart`; queue policy: `lib/services/song_link_playback_policy.dart` and `PlayerController.playSharedSong`.
+- Preserve legacy YouTube imports and preset-file sharing.
+- Deferred deep linking is not implemented and is outside the accepted Android Phase 08 scope.
+- Website source/deployment is maintained separately; do not claim it was audited when only this repository was inspected.
+
+## Current workflows and toolchain
+
+- Flutter `3.47.5`, Java `17`, Android NDK `27.0.12077973`.
+- `code_quality.yml`: push validation for `main` and `dev`; schema generation, debug APK compile, native DSP tests, analyzer, Flutter tests.
+- `muziinap-apk.yml`: `main`/`dev` push or manual; signed release APK build, signature verification, artifact upload.
+- `release.yml`: `main` push, `v*.*.*` tags, or manual; universal/ABI APKs, signatures/checksums, release publication.
+
+The exact workflow run for the exact commit must be checked before reporting success. CI does not prove physical-device behavior.
+
+## Git and documentation policy
+
+- Keep README, CHANGELOG, this file, and `memory-agent.md` aligned with source configuration.
+- Keep historical release notes and license texts unchanged; update only new work under Unreleased.
+- `main` remains the GitHub default branch unless repository settings are explicitly changed; documenting `dev` as maintenance does not change that setting.
 
 ## Useful references
 

@@ -1,1 +1,1 @@
-An Android App for streaming Music
+Android music player with streaming, downloads and custom audio controls

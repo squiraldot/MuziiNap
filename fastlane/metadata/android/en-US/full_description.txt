@@ -1,24 +1,24 @@
+MuziiNap is an Android music player and streaming app built with Flutter.
+
 Features:
-
-- Ability to play song from Ytube/Ytube Music.
-- Song cache while playing
-- Radio feature support
-- Background music
-- Playlist creation & bookmark support
-- Artist & Album bookmark support
-- Import song,Playlist,Album,Artist via sharing from Ytube/Ytube Music.
-- Streaming quality control
-- Song downloading support
-- Language support
-- Skip silence
-- Dynamic Theme
-- Flexibility to switch between Bottom & Side Nav bar
-- Equalizer support
-- Synced & Plain Lyrics support
-- Sleep Timer
+- Search and play music through supported YouTube and YouTube Music integrations
+- Background playback with notification and media controls
+- Playback queue management and playback restoration
+- Song caching and downloads, with offline playback when files are available locally
+- Playlist creation, favourites, bookmarks, and album/artist library views
+- Import supported song, playlist, album, and artist links through Android sharing
+- Share and copy canonical MuziiNap song links; generate song QR content
+- Streaming quality controls and configured stream-source fallback
+- Custom equalizer and Android audio integration
+- Synced and plain lyrics, lyrics reload, and live lyrics translation
+- Radio, sleep timer, skip silence, and dynamic artwork-based theming
 - Android Auto support
-- No Advertisment
-- No Login required
-- Piped playlist integration
+- QR-code generation, sharing, and scanning
+- Configurable navigation, player gestures, and playback settings
+- Multiple language/localization support
 
-MuziiNap source code is maintained in the project's GitHub repository.
+Core app use does not require a MuziiNap account. YouTube sign-in may be used for personalized or account-dependent features.
+
+Feature availability depends on Android version, device audio support, network conditions, and third-party providers. Stream availability and third-party service behavior can change independently of the app.
+
+MuziiNap is an independent community project. YouTube, YouTube Music, and other third-party names and content belong to their respective owners.

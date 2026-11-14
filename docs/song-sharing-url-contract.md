@@ -1,7 +1,9 @@
 # MuziiNap Universal Song Sharing URL Contract
 
 **Contract version:** 1  
-**Status:** Android implementation COMPLETE; Phase 08 final acceptance COMPLETE for the audited Android scope. Website deployment and physical-device verification are recorded as previously reported evidence.
+**Android status:** Implemented; Phase 08 Android acceptance recorded as complete  
+**Last repository audit:** 14 November 2026  
+**Audited branch/commit:** `dev` / `670583ab20d9caf0f76df40999018fe4553e8704`
 
 ## Canonical identity and URL
 
@@ -69,7 +71,7 @@ When the app is installed and the verified domain association is active, Android
 
 There is **no Deferred Deep Linking**. Installing the app after visiting a song page does not automatically transfer or replay that earlier URL on a later manual launch. Physical-device testing specifically confirmed that install-then-manual-launch does not resume an old shared song.
 
-The website implementation and its deployment are maintained in a separate repository; this document records the cross-platform contract and Android integration, not website source changes.
+The website implementation and deployment are maintained in a separate repository; this document records the cross-platform contract and Android integration, not website source changes or fresh deployment verification.
 
 ## Existing YouTube import compatibility
 
@@ -82,16 +84,16 @@ Preset-file sharing and handling are separate from song URL parsing and are not 
 **Acceptance status: COMPLETE**  
 **Audited repository:** `squiraldot/MuziiNap`  
 **Branch:** `dev`  
-**Audited commit:** `20a8afd32ea068c62794a9051855c78001b2c46a`
+**Audited commit:** `670583ab20d9caf0f76df40999018fe4553e8704`
 
 The Android deep-link implementation is accepted as complete for the defined Phase 08 scope. This status is based on source-level implementation review and the successful automated workflows listed below. It does not represent a new physical-device test execution by this final documentation audit.
 
 **Verified GitHub Actions evidence for the audited commit:**
 
-- [Code quality check #614 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43499194676)
-- [MuziiNap Android APK #612 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43499193774)
+- [Code quality check #615 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43568710322)
+- [MuziiNap Android APK #613 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43568710272)
 
-Both workflow runs completed successfully against commit `20a8afd32ea068c62794a9051855c78001b2c46a`.
+Both workflow runs were checked as successful against the current audited commit `670583ab20d9caf0f76df40999018fe4553e8704`.
 
 **Acceptance evidence is intentionally separated:**
 

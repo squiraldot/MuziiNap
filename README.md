@@ -56,7 +56,14 @@ Release builds and checksums are published through the repository's tag-triggere
 
 ## Development
 
-Use the Flutter version configured by GitHub Actions (currently **3.47.5**) and Java 17.
+Use Flutter **3.47.5**, Java **17**, and Android NDK **27.0.12077973** to match CI.
+
+### Branch workflow
+
+- **`dev` is the official maintenance and day-to-day development branch.** Routine fixes and maintenance belong there.
+- `main` is the release/integration branch; promote reviewed release-ready changes from `dev` through the agreed process.
+- GitHub's current default branch remains `main`; this documentation does not change that repository setting.
+- Do not create, rename, delete, or force-update branches or release tags without explicit authorization.
 
 ~~~bash
 flutter pub get
@@ -75,6 +82,16 @@ For release-equivalent signing checks, use CI and its configured Android signing
 - .github/workflows/release.yml — Android APK variants, checksum verification, and tag-triggered GitHub Release publication
 
 Check the actual workflow run for the commit being evaluated before describing CI as passing. A successful CI run does not replace real-device testing.
+
+## Song sharing and deep links
+
+Android song sharing uses the canonical URL format:
+
+`https://muziinap-site.vercel.app/song/VIDEO_ID`
+
+The song is identified by its exact, case-sensitive 11-character YouTube video ID. Android validates incoming links and routes valid song requests into the existing playback/queue system. See [Song Sharing URL Contract](docs/song-sharing-url-contract.md) for the contract, source paths, tests, and evidence boundaries.
+
+Deferred deep linking (automatically restoring a song URL after the user installs the app and later manually launches it) is not implemented and is outside the accepted Android Phase 08 scope. Website implementation/deployment is maintained separately.
 
 ## Troubleshooting
 

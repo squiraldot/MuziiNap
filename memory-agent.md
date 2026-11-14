@@ -5,12 +5,14 @@ This file is the concise project-specific memory. Detailed coding rules live in 
 ## Canonical identity
 
 - Repository: squiraldot/MuziiNap
-- Current maintenance branch: feature/advanced-equalizer
+- **Official maintenance/development branch: `dev`**
+- `main` is the release/integration branch; routine maintenance and development belong on `dev`.
+- GitHub's current default branch remains `main`; that is separate from the maintenance policy.
 - Product: MuziiNap, Android-only Flutter music app
 - Dart package name: muziinap (pubspec.yaml)
 - Android namespace: com.merrmist.muziinapmusic
 - Android application ID: com.merrmist.muziinapmusic (android/app/build.gradle)
-- Dart SDK constraint: >=3.1.5 <4.0.0
+- Dart SDK constraint: >=3.11.0 <4.0.0
 - CI Flutter version: 3.47.5
 - Java: 17
 
@@ -42,7 +44,7 @@ Use actual GitHub Actions results for the exact commit before reporting success.
 
 ## Critical project rules
 
-- For current work, stay on feature/advanced-equalizer; never switch to or modify main or create another branch unless the user changes this instruction.
+- Use `dev` for routine maintenance/development; do not perform routine work on `main`.
 - Android is the maintained target. Do not restore desktop, iOS, or web runners/workflows without an explicit decision. Keep shared Flutter UI and Android tablet/foldable responsiveness when useful.
 - Preserve com.merrmist.muziinapmusic as application ID and namespace unless explicitly authorized.
 - Preserve legacy Hive preference keys, saved-data formats, equalizer preset format and author aliases across branding changes.
@@ -72,6 +74,24 @@ Format changed Dart files with dart format. Release-equivalent builds need confi
 - .github/workflows/release.yml publishes generated GitHub release notes and release assets.
 - git-sync.sh is an optional local helper. It stages all changes and may offer to delete and replace an existing remote tag after confirmation; inspect it carefully and do not run it blindly.
 - The Android release workflow restores a keystore from GitHub Actions secrets; never add signing credentials to source control.
+
+## Song sharing and deep links
+
+See `docs/song-sharing-url-contract.md`.
+
+- Canonical URL: `https://muziinap-site.vercel.app/song/VIDEO_ID`; exact case-sensitive 11-character YouTube video ID.
+- Generator/parser: `lib/utils/song_sharing_config.dart`; share/copy/QR service: `lib/services/song_sharing_service.dart`.
+- Native bridge: `MainActivity.kt`, `muziinap/raw_deep_links`; Dart listener: `lib/services/deep_link_service.dart`.
+- Playback coordinator and stale-request guard: `lib/services/song_link_playback_coordinator.dart`; queue policy: `lib/services/song_link_playback_policy.dart` and `PlayerController.playSharedSong`.
+- Legacy YouTube imports and preset-file handling must remain compatible.
+- Deferred deep linking is not implemented and is outside accepted Android Phase 08 scope. Website source/deployment is separate and not verified by this Android repository audit.
+
+## Current toolchain and workflow triggers
+
+- Dart SDK: `>=3.11.0 <4.0.0`; Flutter CI: `3.47.5`; Java: `17`; NDK: `27.0.12077973`.
+- Code quality and APK artifact workflows run on `main` and `dev` pushes/manual dispatch.
+- Release workflow runs on `main`, `v*.*.*` tags, or manual dispatch; it builds universal/ABI APKs and publishes verified assets.
+- Check exact-commit Actions runs; CI does not replace physical-device QA.
 
 ## Working style
 
