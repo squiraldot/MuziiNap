@@ -117,6 +117,9 @@ class CredentialVault {
         if (!mergedActive.containsKey(field) && activeAccount[field] != null) {
           mergedActive[field] = activeAccount[field];
         }
+        if (!activeAccount.containsKey(field) && mergedActive[field] != null) {
+          activeAccount[field] = mergedActive[field];
+        }
       }
     }
 
