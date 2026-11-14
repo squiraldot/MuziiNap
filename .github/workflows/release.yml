@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - dev
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -90,6 +91,423 @@ jobs:
           test -s "$MAPPING" || { echo "::error::Universal R8 mapping.txt was not generated."; exit 1; }
           mkdir -p "$SYMBOLS_DIR/r8/universal"
           cp "$MAPPING" "$SYMBOLS_DIR/r8/universal/mapping.txt"
+
+      - name: Capture universal native debug symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          NATIVE_SYMBOLS="build/app/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+          test -s "$APK"
+          test -s "$NATIVE_SYMBOLS" || { echo "::error::Universal native debug-symbol archive is missing."; exit 1; }
+          APK_ABIS="$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so$/ { print $2 }' | sort -u)"
+          test -n "$APK_ABIS" || { echo "::error::Universal APK contains no native Android ABI libraries."; exit 1; }
+          SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
+          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg
+        run: flutter build apk --target-platform android-arm,android-arm64,android-x64 --split-per-abi --release --obfuscate --split-debug-info="$SYMBOLS_DIR/split-per-abi"
+
+      - name: Preserve split-ABI R8 mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAPPING="build/app/outputs/mapping/release/mapping.txt"
+          test -s "$MAPPING" || { echo "::error::Split-ABI R8 mapping.txt was not generated."; exit 1; }
+          mkdir -p "$SYMBOLS_DIR/r8/split-per-abi"
+          cp "$MAPPING" "$SYMBOLS_DIR/r8/split-per-abi/mapping.txt"
+
+      - name: Capture split-ABI native debug symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="build/app/outputs/flutter-apk"
+          NATIVE_SYMBOLS="build/app/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+          test -s "$NATIVE_SYMBOLS" || { echo "::error::Split-ABI native debug-symbol archive is missing."; exit 1; }
+          APK_ABIS=""
+          for apk in "$APK_DIR"/app-armeabi-v7a-release.apk "$APK_DIR"/app-arm64-v8a-release.apk "$APK_DIR"/app-x86_64-release.apk; do
+            test -s "$apk"
+            APK_ABIS="$APK_ABIS
+$(unzip -Z1 "$apk" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so$/ { print $2 }')"
+          done
+          APK_ABIS="$(printf '%s\n' "$APK_ABIS" | sed '/^[[:space:]]*$/d' | sort -u)"
+          test -n "$APK_ABIS" || { echo "::error::Split APKs contain no native Android ABI libraries."; exit 1; }
+          SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
+          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="build/app/outputs/flutter-apk"
+          test -s "$APK_DIR/app-release.apk"
+          test -s "$APK_DIR/app-armeabi-v7a-release.apk"
+          test -s "$APK_DIR/app-arm64-v8a-release.apk"
+          test -s "$APK_DIR/app-x86_64-release.apk"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          EXPECTED_CERT="$ANDROID_EXPECTED_CERT_SHA256"
+          for apk in "$APK_DIR"/*.apk; do
+            "$APKSIGNER" verify --verbose "$apk"
+            ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo "::error::Unexpected APK signer."; exit 1; }
+            if unzip -Z1 "$apk" | grep -Eq '(^|/)[^/]+\.symbols$'; then
+              echo "::error::Dart symbol files must not be packaged inside $apk."
+              exit 1
+            fi
+          done
+          echo "All APKs exist, pass Android signature verification, and contain no Dart symbol files."
+
+      - name: Encrypt and verify Dart AOT symbols
+        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload encrypted Dart AOT symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/secure-symbols/*.gpg
+          if-no-files-found: error
+          retention-days: 90
+
+  package-android:
+    name: Package and verify Android release assets
+    needs: [build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-builds
+          path: downloaded-apks
+
+      - name: Organize APKs and verify SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          VERSION=${GITHUB_REF_NAME#v}
+          if [[ "${GITHUB_REF_NAME}" != v* ]]; then VERSION="latest"; fi
+          find downloaded-apks -type f -name "*.apk" -exec cp {} release-assets/ \;
+          cd release-assets
+          if [ -f "app-armeabi-v7a-release.apk" ]; then mv app-armeabi-v7a-release.apk "muziinap-${VERSION}-armeabi-v7a.apk"; fi
+          if [ -f "app-arm64-v8a-release.apk" ]; then mv app-arm64-v8a-release.apk "muziinap-${VERSION}-arm64-v8a.apk"; fi
+          if [ -f "app-x86_64-release.apk" ]; then mv app-x86_64-release.apk "muziinap-${VERSION}-x86_64.apk"; fi
+          if [ -f "app-release.apk" ]; then mv app-release.apk "muziinap-${VERSION}.apk"; fi
+          test -s "muziinap-${VERSION}.apk"
+          test -s "muziinap-${VERSION}-armeabi-v7a.apk"
+          test -s "muziinap-${VERSION}-arm64-v8a.apk"
+          test -s "muziinap-${VERSION}-x86_64.apk"
+          sha256sum *.apk > "muziinap-v${VERSION}.sha256sum"
+          sha256sum -c "muziinap-v${VERSION}.sha256sum"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [package-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          test -n "$(find . -maxdepth 1 -name '*.apk' -type f -print -quit)"
+          checksum_file="$(find . -maxdepth 1 -name '*.sha256sum' -type f -print -quit)"
+          test -n "$checksum_file"
+          sha256sum -c "$checksum_file"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          draft: false
+          generate_release_notes: true
+ || { echo "::error::Universal native archive contains no .dbg files."; exit 1; }
+          for abi in $APK_ABIS; do
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)\${abi}/.*\.dbg$" || { echo "::error::Missing universal native symbols for $abi."; exit 1; }
+          done
+          mkdir -p "$SYMBOLS_DIR/native/universal"
+          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/universal/native-debug-symbols.zip"
+          printf 'Variant: universal\nCommit: %s\nABIs:\n%s\n' "$GITHUB_SHA" "$APK_ABIS" > "$SYMBOLS_DIR/native/universal/manifest.txt"
+          echo "Universal native symbols verified for: $APK_ABIS"
+
+      - name: Build obfuscated Architecture Specific APKs
+        run: flutter build apk --target-platform android-arm,android-arm64,android-x64 --split-per-abi --release --obfuscate --split-debug-info="$SYMBOLS_DIR/split-per-abi"
+
+      - name: Preserve split-ABI R8 mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAPPING="build/app/outputs/mapping/release/mapping.txt"
+          test -s "$MAPPING" || { echo "::error::Split-ABI R8 mapping.txt was not generated."; exit 1; }
+          mkdir -p "$SYMBOLS_DIR/r8/split-per-abi"
+          cp "$MAPPING" "$SYMBOLS_DIR/r8/split-per-abi/mapping.txt"
+
+      - name: Verify generated APKs and release signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="build/app/outputs/flutter-apk"
+          test -s "$APK_DIR/app-release.apk"
+          test -s "$APK_DIR/app-armeabi-v7a-release.apk"
+          test -s "$APK_DIR/app-arm64-v8a-release.apk"
+          test -s "$APK_DIR/app-x86_64-release.apk"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          EXPECTED_CERT="$ANDROID_EXPECTED_CERT_SHA256"
+          for apk in "$APK_DIR"/*.apk; do
+            "$APKSIGNER" verify --verbose "$apk"
+            ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo "::error::Unexpected APK signer."; exit 1; }
+            if unzip -Z1 "$apk" | grep -Eq '(^|/)[^/]+\.symbols$'; then
+              echo "::error::Dart symbol files must not be packaged inside $apk."
+              exit 1
+            fi
+          done
+          echo "All APKs exist, pass Android signature verification, and contain no Dart symbol files."
+
+      - name: Encrypt and verify Dart AOT symbols
+        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload encrypted Dart AOT symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/secure-symbols/*.gpg
+          if-no-files-found: error
+          retention-days: 90
+
+  package-android:
+    name: Package and verify Android release assets
+    needs: [build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-builds
+          path: downloaded-apks
+
+      - name: Organize APKs and verify SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          VERSION=${GITHUB_REF_NAME#v}
+          if [[ "${GITHUB_REF_NAME}" != v* ]]; then VERSION="latest"; fi
+          find downloaded-apks -type f -name "*.apk" -exec cp {} release-assets/ \;
+          cd release-assets
+          if [ -f "app-armeabi-v7a-release.apk" ]; then mv app-armeabi-v7a-release.apk "muziinap-${VERSION}-armeabi-v7a.apk"; fi
+          if [ -f "app-arm64-v8a-release.apk" ]; then mv app-arm64-v8a-release.apk "muziinap-${VERSION}-arm64-v8a.apk"; fi
+          if [ -f "app-x86_64-release.apk" ]; then mv app-x86_64-release.apk "muziinap-${VERSION}-x86_64.apk"; fi
+          if [ -f "app-release.apk" ]; then mv app-release.apk "muziinap-${VERSION}.apk"; fi
+          test -s "muziinap-${VERSION}.apk"
+          test -s "muziinap-${VERSION}-armeabi-v7a.apk"
+          test -s "muziinap-${VERSION}-arm64-v8a.apk"
+          test -s "muziinap-${VERSION}-x86_64.apk"
+          sha256sum *.apk > "muziinap-v${VERSION}.sha256sum"
+          sha256sum -c "muziinap-v${VERSION}.sha256sum"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [package-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          test -n "$(find . -maxdepth 1 -name '*.apk' -type f -print -quit)"
+          checksum_file="$(find . -maxdepth 1 -name '*.sha256sum' -type f -print -quit)"
+          test -n "$checksum_file"
+          sha256sum -c "$checksum_file"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          draft: false
+          generate_release_notes: true
+ || { echo "::error::Split native archive contains no .dbg files."; exit 1; }
+          for abi in $APK_ABIS; do
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)\${abi}/.*\.dbg$" || { echo "::error::Missing split-ABI native symbols for $abi."; exit 1; }
+          done
+          mkdir -p "$SYMBOLS_DIR/native/split-per-abi"
+          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/split-per-abi/native-debug-symbols.zip"
+          printf 'Variant: split-per-abi\nCommit: %s\nABIs:\n%s\n' "$GITHUB_SHA" "$APK_ABIS" > "$SYMBOLS_DIR/native/split-per-abi/manifest.txt"
+          echo "Split-ABI native symbols verified for: $APK_ABIS"
+
+      - name: Verify generated APKs and release signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="build/app/outputs/flutter-apk"
+          test -s "$APK_DIR/app-release.apk"
+          test -s "$APK_DIR/app-armeabi-v7a-release.apk"
+          test -s "$APK_DIR/app-arm64-v8a-release.apk"
+          test -s "$APK_DIR/app-x86_64-release.apk"
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          EXPECTED_CERT="$ANDROID_EXPECTED_CERT_SHA256"
+          for apk in "$APK_DIR"/*.apk; do
+            "$APKSIGNER" verify --verbose "$apk"
+            ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo "::error::Unexpected APK signer."; exit 1; }
+            if unzip -Z1 "$apk" | grep -Eq '(^|/)[^/]+\.symbols$'; then
+              echo "::error::Dart symbol files must not be packaged inside $apk."
+              exit 1
+            fi
+          done
+          echo "All APKs exist, pass Android signature verification, and contain no Dart symbol files."
+
+      - name: Encrypt and verify Dart AOT symbols
+        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload encrypted Dart AOT symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: muziinap-obfuscated-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/secure-symbols/*.gpg
+          if-no-files-found: error
+          retention-days: 90
+
+  package-android:
+    name: Package and verify Android release assets
+    needs: [build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-builds
+          path: downloaded-apks
+
+      - name: Organize APKs and verify SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          VERSION=${GITHUB_REF_NAME#v}
+          if [[ "${GITHUB_REF_NAME}" != v* ]]; then VERSION="latest"; fi
+          find downloaded-apks -type f -name "*.apk" -exec cp {} release-assets/ \;
+          cd release-assets
+          if [ -f "app-armeabi-v7a-release.apk" ]; then mv app-armeabi-v7a-release.apk "muziinap-${VERSION}-armeabi-v7a.apk"; fi
+          if [ -f "app-arm64-v8a-release.apk" ]; then mv app-arm64-v8a-release.apk "muziinap-${VERSION}-arm64-v8a.apk"; fi
+          if [ -f "app-x86_64-release.apk" ]; then mv app-x86_64-release.apk "muziinap-${VERSION}-x86_64.apk"; fi
+          if [ -f "app-release.apk" ]; then mv app-release.apk "muziinap-${VERSION}.apk"; fi
+          test -s "muziinap-${VERSION}.apk"
+          test -s "muziinap-${VERSION}-armeabi-v7a.apk"
+          test -s "muziinap-${VERSION}-arm64-v8a.apk"
+          test -s "muziinap-${VERSION}-x86_64.apk"
+          sha256sum *.apk > "muziinap-v${VERSION}.sha256sum"
+          sha256sum -c "muziinap-v${VERSION}.sha256sum"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [package-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release-assets
+          path: release-assets
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          test -n "$(find . -maxdepth 1 -name '*.apk' -type f -print -quit)"
+          checksum_file="$(find . -maxdepth 1 -name '*.sha256sum' -type f -print -quit)"
+          test -n "$checksum_file"
+          sha256sum -c "$checksum_file"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          draft: false
+          generate_release_notes: true
+ || { echo "::error::Universal native archive contains no .dbg files."; exit 1; }
+          for abi in $APK_ABIS; do
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)\${abi}/.*\.dbg$" || { echo "::error::Missing universal native symbols for $abi."; exit 1; }
+          done
+          mkdir -p "$SYMBOLS_DIR/native/universal"
+          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/universal/native-debug-symbols.zip"
+          printf 'Variant: universal\nCommit: %s\nABIs:\n%s\n' "$GITHUB_SHA" "$APK_ABIS" > "$SYMBOLS_DIR/native/universal/manifest.txt"
+          echo "Universal native symbols verified for: $APK_ABIS"
 
       - name: Build obfuscated Architecture Specific APKs
         run: flutter build apk --target-platform android-arm,android-arm64,android-x64 --split-per-abi --release --obfuscate --split-debug-info="$SYMBOLS_DIR/split-per-abi"

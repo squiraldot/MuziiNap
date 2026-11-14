@@ -65,7 +65,7 @@ Keep the same Flutter SDK, Java 17, Android NDK, localization generation, Isar g
 ## Recover and symbolicate a crash
 
 1. Locate the workflow run for the exact commit, version, and build ID.
-2. Download the matching `muziinap-obfuscated-symbols-<commit>-<run-id>-<attempt>` artifact before it expires.
+2. Download the matching encrypted symbols artifact before it expires: `muziinap-private-symbols-<commit>-<run-id>-<attempt>` from `MuziiNap Android APK`, or `muziinap-obfuscated-symbols-<commit>-<run-id>-<attempt>` from `Release Workflow`.
 3. Obtain the matching passphrase from the approved password manager.
 4. Decrypt and extract the archive:
 

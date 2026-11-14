@@ -2,7 +2,7 @@
 
 ## Scope and audited architecture
 
-Audited on `dev` at commit `4760063e5b79fbdedb7dd7086e0c0d2db25e81c1` (2026-11-14).
+Re-audited on `dev` (2026-11-14); see `docs/security/FINAL-SECURITY-AUDIT-2026-11-14.md` for the current evidence and limitations.
 
 - No first-party C/C++ source, `CMakeLists.txt`, `Android.mk`, `Application.mk`, checked-in `.so`, or checked-in static native archive is present in the repository tree.
 - The Android app pins NDK `27.0.12077973`; Android Gradle Plugin is `8.11.1`.
@@ -31,7 +31,7 @@ No `abiFilters` or target-platform restriction is added. CI derives the ABI set 
 
 ## Build and verification
 
-The `MuziiNap Android APK` workflow on `dev` performs the release build, APK signature verification, native library inventory, native debug-symbol archive verification, and encryption/integrity verification of the private symbols bundle.
+The `MuziiNap Android APK` workflow on `dev` verifies the universal APK. The `Release Workflow` also runs on `dev` and verifies the universal plus armv7, arm64, and x86_64 APKs; it captures native debug-symbol archives for both universal and split-ABI builds inside the encrypted symbols bundle.
 
 The code-quality workflow runs Android debug compilation and existing Kotlin DSP unit tests. CI build evidence must be read from the workflow run after this commit; a repository edit alone is not evidence of a successful native build.
 

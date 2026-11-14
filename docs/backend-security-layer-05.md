@@ -2,7 +2,7 @@
 
 **Target branch:** `dev`  
 **Audit / implementation:** 2026-11-14  
-**Implementation status:** Secure-storage migration implemented; automated and device verification pending.
+**Implementation status:** Secure-storage migration implemented; automated CI tests verified on `dev` commit `ff3eb59582bf8514efc42bcf0ea985bbadf0c505`; physical-device migration and authenticated-flow verification remain pending.
 
 ## Executive summary
 
@@ -67,7 +67,7 @@ Added regression coverage:
 - `test/services/innertube_session_manager_test.dart`: session headers via injected vault and assertion that cookies are not written to Hive.
 - `test/services/piped_service_security_test.dart`: HTTPS URL validation and rejection of credential-bearing or malformed endpoints.
 
-The code changes have been committed to `dev`. A successful source commit is not proof that the new CI run or device tests passed. Confirm the new `flutter pub get`, analyzer, and Flutter test workflow after these commits. Also verify on a real Android device:
+The code changes have been committed to `dev`. The `Code quality check` workflow passed on `dev` commit `ff3eb59582bf8514efc42bcf0ea985bbadf0c505`, including dependency resolution, Isar generation, Android debug compilation, Kotlin DSP unit tests, analyzer checks, and the Flutter test suite. Physical-device migration and authenticated-flow checks remain outstanding. Also verify on a real Android device:
 - Upgrade from a build containing legacy Hive sessions and confirm migration preserves account switching.
 - Confirm YouTube login, personalized home, queue, downloads, and background playback.
 - Confirm Piped login, playlist operations, and unlink/relink.
