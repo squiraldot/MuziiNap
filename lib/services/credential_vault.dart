@@ -59,7 +59,7 @@ class CredentialVault {
   bool _ready = false;
 
   bool get isReady => _ready;
-  String? get pipedToken => _pipedToken;
+  String? get pipedToken => _pipedToken?.isNotEmpty == true ? _pipedToken : null;
   Map<String, dynamic> get activeSession =>
       Map<String, dynamic>.from(_activeSession);
 
@@ -181,6 +181,7 @@ class CredentialVault {
     if (legacyBox != null) {
       await legacyBox.put('yt_accounts', _safeAccounts(normalized));
     }
+    _ready = true;
   }
 
   Future<void> saveActiveSession(Map<String, dynamic> session) async {
@@ -189,6 +190,7 @@ class CredentialVault {
     final encoded = jsonEncode(normalized);
     await _writeAndVerify(_activeSessionKey, encoded);
     _activeSession = normalized;
+    _ready = true;
   }
 
   Future<void> clearActiveSession() async {
@@ -202,6 +204,7 @@ class CredentialVault {
     }
     await _writeAndVerify(_pipedTokenKey, token);
     _pipedToken = token;
+    _ready = true;
   }
 
   Future<void> clearPipedToken() async {
