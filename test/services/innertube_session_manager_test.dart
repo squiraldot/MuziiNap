@@ -5,17 +5,38 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:muziinap/services/innertube_session_manager.dart';
+import 'package:muziinap/services/credential_vault.dart';
+
+class MemoryCredentialStorage implements CredentialStorageBackend {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
+}
 
 void main() {
   late Directory tempDirectory;
   late Box<dynamic> box;
   late InnerTubeSessionManager manager;
+  late CredentialVault vault;
 
   setUp(() async {
     tempDirectory = await Directory.systemTemp.createTemp('innertube_session_');
     Hive.init(tempDirectory.path);
     box = await Hive.openBox<dynamic>('test_preferences');
-    manager = InnerTubeSessionManager(box: box);
+    vault = CredentialVault(backend: MemoryCredentialStorage());
+    await vault.migrateLegacyCredentials(box);
+    manager = InnerTubeSessionManager(box: box, credentialVault: vault);
   });
 
   tearDown(() async {
@@ -62,7 +83,7 @@ void main() {
 
   test('reports missing SAPISID instead of creating anonymous auth headers',
       () async {
-    await box.put('yt_cookies', 'SID=session-value');
+    await vault.saveActiveSession({'cookies': 'SID=session-value'});
 
     expect(
       () => manager.getAuthenticatedHeaders('https://music.youtube.com'),
