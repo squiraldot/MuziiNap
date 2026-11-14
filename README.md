@@ -91,6 +91,10 @@ Check the actual workflow run for the commit being evaluated before describing C
 - [AI coding instructions](.github/copilot-instructions.md)
 - [Coding-agent project memory](memory-agent.md)
 
+## APK integrity
+
+See [APK integrity and signing verification](docs/apk-integrity.md) for release certificate pinning, sideloading behavior, failure policy, and verification limits.
+
 ## Song sharing and deep links
 
 Android song sharing uses the canonical URL format:

@@ -66,7 +66,10 @@ jobs:
           chmod 600 "$ANDROID_KEYSTORE_PATH"
           test -s "$ANDROID_KEYSTORE_PATH"
           keytool -list -keystore "$ANDROID_KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null
-          echo "Release keystore restored and alias validated."
+          RELEASE_CERT_SHA256="$(keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" -alias "$ANDROID_KEY_ALIAS" -storepass "$ANDROID_KEYSTORE_PASSWORD" | sha256sum | awk '{print toupper($1)}')"
+          [[ "$RELEASE_CERT_SHA256" =~ ^[A-F0-9]{64}$ ]]
+          echo "ANDROID_EXPECTED_CERT_SHA256=$RELEASE_CERT_SHA256" >> "$GITHUB_ENV"
+          echo "Release keystore restored; SHA-256 certificate fingerprint derived."
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -176,7 +179,85 @@ jobs:
           APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -n "$APKSIGNER"
           "$APKSIGNER" verify --verbose "$APK"
-          if unzip -Z1 "$APK" | grep -Eq '(^|/)[^/]+\.symbols$'; then
+          EXPECTED_CERT="$(printf '%s' "$ANDROID_EXPECTED_CERT_SHA256" | tr '[:lower:]' '[:upper:]')"
+          ACTUAL_CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$ACTUAL_CERT" = "$EXPECTED_CERT" || { echo "::error::APK signer does not match the CI release keystore."; exit 1; }
+          if unzip -Z1 "$APK" | grep -Eq '(^|/)[^/]+\.symbols
+            echo "::error::Dart symbol files must not be packaged inside the APK."
+            exit 1
+          fi
+          echo "APK passed Android signature verification and contains no Dart symbol files."
+          ls -lh "$APK"
+
+      - name: Capture and verify native symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          NATIVE_SYMBOLS="build/app/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+          test -s "$APK"
+          test -s "$NATIVE_SYMBOLS" || { echo "::error::AGP native-debug-symbols.zip is missing or empty."; exit 1; }
+
+          APK_ABIS="$(unzip -Z1 "$APK" | awk -F/ '$1 == "lib" && NF == 3 && $3 ~ /\.so$/ { print $2 }' | sort -u)"
+          test -n "$APK_ABIS" || { echo "::error::No native Android ABI libraries found in the release APK."; exit 1; }
+          SYMBOL_ENTRIES="$(unzip -Z1 "$NATIVE_SYMBOLS")"
+          printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq '(^|/)[^/]+\.dbg$' || {
+            echo "::error::Native symbols archive contains no extracted .dbg files (a dependency may already be stripped)."
+            exit 1
+          }
+
+          for abi in $APK_ABIS; do
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -Eq "(^|/)${abi}/.*\.dbg$" || {
+              echo "::error::No native debug symbols captured for APK ABI: $abi"
+              exit 1
+            }
+          done
+
+          mkdir -p "$SYMBOLS_DIR/native"
+          cp "$NATIVE_SYMBOLS" "$SYMBOLS_DIR/native/native-debug-symbols.zip"
+          {
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Commit SHA: $GITHUB_SHA"
+            echo "App version: $APP_VERSION"
+            echo "Build ID: $BUILD_ID"
+            echo "NDK: 27.0.12077973"
+            echo "Android Gradle Plugin: 8.11.1"
+            echo "Debug symbol level: FULL"
+            echo
+            echo "Packaged ABIs:"
+            printf '%s\n' "$APK_ABIS"
+            echo
+            echo "Packaged native libraries:"
+            unzip -Z1 "$APK" | grep -E '^lib/.+\.so$' || true
+            echo
+            echo "Captured native debug-symbol entries:"
+            printf '%s\n' "$SYMBOL_ENTRIES" | grep -E '(^|/)[^/]+\.dbg$'
+          } > "$SYMBOLS_DIR/native/native-symbols-manifest.txt"
+          test -s "$SYMBOLS_DIR/native/native-symbols-manifest.txt"
+          echo "Native debug symbols verified for all APK ABIs: $APK_ABIS"
+
+      - name: Encrypt and verify Dart AOT symbols
+        shell: bash
+        env:
+          SYMBOLS_ENCRYPTION_KEY: ${{ secrets.SYMBOLS_ENCRYPTION_KEY }}
+        run: bash scripts/ci/package_obfuscation_symbols.sh "$SYMBOLS_DIR" build/secure-symbols
+
+      - name: Upload MuziiNap APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: muziinap-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload encrypted Dart, R8 and native symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: muziinap-private-symbols-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/secure-symbols/*.gpg
+          if-no-files-found: error
+          retention-days: 90
+; then
             echo "::error::Dart symbol files must not be packaged inside the APK."
             exit 1
           fi
