@@ -127,7 +127,7 @@ class _ArtworkPlaceholder extends StatelessWidget {
       alignment: Alignment.center,
       child: Icon(
         icon,
-        size: (size * 0.28).clamp(20.0, 48.0),
+        size: (size * 0.28).clamp(20.0, 48.0).toDouble(),
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
