@@ -83,6 +83,13 @@ For release-equivalent signing checks, use CI and its configured Android signing
 
 Check the actual workflow run for the commit being evaluated before describing CI as passing. A successful CI run does not replace real-device testing.
 
+## Repository documentation
+
+- [Maintenance branch policy](docs/maintenance-branch-policy.md)
+- [Project documentation index](docs/project-documentation-index.md)
+- [AI coding instructions](.github/copilot-instructions.md)
+- [Coding-agent project memory](memory-agent.md)
+
 ## Song sharing and deep links
 
 Android song sharing uses the canonical URL format:
