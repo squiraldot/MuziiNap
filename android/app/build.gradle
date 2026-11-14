@@ -50,11 +50,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         // Keep the application ID stable so existing installs can update in place.
         applicationId "com.merrmist.muziinapmusic"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
@@ -74,13 +71,16 @@ android {
 
     buildTypes {
         release {
-            // Local release builds retain the debug-signing fallback when no release
-            // credentials are configured. CI validates all secrets and signs with release.
+            // Local release builds retain the existing debug-signing fallback when
+            // release credentials are absent. CI validates and supplies release signing.
             if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             } else {
                 signingConfig signingConfigs.debug
             }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
