@@ -78,6 +78,9 @@ android {
             } else {
                 signingConfig signingConfigs.debug
             }
+            // Keep full native debug metadata in a separate AGP symbols archive.
+            // The APK remains stripped; CI encrypts the archive with the private symbols bundle.
+            ndk { debugSymbolLevel 'FULL' }
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
