@@ -16,6 +16,7 @@ import '../Library/library_controller.dart';
 import '../../widgets/snackbar.dart';
 import '../Home/home_screen_controller.dart';
 import '../../../services/music_service.dart';
+import '../../../services/credential_vault.dart';
 import 'advanced_equalizer_screen.dart';
 import 'about_screen.dart';
 import '../../utils/theme_controller.dart';
@@ -290,12 +291,21 @@ class SettingsScreen extends StatelessWidget {
                                 ),
                                 onPressed: () async {
                                   if (isLoggedIn) {
+                                    await CredentialVault.instance.clearYouTubeData();
                                     await box.delete('yt_accounts');
                                     await box.delete('yt_active_account_key');
-                                    await box.delete('yt_cookies');
+                                    for (final key in const [
+                                      'yt_cookies',
+                                      'yt_visitor_data',
+                                      'yt_data_sync_id',
+                                      'yt_auth_user',
+                                      'yt_identity_token',
+                                    ]) {
+                                      await box.delete(key);
+                                    }
                                     await box.put('yt_logged_in', false);
                                     if (Get.isRegistered<MusicServices>()) {
-                                      Get.find<MusicServices>()
+                                      await Get.find<MusicServices>()
                                           .clearAuthCookies();
                                     }
                                     if (Get.isRegistered<
