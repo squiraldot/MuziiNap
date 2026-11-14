@@ -15,6 +15,7 @@ import './utils.dart';
 import '../utils/helper.dart';
 import '../utils/youtube_auth.dart';
 import 'innertube_session_manager.dart';
+import 'credential_vault.dart';
 import 'innertube_auth_interceptor.dart';
 import '../models/home_mood.dart';
 import 'constant.dart';
@@ -114,29 +115,27 @@ class MusicServices extends getx.GetxService {
     glCode = appPrefsBox.get('contentCountryCode') ??
         getx.Get.deviceLocale?.countryCode ?? 'US';
 
-    final storedAccounts = appPrefsBox.get('yt_accounts');
+    final credentialVault = CredentialVault.instance;
+    final storedAccounts = credentialVault.youtubeAccounts;
     final activeAccountKey = appPrefsBox.get('yt_active_account_key')?.toString();
-    Map<String, dynamic>? activeAccount;
-    if (storedAccounts is Map && activeAccountKey != null) {
-      final candidate = storedAccounts[activeAccountKey];
-      if (candidate is Map) {
-        activeAccount = Map<String, dynamic>.from(candidate);
-      }
-    }
+    final activeAccount = activeAccountKey == null
+        ? null
+        : storedAccounts[activeAccountKey];
+    final activeSession = credentialVault.activeSession;
     final storedCookies =
-        activeAccount?['cookies'] ?? appPrefsBox.get('yt_cookies');
+        activeAccount?['cookies'] ?? activeSession['cookies'];
     final storedVisitorData =
         activeAccount?['visitorData']?.toString() ??
-        appPrefsBox.get('yt_visitor_data')?.toString();
+        activeSession['visitorData']?.toString();
     final storedDataSyncId =
         activeAccount?['dataSyncId']?.toString() ??
-        appPrefsBox.get('yt_data_sync_id')?.toString();
+        activeSession['dataSyncId']?.toString();
     final storedAuthUser =
         activeAccount?['authUser']?.toString() ??
-        appPrefsBox.get('yt_auth_user')?.toString();
+        activeSession['authUser']?.toString();
     final storedIdentityToken =
         activeAccount?['identityToken']?.toString() ??
-        appPrefsBox.get('yt_identity_token')?.toString();
+        activeSession['identityToken']?.toString();
     if (storedCookies != null && storedCookies.toString().isNotEmpty) {
       await updateAuthCookies(
         storedCookies.toString(),
@@ -186,7 +185,7 @@ class MusicServices extends getx.GetxService {
   }) async {
     final normalizedCookies = cookies.trim();
     if (normalizedCookies.isEmpty) {
-      clearAuthCookies();
+      await clearAuthCookies();
       return false;
     }
 
@@ -215,6 +214,16 @@ class MusicServices extends getx.GetxService {
       _headers.remove('X-Youtube-Identity-Token');
     }
     _headers['X-Origin'] = 'https://music.youtube.com';
+
+    await CredentialVault.instance.saveActiveSession({
+      ...CredentialVault.instance.activeSession,
+      'cookies': normalizedCookies,
+      if (visitorData != null) 'visitorData': visitorData.trim(),
+      if (dataSyncId != null) 'dataSyncId': dataSyncId.trim(),
+      'authUser': identity.authUser,
+      if (identityToken != null && identityToken.trim().isNotEmpty)
+        'identityToken': identityToken.trim(),
+    });
 
     try {
       final sessionManager = InnerTubeSessionManager();
@@ -254,8 +263,8 @@ class MusicServices extends getx.GetxService {
     }
   }
 
-  void clearAuthCookies() {
-    unawaited(InnerTubeSessionManager().clearCookies());
+  Future<void> clearAuthCookies() async {
+    await InnerTubeSessionManager().clearCookies();
     _resetInMemoryAuthHeaders();
   }
 
@@ -281,38 +290,22 @@ class MusicServices extends getx.GetxService {
     if (failedCookie == null || failedCookie.isEmpty) return false;
 
     final box = Hive.box(appPrefsBoxName);
-    final currentCookies = box.get('yt_cookies')?.toString();
+    final vault = CredentialVault.instance;
+    final currentCookies = vault.activeSession['cookies']?.toString();
     // Ignore late failures from requests sent before the user switched account
     // or completed a newer login.
     if (currentCookies != failedCookie) return false;
 
     final activeKey = box.get('yt_active_account_key')?.toString();
-    final storedAccounts = box.get('yt_accounts');
-    if (storedAccounts is Map && activeKey != null) {
-      final accounts = <String, dynamic>{
-        for (final entry in storedAccounts.entries)
-          entry.key.toString(): entry.value,
-      };
-      final activeAccount = accounts[activeKey];
-      if (activeAccount is Map &&
-          activeAccount['cookies']?.toString() == failedCookie) {
-        accounts.remove(activeKey);
-        if (accounts.isEmpty) {
-          await box.delete('yt_accounts');
-        } else {
-          await box.put('yt_accounts', accounts);
-        }
-      }
+    final accounts = vault.youtubeAccounts;
+    if (activeKey != null && accounts[activeKey]?['cookies']?.toString() == failedCookie) {
+      accounts.remove(activeKey);
+      await vault.saveYouTubeAccounts(accounts, legacyBox: box);
     }
 
-    await InnerTubeSessionManager().clearCookies();
+    await vault.clearActiveSession();
     for (final key in [
-      'yt_cookies',
       'yt_active_account_key',
-      'yt_visitor_data',
-      'yt_data_sync_id',
-      'yt_auth_user',
-      'yt_identity_token',
       'AccountName',
       'AccountThumbUrl',
       'yt_account_name',
@@ -608,10 +601,9 @@ class MusicServices extends getx.GetxService {
   Future<bool> activateYouTubeAccount(String accountKey) async {
     await ensureReady();
     final box = Hive.box(appPrefsBoxName);
-    final storedAccounts = box.get('yt_accounts');
-    if (storedAccounts is! Map) return false;
+    final storedAccounts = CredentialVault.instance.youtubeAccounts;
     final account = storedAccounts[accountKey];
-    if (account is! Map) return false;
+    if (account == null) return false;
 
     final cookies = account['cookies']?.toString();
     if (cookies == null || cookies.isEmpty) return false;
@@ -625,19 +617,9 @@ class MusicServices extends getx.GetxService {
     );
     if (!ready) return false;
 
+    await CredentialVault.instance.saveActiveSession(account);
     await box.put('yt_active_account_key', accountKey);
-    await box.put('yt_cookies', cookies);
     await box.put('yt_logged_in', true);
-    if (account['visitorData'] != null) {
-      await box.put('yt_visitor_data', account['visitorData']);
-    }
-    if (account['dataSyncId'] != null) {
-      await box.put('yt_data_sync_id', account['dataSyncId']);
-    }
-    await box.put('yt_auth_user', account['authUser']?.toString() ?? '0');
-    if (account['identityToken'] != null) {
-      await box.put('yt_identity_token', account['identityToken']);
-    }
     return await validateYouTubeSession();
   }
 
