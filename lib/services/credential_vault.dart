@@ -73,12 +73,13 @@ class CredentialVault {
   /// left untouched so the user does not lose their sessions.
   Future<void> migrateLegacyCredentials(Box<dynamic> legacyBox) async {
     final secureAccounts = _decodeMap(await _backend.read(_accountsKey));
+    final legacyAccounts = <String, dynamic>{};
     final legacyAccountsRaw = legacyBox.get('yt_accounts');
-    final legacyAccounts = legacyAccountsRaw is Map
-        ? legacyAccountsRaw.map(
-            (key, value) => MapEntry(key.toString(), value),
-          )
-        : <String, dynamic>{};
+    if (legacyAccountsRaw is Map) {
+      legacyAccountsRaw.forEach((key, value) {
+        legacyAccounts[key.toString()] = value;
+      });
+    }
 
     final mergedAccounts = <String, Map<String, dynamic>>{};
     for (final key in {...secureAccounts.keys, ...legacyAccounts.keys}) {
@@ -123,8 +124,9 @@ class CredentialVault {
     final legacyPipedToken =
         pipedRaw is Map ? pipedRaw['token']?.toString() : null;
     final securePipedToken = await _backend.read(_pipedTokenKey);
-    final mergedPipedToken = securePipedToken ??
-        (legacyPipedToken?.isNotEmpty == true ? legacyPipedToken : null);
+    final mergedPipedToken = securePipedToken?.isNotEmpty == true
+        ? securePipedToken
+        : (legacyPipedToken?.isNotEmpty == true ? legacyPipedToken : null);
 
     // Persist all secrets first, then verify the exact stored payloads.
     if (mergedAccounts.isNotEmpty) {
