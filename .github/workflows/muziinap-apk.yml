@@ -152,8 +152,18 @@ jobs:
             echo "SYMBOLS_DIR=$SYMBOLS_DIR"
           } >> "$GITHUB_ENV"
 
-      - name: Build obfuscated release APK
+      - name: Build obfuscated and R8-hardened release APK
         run: flutter build apk --release --obfuscate --split-debug-info="$SYMBOLS_DIR/universal"
+
+      - name: Preserve R8 mapping for this build
+        shell: bash
+        run: |
+          set -euo pipefail
+          MAPPING="android/app/build/outputs/mapping/release/mapping.txt"
+          test -s "$MAPPING" || { echo "::error::R8 mapping.txt was not generated."; exit 1; }
+          mkdir -p "$SYMBOLS_DIR/r8/universal"
+          cp "$MAPPING" "$SYMBOLS_DIR/r8/universal/mapping.txt"
+          test -s "$SYMBOLS_DIR/r8/universal/mapping.txt"
 
       - name: Verify APK and release signature
         shell: bash
