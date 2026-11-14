@@ -161,14 +161,12 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
     final vault = CredentialVault.instance;
     final stored = vault.youtubeAccounts;
 
-    final accounts = <String, dynamic>{};
-    if (stored is Map) {
-      accounts.addAll(
+    final accounts = <String, dynamic>{}
+      ..addAll(
         stored.map(
           (key, value) => MapEntry(key.toString(), value),
         ),
       );
-    }
 
     var activeKey = box.get('yt_active_account_key')?.toString();
     Map<String, dynamic> current = <String, dynamic>{};
