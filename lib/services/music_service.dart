@@ -1222,8 +1222,7 @@ class MusicServices extends getx.GetxService {
     );
     if (results != null) {
       List contents = [];
-      if (results.runtimeType.toString().contains("Iterable") ||
-          results.runtimeType.toString().contains("List")) {
+      if (results is Iterable) {
         for (dynamic result in results) {
           contents.add(parseAlbum(result['musicTwoRowItemRenderer']));
         }

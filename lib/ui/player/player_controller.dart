@@ -802,7 +802,7 @@ class PlayerController extends GetxController
   }
 
   Future<void> _addRadioContinuation(dynamic item) async {
-    final isSong = item.runtimeType.toString() == "MediaItem";
+    final isSong = item is MediaItem;
     final content = await _musicServices.getWatchPlaylist(
         videoId: isSong ? item.id : "",
         radio: true,

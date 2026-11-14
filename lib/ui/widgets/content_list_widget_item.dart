@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:get/get.dart';
 
 import '../navigator.dart';
+import '../../../models/album.dart';
 import 'image_widget.dart';
 
 class ContentListItem extends StatefulWidget {
@@ -23,7 +24,7 @@ class _ContentListItemState extends State<ContentListItem> {
   Widget build(BuildContext context) {
     final content = widget.content;
     final isLibraryItem = widget.isLibraryItem;
-    final isAlbum = content.runtimeType.toString() == "Album";
+    final isAlbum = content is Album;
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth.isFinite
