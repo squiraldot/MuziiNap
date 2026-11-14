@@ -1,4 +1,4 @@
-package com.merrmist.muziinapmusicmusic
+package com.merrmist.muziinapmusic
 
 import android.os.Build
 import androidx.annotation.Keep
