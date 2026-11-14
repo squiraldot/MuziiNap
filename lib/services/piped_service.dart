@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 
 import '../utils/helper.dart';
+import 'credential_vault.dart';
 
 /// Normalizes a Piped instance URL before credentials or API requests are sent.
 /// Only HTTPS origins are trusted; embedded credentials and URL parameters are
@@ -41,9 +42,10 @@ class PipedServices extends GetxService {
       final appPrefsBox = Hive.box(appPrefsBoxName);
       final piped = appPrefsBox.get('piped') ??
           {"isLoggedIn": false, "token": "", "instApiUrl": ""};
-      _isLoggedIn = piped["isLoggedIn"];
+      final token = CredentialVault.instance.pipedToken;
+      _isLoggedIn = piped["isLoggedIn"] == true && token != null;
       if (isLoggedIn) {
-        _headers["Authorization"] = piped['token'];
+        _headers["Authorization"] = token;
         try {
           _insApiUrl = normalizePipedInstanceUrl(
             piped["instApiUrl"].toString(),
@@ -87,10 +89,10 @@ class PipedServices extends GetxService {
           errorMessage: 'The Piped instance returned an invalid login response.',
         );
       }
+      await CredentialVault.instance.savePipedToken(data['token'] as String);
       final appPrefsBox = Hive.box(appPrefsBoxName);
       await appPrefsBox.put("piped", {
         "isLoggedIn": true,
-        "token": data['token'],
         "instApiUrl": normalizedInstanceUrl
       });
       _headers["Authorization"] = data['token'];
@@ -113,11 +115,14 @@ class PipedServices extends GetxService {
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await CredentialVault.instance.clearPipedToken();
     final appPrefsBox = Hive.box(appPrefsBoxName);
-    appPrefsBox
-        .put("piped", {"isLoggedIn": false, "token": "", "instApiUrl": ""});
-    _headers["Authorization"] = "";
+    await appPrefsBox.put(
+      "piped",
+      {"isLoggedIn": false, "instApiUrl": ""},
+    );
+    _headers.remove("Authorization");
     _isLoggedIn = false;
     _insApiUrl = "";
   }
