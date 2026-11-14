@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:muziinap/services/credential_vault.dart';
 import 'package:muziinap/services/innertube_auth_interceptor.dart';
 import 'package:muziinap/services/innertube_session_manager.dart';
 
@@ -13,13 +14,18 @@ void main() {
   late Directory tempDirectory;
   late Box<dynamic> box;
   late InnerTubeSessionManager sessionManager;
+  late CredentialVault credentialVault;
 
   setUp(() async {
     tempDirectory =
         await Directory.systemTemp.createTemp('innertube_auth_interceptor_');
     Hive.init(tempDirectory.path);
     box = await Hive.openBox<dynamic>('test_preferences');
-    sessionManager = InnerTubeSessionManager(box: box);
+    credentialVault = CredentialVault(backend: _MemoryCredentialStorage());
+    sessionManager = InnerTubeSessionManager(
+      box: box,
+      credentialVault: credentialVault,
+    );
   });
 
   tearDown(() async {
@@ -150,4 +156,21 @@ ResponseBody _response(
       Headers.contentTypeHeader: [Headers.jsonContentType],
     },
   );
+}
+
+class _MemoryCredentialStorage implements CredentialStorageBackend {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    _values.remove(key);
+  }
 }
