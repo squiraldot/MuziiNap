@@ -1,7 +1,7 @@
 # MuziiNap Universal Song Sharing URL Contract
 
 **Contract version:** 1  
-**Status:** Implemented on Android and deployed website; physical-device link and playback verification reported complete.
+**Status:** Android implementation COMPLETE; Phase 08 final acceptance COMPLETE for the audited Android scope. Website deployment and physical-device verification are recorded as previously reported evidence.
 
 ## Canonical identity and URL
 
@@ -76,6 +76,30 @@ The website implementation and its deployment are maintained in a separate repos
 Canonical MuziiNap song URLs are parsed separately from legacy YouTube imports. The Android manifest retains the existing HTTPS intent filters for `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, and `youtu.be`. The legacy import path remains responsible for supported YouTube watch, music, short-link, playlist, album, and artist/channel URLs. Incoming non-MuziiNap URLs continue through the existing legacy-link handling path.
 
 Preset-file sharing and handling are separate from song URL parsing and are not changed by this contract.
+
+## Phase 08 — Android Deep Link Final Acceptance
+
+**Acceptance status: COMPLETE**  
+**Audited repository:** `squiraldot/MuziiNap`  
+**Branch:** `dev`  
+**Audited commit:** `20a8afd32ea068c62794a9051855c78001b2c46a`
+
+The Android deep-link implementation is accepted as complete for the defined Phase 08 scope. This status is based on source-level implementation review and the successful automated workflows listed below. It does not represent a new physical-device test execution by this final documentation audit.
+
+**Verified GitHub Actions evidence for the audited commit:**
+
+- [Code quality check #614 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43499194676)
+- [MuziiNap Android APK #612 — SUCCESS](https://github.com/squiraldot/MuziiNap/actions/runs/43499193774)
+
+Both workflow runs completed successfully against commit `20a8afd32ea068c62794a9051855c78001b2c46a`.
+
+**Acceptance evidence is intentionally separated:**
+
+- **Source-level implementation verification:** canonical URL generation and parsing, Android HTTPS App Links manifest declarations, incoming-link handling, playback coordination and stale-request protection, and regression tests were inspected in the audited source.
+- **Automated CI verification:** the two workflow runs above are independently verified as successful for the audited commit.
+- **Physical-device verification:** previously reported complete in the existing project test record; this Phase 08 final audit did not repeat those device tests.
+
+**Deferred Deep Linking: NOT IMPLEMENTED / OUT OF SCOPE.** Installing the app after opening a song URL does not preserve and automatically replay that URL on a later manual launch. This is an explicit scope limitation, not an incomplete Phase 08 acceptance item.
 
 ## Verification status and evidence boundaries
 
