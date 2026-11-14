@@ -89,7 +89,14 @@ class PipedServices extends GetxService {
           errorMessage: 'The Piped instance returned an invalid login response.',
         );
       }
-      await CredentialVault.instance.savePipedToken(data['token'] as String);
+      try {
+        await CredentialVault.instance.savePipedToken(data['token'] as String);
+      } catch (_) {
+        return Res(
+          0,
+          errorMessage: 'Secure storage is unavailable. Piped login was not saved.',
+        );
+      }
       final appPrefsBox = Hive.box(appPrefsBoxName);
       await appPrefsBox.put("piped", {
         "isLoggedIn": true,
