@@ -47,6 +47,8 @@ void main() {
 
   test('creates WEB_REMIX headers with a valid SAPISIDHASH', () async {
     await manager.storeCookies('SAPISID=secret-value; SID=session-value');
+    expect(box.containsKey('yt_cookies'), isFalse);
+    expect(vault.activeSession['cookies'], 'SAPISID=secret-value; SID=session-value');
 
     final headers =
         manager.getAuthenticatedHeaders('https://music.youtube.com/youtubei/v1/browse');
