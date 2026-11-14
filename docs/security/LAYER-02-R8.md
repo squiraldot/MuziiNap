@@ -35,7 +35,7 @@ Do not upload plaintext `mapping.txt` files or commit them to the repository.
 3. Decrypt and extract the archive:
 
 ```bash
-gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+printf '%s\\n' "$SYMBOLS_ENCRYPTION_KEY" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
   --decrypt --output muziinap-symbols.tar.gz muziinap-symbols-<commit>-<version>-<run-id>-<attempt>.tar.gz.gpg
 tar -xzf muziinap-symbols.tar.gz
 ```
@@ -43,7 +43,7 @@ tar -xzf muziinap-symbols.tar.gz
 For Android Java/Kotlin stack traces, run Retrace with the matching variant mapping:
 
 ```bash
-$ANDROID_HOME/cmdline-tools/latest/bin/retrace <path-to-r8-mapping.txt> <stacktrace.txt>
+retrace <path-to-r8-mapping.txt> <stacktrace.txt>
 ```
 
 If using a standalone R8 distribution, use its matching `retrace` executable with the same arguments. Never use a mapping from a different commit, app version, variant, or workflow attempt.
