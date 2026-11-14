@@ -233,7 +233,9 @@ class MusicServices extends getx.GetxService {
       _authInterceptor.reset();
       return true;
     } on InnerTubeSessionException catch (error) {
-      await CredentialVault.instance.clearActiveSession();
+      try {
+        await CredentialVault.instance.clearActiveSession();
+      } catch (_) {}
       _resetInMemoryAuthHeaders();
       printINFO('YouTube session rejected: ${error.code.name}');
       return false;
