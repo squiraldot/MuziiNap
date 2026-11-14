@@ -159,7 +159,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          MAPPING="android/app/build/outputs/mapping/release/mapping.txt"
+          MAPPING="build/app/outputs/mapping/release/mapping.txt"
           test -s "$MAPPING" || { echo "::error::R8 mapping.txt was not generated."; exit 1; }
           mkdir -p "$SYMBOLS_DIR/r8/universal"
           cp "$MAPPING" "$SYMBOLS_DIR/r8/universal/mapping.txt"
