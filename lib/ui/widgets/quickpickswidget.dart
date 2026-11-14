@@ -187,6 +187,19 @@ class QuickPicksWidget extends StatelessWidget {
     );
   }
 
+  Widget _artworkPlaceholder(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.music_note,
+          size: 42,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
   Widget _cardShelf(BuildContext context, {required bool wideCards}) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -232,10 +245,15 @@ class QuickPicksWidget extends StatelessWidget {
                                   child: Image.network(
                                     song.artUri.toString(),
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Image.asset(
-                                      'assets/icons/song.png',
-                                      fit: BoxFit.cover,
-                                    ),
+                                    frameBuilder: (context, child, frame,
+                                        wasSynchronouslyLoaded) {
+                                      if (wasSynchronouslyLoaded || frame != null) {
+                                        return child;
+                                      }
+                                      return _artworkPlaceholder(context);
+                                    },
+                                    errorBuilder: (_, __, ___) =>
+                                        _artworkPlaceholder(context),
                                   ),
                                 ),
                               ),
