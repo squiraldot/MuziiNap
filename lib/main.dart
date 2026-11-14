@@ -14,6 +14,7 @@ import './ui/screens/Search/search_screen_controller.dart';
 import './utils/get_localization.dart';
 import './services/downloader.dart';
 import './services/piped_service.dart';
+import './services/credential_vault.dart';
 import 'utils/app_link_controller.dart';
 import 'services/deep_link_service.dart';
 import './services/audio_handler.dart';
@@ -261,6 +262,13 @@ initHive() async {
   await Hive.openBox("SongDownloads");
   await Hive.openBox('SongsUrlCache');
   await Hive.openBox(appPrefsBoxName);
+  try {
+    await CredentialVault.instance
+        .migrateLegacyCredentials(Hive.box(appPrefsBoxName));
+  } catch (_) {
+    // Fail closed for authenticated services but keep local playback available.
+    debugPrint('Secure credential migration is pending; saved accounts are unavailable until storage recovers.');
+  }
 }
 
 void _setAppInitPrefs() {
