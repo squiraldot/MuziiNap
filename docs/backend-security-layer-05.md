@@ -75,3 +75,11 @@ The code changes have been committed to `dev`. The `Code quality check` workflow
 - Confirm the secure-storage dependency resolves in the project's pinned Flutter toolchain and commit the generated lockfile if CI updates it.
 
 **Residual risk:** rooted devices, runtime instrumentation, memory inspection, and an attacker controlling the unlocked app process can still access credentials while the app uses them. Keystore-backed storage protects data at rest; it does not make a compromised runtime safe. Full Git history scanning, provider-side API-key restriction review, and release-artifact scanning remain separate verification tasks.
+
+## Status clarification — 2026-11-15
+
+The project owner confirms that application functional testing has been completed on physical Android devices, including playback behavior, and reports that the app's features work correctly in that testing. This is **owner-confirmed device evidence**, not a new test executed by this documentation audit; no device model, Android version, date, or test log is asserted here.
+
+That broad functional-test confirmation does not independently prove each security-specific migration scenario listed below. CredentialVault legacy-Hive migration, failure-preservation behavior, YouTube/Piped authenticated account flows, backup/restore behavior, and controlled credential exposure tests remain separately unverified unless supported by their own device-test record. The 2026-11-14 CI run and commit cited above are historical evidence for that baseline, not a claim that CI was rerun during this documentation task.
+
+The current Android NDK is `28.2.13676358` (not the superseded `27.0.12077973` value found in older notes). Current app version configuration is `1.0.0-beta.1+1`; v1.0.0 remains the upcoming first production release target.

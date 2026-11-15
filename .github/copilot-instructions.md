@@ -15,8 +15,9 @@ These instructions describe the current repository configuration. If documentati
 - Dart package name: muziinap
 - Android namespace and application ID: com.merrmist.muziinapmusic
 - Dart SDK constraint: >=3.11.0 <4.0.0
-- CI Flutter version: 3.47.5
-- Java: 17
+- Current source version: `1.0.0-beta.1+1` (`pubspec.yaml`); first production target: `v1.0.0`, not yet published.
+- CI Flutter version: 3.47.5 (Flutter submodule gitlink: `84abdf7372654171e0a66174be2846f53331f6ab`)
+- Java: 17; Gradle: 8.14.2; Android Gradle Plugin: 8.11.1; Kotlin: 2.2.20; Android NDK: 28.2.13676358
 - Keep the Android application ID, namespace, signing identity expectations, and persisted-data compatibility stable unless explicitly authorized.
 
 ## Stack and architecture
@@ -75,9 +76,9 @@ Follow existing patterns and inspect actual call sites before changing architect
 
 - .github/workflows/code_quality.yml: Flutter analysis and test suite
 - .github/workflows/muziinap-apk.yml: Android APK build, analysis, and APK signature verification
-- .github/workflows/release.yml: release-signed universal and ABI APKs, checksum verification, and tag-triggered GitHub Release publishing
+- .github/workflows/release.yml: main-push/manual universal and ABI APK builds, signer verification, SHA-256 checksum generation, and GitHub Actions artifact upload; it does not publish a GitHub Release
 
-The workflows currently use Flutter 3.47.5 and Java 17. The release workflow expects configured Android signing secrets. Do not infer successful CI from a commit being pushed; inspect the latest run for the exact commit SHA.
+The workflows use Flutter 3.47.5 and Java 17. Android Gradle Plugin 8.11.1, Gradle 8.14.2, Kotlin 2.2.20, and NDK 28.2.13676358 are configured. Release workflows expect configured Android signing secrets. Do not infer successful CI from a commit being pushed; inspect the latest run for the exact commit SHA.
 
 ## Suggested verification
 
@@ -119,9 +120,9 @@ The Android canonical song URL contract is documented in `docs/song-sharing-url-
 ## Current workflows and toolchain
 
 - Flutter `3.47.5`, Java `17`, Android NDK `27.0.12077973`.
-- `code_quality.yml`: push validation for `main` and `dev`; schema generation, debug APK compile, native DSP tests, analyzer, Flutter tests.
-- `muziinap-apk.yml`: `main`/`dev` push or manual; signed release APK build, signature verification, artifact upload.
-- `release.yml`: `main` push, `v*.*.*` tags, or manual; universal/ABI APKs, signatures/checksums, release publication.
+- `code_quality.yml`: push validation for `main` and `dev`, plus manual dispatch; Flutter/Android debug build, Isar code generation, native DSP unit tests, analyzer and Flutter tests.
+- `muziinap-apk.yml`: `main`/`dev` push or manual; signed universal release APK, signature verification, Dart/R8/native symbol capture, encrypted symbol artifact, and APK Actions artifact.
+- `release.yml` (inspected on `main`): `main` push or manual dispatch only; signed universal and split-ABI APKs, Dart/R8 symbol encryption, signature checks, SHA-256 checksums, and Actions artifact upload. No tag trigger and no GitHub Release publishing step.
 
 The exact workflow run for the exact commit must be checked before reporting success. CI does not prove physical-device behavior.
 
@@ -137,3 +138,10 @@ The exact workflow run for the exact commit must be checked before reporting suc
 - [GetX](https://pub.dev/packages/get)
 - [Hive](https://docs.hivedb.dev/)
 - See README.md for user-facing capabilities and download instructions.
+
+## Production download and update contract
+
+- APK distribution is through the official Telegram channel: https://telegram.me/muziinap/3. Do not describe GitHub Releases as the APK download host.
+- In-app version metadata is fetched from `https://api.github.com/repos/squiraldot/MuziiNap-Official/releases`; the checker filters drafts/prereleases, compares semantic versions, displays the release body, and opens the Telegram URL externally.
+- GitHub Releases in MuziiNap-Official are metadata, not APK assets. The checker does not download a GitHub asset, install an APK, or perform OTA updates.
+- The upcoming first production release target is v1.0.0; do not claim publication before a real release exists.

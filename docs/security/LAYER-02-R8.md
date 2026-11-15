@@ -64,3 +64,14 @@ To disable this layer temporarily, revert only the release build-type R8 setting
 ## Verification boundary
 
 CI builds and APK signature checks provide build-time evidence only. Physical-device checks for playback, notifications, widgets, JNI, deep links, and BgUtils are still required before declaring full runtime regression coverage.
+
+## Current pinned toolchain (2026-11-15)
+
+- Android Gradle Plugin: 8.11.1
+- Gradle wrapper: 8.14.2
+- Kotlin Android plugin: 2.2.20
+- Android NDK: 28.2.13676358
+- Java source/target and Kotlin JVM target: 17
+- Flutter CI action: 3.47.5; Dart SDK constraint: `>=3.11.0 <4.0.0`
+
+The configured current app version is `1.0.0-beta.1+1`; the first production release target `v1.0.0` has not been published. The NDK value supersedes older documentation that stated `27.0.12077973`.

@@ -6,7 +6,7 @@
 
 ## Distribution and trust boundary
 
-The documented distribution path is direct APK download from GitHub Releases. The audited repository does not declare Google Play distribution or a first-party trusted backend for integrity-token verification. Play Integrity is not enabled and is not required for sideloaded installs.
+The official APK distribution destination is the MuziiNap Telegram channel: https://telegram.me/muziinap/3. The separate repository https://github.com/squiraldot/MuziiNap-Official supplies version/release metadata to the app's update checker; it is not the APK download host. The MuziiNap `release.yml` workflow uploads build outputs as GitHub Actions artifacts and does not publish GitHub Releases. The audited repository does not declare Google Play distribution or a first-party trusted backend for integrity-token verification. Play Integrity is not enabled and is not required for sideloaded installs.
 
 This implementation performs a local Android package/signing identity check. It is a repackaging signal, not proof against a determined attacker: client-side code and embedded fingerprints can be patched or extracted. Any future protected server feature must independently verify server-issued challenges and integrity evidence before granting sensitive access.
 
@@ -14,7 +14,7 @@ This implementation performs a local Android package/signing identity check. It 
 
 - Android application ID: `com.merrmist.muziinapmusic`.
 - Debug builds are classified separately and do not use the release pin.
-- Both release workflows restore the existing Actions keystore and derive its SHA-256 certificate fingerprint from the public certificate.
+- The `muziinap-apk.yml` and `release.yml` workflows restore the existing Actions keystore and derive its SHA-256 certificate fingerprint from the public certificate. `muziinap-apk.yml` builds one universal APK on `main`/`dev` pushes or manual dispatch; `release.yml` builds universal and ABI-specific APKs on `main` pushes or manual dispatch.
 - The fingerprint is injected into generated `BuildConfig.TRUSTED_RELEASE_CERT_SHA256S`; no private key or keystore is packaged.
 - CI verifies each release APK with `apksigner` and compares its signer fingerprint with the restored CI keystore.
 
@@ -65,3 +65,19 @@ Wrong-signer/repackaging and offline tests on a device/emulator remain manual co
 ## Rollback
 
 Revert the Layer 04 commit on `dev` if a regression is found. The verifier is non-blocking and adds no manifest permissions, network calls, backend dependency, or persistent state.
+
+## Workflow and distribution boundaries (2026-11-15)
+
+| Workflow | Trigger | APK outputs | Verification / retention | Publication |
+| --- | --- | --- | --- | --- |
+| `.github/workflows/muziinap-apk.yml` | Push to `main` or `dev`; manual dispatch | Universal release APK | `apksigner` verifies signer against the Actions keystore; APK artifact retention 14 days; encrypted Dart/R8/native symbols artifact retention 90 days | GitHub Actions artifacts only |
+| `.github/workflows/release.yml` (verified on `main`) | Push to `main`; manual dispatch; no tag trigger | Universal, armeabi-v7a, arm64-v8a, x86_64 APKs | Signature verification for each APK; SHA-256 checksum manifest; encrypted Dart/R8 symbols artifact retention 90 days | GitHub Actions artifacts only; no GitHub Release creation/upload step |
+
+Both workflows restore signing material from GitHub Actions Secrets. The release workflow's `permissions` are `contents: read`. Its package job creates and verifies checksums before uploading the build-assets artifact. This build pipeline is distinct from the owner-operated Telegram APK distribution. A successful build or artifact upload does not establish that a public APK was posted to Telegram.
+
+## Current toolchain
+
+- Flutter action: `3.47.5`; Flutter git submodule commit: `84abdf7372654171e0a66174be2846f53331f6ab`.
+- Java: 17; Android Gradle Plugin: 8.11.1; Gradle wrapper: 8.14.2; Kotlin: 2.2.20; Android NDK: 28.2.13676358.
+- Dart SDK constraint: `>=3.11.0 <4.0.0`.
+- Current configured app version: `1.0.0-beta.1+1`; v1.0.0 is the upcoming first production release target, not a published release.

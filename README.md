@@ -5,7 +5,7 @@
 
 An Android-only Flutter music app created and maintained by SquiralDot.
 
-[Download latest APK](https://github.com/squiraldot/MuziiNap/releases/latest) · [Report a bug](https://github.com/squiraldot/MuziiNap/issues) · [View source](https://github.com/squiraldot/MuziiNap)
+[Download APK](https://telegram.me/muziinap/3) · [Report a bug](https://github.com/squiraldot/MuziiNap/issues) · [View source](https://github.com/squiraldot/MuziiNap)
 
 </div>
 
@@ -50,9 +50,11 @@ The Dart package name is **muziinap**. The Android namespace/application ID is *
 
 ## Download and update
 
-Download the latest published Android APK from the [GitHub Releases page](https://github.com/squiraldot/MuziiNap/releases/latest). For in-place updates, install builds signed with the same release signing identity. Do not uninstall an existing installation unless you understand the effect on local app data.
+**First production release target: MuziiNap v1.0.0 (not yet published).** The current source configuration still declares `1.0.0-beta.1+1`; this documentation target does not change the configured app version.
 
-Release builds and checksums are published through the repository's tag-triggered release workflow. Branch CI artifacts are validation builds, not necessarily published releases.
+Download the Android APK from the [official MuziiNap Telegram channel](https://telegram.me/muziinap/3). MuziiNap does **not** distribute its APK through GitHub Releases. In-place updates require an APK signed with the same release signing identity; do not uninstall an existing installation unless you understand the effect on local app data.
+
+The in-app version checker reads GitHub Releases metadata from the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official), selects the highest stable semantic version, and opens the Telegram channel link when an update is available. GitHub is the version-metadata source; Telegram is the APK download destination. The checker does not install APKs automatically.
 
 ## Development
 
@@ -79,7 +81,7 @@ For release-equivalent signing checks, use CI and its configured Android signing
 
 - .github/workflows/code_quality.yml — analyzer and Flutter tests
 - .github/workflows/muziinap-apk.yml — Android APK build, analysis, and signature verification
-- .github/workflows/release.yml — Android APK variants, checksum verification, and tag-triggered GitHub Release publication
+- .github/workflows/release.yml — main-only universal and ABI APK build, signature verification, checksum generation, and Actions artifact upload (no GitHub Release publishing)
 - `docs/dart-aot-obfuscation.md` — Android release obfuscation, encrypted symbol retention, and crash symbolication
 
 Check the actual workflow run for the commit being evaluated before describing CI as passing. A successful CI run does not replace real-device testing.
@@ -90,6 +92,10 @@ Check the actual workflow run for the commit being evaluated before describing C
 - [Project documentation index](docs/project-documentation-index.md)
 - [AI coding instructions](.github/copilot-instructions.md)
 - [Coding-agent project memory](memory-agent.md)
+
+## First production release and distribution
+
+The planned first production release is **v1.0.0**. It has not been published as of this documentation snapshot. The official APK download destination is [Telegram](https://telegram.me/muziinap/3); the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official) supplies release metadata to the in-app checker. The repository's `release.yml` workflow creates GitHub Actions artifacts, not GitHub Releases.
 
 ## APK integrity
 

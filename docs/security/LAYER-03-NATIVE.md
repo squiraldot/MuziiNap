@@ -5,7 +5,7 @@
 Re-audited on `dev` (2026-11-14); see `docs/security/FINAL-SECURITY-AUDIT-2026-11-14.md` for the current evidence and limitations.
 
 - No first-party C/C++ source, `CMakeLists.txt`, `Android.mk`, `Application.mk`, checked-in `.so`, or checked-in static native archive is present in the repository tree.
-- The Android app pins NDK `27.0.12077973`; Android Gradle Plugin is `8.11.1`.
+- The Android app pins NDK `28.2.13676358`; Android Gradle Plugin is `8.11.1`.
 - The transitive Flutter package `jni 0.14.2` is an Android FFI plugin whose Android Gradle module builds native code through its own CMake project. Its CMake source and compile flags are owned by the resolved pub dependency, not by this repository.
 - JNIGen output in `lib/native_bindings/andrid_utils.dart` resolves Kotlin/Java methods on `Equalizer` and `SDKInt`. These are not C/C++ JNI exports. The app does not declare `externalNativeBuild` or `ndk-build`.
 - The maintained `packages/just_audio` Android fork uses Java/Kotlin and AndroidX Media3. `MuziiNapPcmAudioProcessor.kt` is JVM code; it is not a native C++ DSP implementation.
@@ -31,7 +31,7 @@ No `abiFilters` or target-platform restriction is added. CI derives the ABI set 
 
 ## Build and verification
 
-The `MuziiNap Android APK` workflow on `dev` verifies the universal APK and captures its native debug-symbol archive in the encrypted symbols bundle. The separate `Release Workflow` is configured for `main` pushes and version tags; it was not executed on `dev` during this audit. Its universal and split-ABI release outputs therefore remain unverified on `dev`.
+The `MuziiNap Android APK` workflow (`muziinap-apk.yml`) runs on `main` and `dev` pushes or manual dispatch; it builds a universal APK and captures the AGP native debug-symbol archive in the encrypted symbols bundle. The separate `Android Build & Package` workflow (`release.yml`) is configured for `main` pushes and manual dispatch only (no version-tag trigger); it builds universal and split-ABI APKs and captures Dart symbols/R8 mappings, but its current YAML does not include the native-symbol capture step. It uploads Actions artifacts and does not publish a GitHub Release.
 
 The code-quality workflow runs Android debug compilation and existing Kotlin DSP unit tests. CI build evidence must be read from the workflow run after this commit; a repository edit alone is not evidence of a successful native build.
 
@@ -47,3 +47,9 @@ Device-level playback, JNI runtime loading, native crash symbolication, and late
 ## Rollback
 
 Revert the Layer 03 commit on `dev`. This removes the `FULL` native symbol extraction request and CI symbol capture step. It does not change app runtime behavior, DSP processing, JNI bindings, or ABI selection.
+
+## Updated owner-confirmed device-test status (2026-11-15)
+
+The project owner confirms that real-device functional testing has been completed and that playback and application features work correctly. This is owner-reported evidence; this documentation audit did not execute a new device test and does not invent device models, OS versions, dates, or logs. The confirmation supports general functional QA status but does not independently verify native debug-symbol extraction, native crash symbolication, ELF/DWARF contents, or a controlled JNI failure test.
+
+The current NDK pin is `28.2.13676358`. The `release.yml` workflow's native-symbol behavior must not be inferred from `muziinap-apk.yml`: only the latter explicitly captures and validates the AGP native debug-symbol archive in its current YAML.

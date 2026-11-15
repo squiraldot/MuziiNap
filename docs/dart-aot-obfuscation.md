@@ -97,3 +97,14 @@ For ABI-specific builds, use the corresponding directory under `split-per-abi`. 
 ## Verification boundaries
 
 CI can verify the release build, APK signature, existence of symbol files, successful encryption/decryption, archive integrity, unique build metadata, and separation of APKs from symbols. It cannot prove real-device playback, queue behavior, background audio, widgets, JNI behavior, or deep-link behavior. Those require device/integration testing and remain separate from this build-protection layer.
+
+## Current workflow scope and APK distribution (2026-11-15)
+
+The current workflow definitions were inspected independently on `main` (the branch heads are presently identical to `dev`):
+
+- `muziinap-apk.yml`: runs on pushes to `main` and `dev`, or manual dispatch. It builds one signed universal release APK, verifies its signer, captures Dart AOT symbols, R8 mapping, and AGP native debug symbols, encrypts the symbol bundle, and uploads the APK and encrypted bundle as Actions artifacts (14-day APK / 90-day symbol retention).
+- `release.yml`: runs on `main` pushes or manual dispatch only. It builds signed universal and split APKs for armeabi-v7a, arm64-v8a, and x86_64; captures Dart symbols and R8 mappings; verifies all APK signatures; generates and checks SHA-256 checksums; and uploads Actions artifacts. It has no version-tag trigger and no GitHub Release publishing step. It does not contain the native-symbol capture step present in `muziinap-apk.yml`.
+
+Neither workflow is the public APK distribution channel. The owner-provided distribution path is Telegram: https://telegram.me/muziinap/3. The separate `MuziiNap-Official` repository supplies release metadata to the app's version checker. GitHub Actions build artifacts and the encrypted diagnostic-symbol artifacts must not be described as public end-user APK releases.
+
+The first production release target is `v1.0.0`, not yet published. The current source version remains `1.0.0-beta.1+1` in `pubspec.yaml`.

@@ -130,3 +130,16 @@ No app code was modified. No debug symbols were deleted. No private build artifa
 7. Run full Git-history and release-artifact secret scans; review provider-side restrictions for public client API keys.
 
 **Final classification:** The five-layer protection system is not security-complete. Layers 01 and 02 are verified for the tested universal release build; Layers 03–05 remain partial or unimplemented in the specific areas stated above.
+
+## Subsequent status note — 2026-11-15 (historical audit preserved)
+
+This note supplements, and does not rewrite, the 2026-11-14 audit baseline and evidence above.
+
+- The owner now confirms that physical-device functional testing has been completed and that the application's features, including playback behavior, work correctly on real devices. This is owner-confirmed evidence, not a new test run performed by this documentation audit. No device models, Android versions, dates, or logs are asserted.
+- This general functional-test confirmation does not retroactively change the 2026-11-14 audit's narrower claims about controlled modified/repackaged APK tests, ELF/DWARF inspection, artifact-access testing, exhaustive secret scans, or server-side verification. Those remain unverified/not implemented as stated unless separate evidence is recorded.
+- Current toolchain configuration is Flutter 3.47.5, Java 17, AGP 8.11.1, Gradle 8.14.2, Kotlin 2.2.20, and NDK 28.2.13676358. Older NDK references in prior documentation are superseded.
+- Current `pubspec.yaml` version is `1.0.0-beta.1+1`. The first production release target is v1.0.0 and has not been published.
+- APK distribution is through the official Telegram channel (https://telegram.me/muziinap/3). The separate MuziiNap-Official repository provides release metadata to the app's checker; it is not the APK host.
+- The current `main` `release.yml` workflow creates and verifies GitHub Actions artifacts (universal/ABI APKs and checksums); it does not publish GitHub Releases and is triggered by `main` pushes or manual dispatch, not version tags.
+
+The audit's historical final classification remains valid for its stated scope: the security layers are not security-complete. General real-device QA confirmation does not convert local APK integrity into server-side enforcement or establish the unverified security tests above.

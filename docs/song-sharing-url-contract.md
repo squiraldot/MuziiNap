@@ -123,3 +123,11 @@ These device observations are recorded as reported test evidence, not as results
 Keep the public domain and route prefix centralized in `lib/utils/song_sharing_config.dart`. Future share actions and route consumers must call its validation and canonical URL methods rather than duplicate domain strings.
 
 If the public domain, route, ID format, or signing certificate changes, version and migrate the contract deliberately. Any future query parameters require a documented contract revision and matching Android/website tests.
+
+## Current repository and device-test status (2026-11-15)
+
+The source baseline for this documentation synchronization is `dev` commit `e643c8522924f01d633ad0a50ad61a1e52cb05ea`; `main` currently points to the same commit. The Phase 08 commit/run identifiers above remain historical acceptance evidence and are not relabeled as the current source commit.
+
+The project owner confirms completed physical-device functional testing, including playback behavior, and reports that application features work correctly on real devices. This is owner-confirmed evidence only; this documentation task did not execute new device tests or add device models, OS versions, dates, or test logs. The existing song-sharing test record remains the specific evidence for the link flows described in this contract.
+
+The website implementation and its current deployment remain outside this Android repository audit. The APK download/update strategy is separate from song-link handling: APKs are distributed through https://telegram.me/muziinap/3; the MuziiNap-Official repository provides version metadata, not APK assets.

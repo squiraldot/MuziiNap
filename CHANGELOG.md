@@ -1,5 +1,7 @@
 ## Unreleased
 
+> First production release target: **MuziiNap v1.0.0**. This is a preparation target, not a published release. The current `pubspec.yaml` version remains `1.0.0-beta.1+1` until a separately authorized release change.
+
 ### Android release build security
 
 - Added official Dart AOT obfuscation to Android release APK build paths, with per-build symbol generation, encrypted CI retention, and crash-symbolication documentation.

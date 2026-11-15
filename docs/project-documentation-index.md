@@ -1,51 +1,86 @@
-# MuziiNap Documentation Index and Maintenance Scope
+# MuziiNap Documentation Index and Audit Inventory
 
 **Repository:** `squiraldot/MuziiNap`  
-**Branch:** `dev`  
-**Snapshot:** 14 November 2026
+**Documentation branch:** `dev`  
+**Current source snapshot:** 15 November 2026 — `e643c8522924f01d633ad0a50ad61a1e52cb05ea`  
+**First production target:** `v1.0.0` (not yet published)
 
-This index inventories the repository's human-readable documentation and records its maintenance treatment. Source configuration is authoritative for SDK/toolchain versions, workflow behavior, package identity, and implementation status.
+This index is the complete Markdown inventory for the current source snapshot. Every `.md`, `.mdx`, and `.markdown` file was enumerated recursively from the `dev` Git tree and inspected individually. The current inventory contains 13 pre-existing Markdown files; this synchronization adds the audit report, bringing the final inventory to 14.
 
-## Maintained project documentation
+## Complete Markdown inventory
 
-| File | Purpose | Maintenance treatment |
+| Markdown file | Purpose | Final classification |
 | --- | --- | --- |
-| `README.md` | Public project overview, features, setup, workflows, troubleshooting | Keep aligned with supported app behavior and developer workflow |
-| `.github/copilot-instructions.md` | Detailed AI/contributor engineering instructions | Keep aligned with source, CI, and branch policy |
-| `memory-agent.md` | Concise project memory for coding agents | Keep synchronized with detailed instructions |
-| `CHANGELOG.md` | Release-facing change history | Add new work under Unreleased; preserve historical entries |
-| `docs/maintenance-branch-policy.md` | Official branch roles and automation policy | Update when branch/release policy changes |
-| `docs/song-sharing-url-contract.md` | Canonical song URL and Android App Links contract | Update with source/contract changes and new verification evidence |
-| `docs/dart-aot-obfuscation.md` | Android release AOT obfuscation, encrypted symbol retention, and crash recovery | Keep aligned with release workflows, artifact retention, and symbolication procedure |
-| `fastlane/metadata/android/en-US/title.txt` | Store listing title | Change only when the approved product title changes |
-| `fastlane/metadata/android/en-US/short_description.txt` | Store listing short description | Keep within store limits and aligned with product |
-| `fastlane/metadata/android/en-US/full_description.txt` | Store listing feature description | Keep claims supportable by current app behavior |
+| `.github/copilot-instructions.md` | Contributor/AI engineering instructions, branch policy, source paths and workflow rules | Updated |
+| `CHANGELOG.md` | Release-facing change history; historical entries retained | Updated |
+| `README.md` | Public project overview, capabilities, setup, distribution and troubleshooting | Updated |
+| `docs/apk-integrity.md` | Local signer identity check, CI signing verification and trust boundaries | Updated |
+| `docs/backend-security-layer-05.md` | CredentialVault, secure storage, public configuration, secret handling and backend limits | Updated |
+| `docs/dart-aot-obfuscation.md` | Dart AOT symbol generation, encryption, retention and crash symbolication | Updated |
+| `docs/maintenance-branch-policy.md` | Branch roles, workflow triggers and maintenance policy | Updated |
+| `docs/project-documentation-index.md` | Complete documentation inventory and source-of-truth map | Updated |
+| `docs/security/FINAL-SECURITY-AUDIT-2026-11-14.md` | Historical five-layer security audit and subsequent dated clarification | Historical — preserved intentionally |
+| `docs/security/LAYER-02-R8.md` | R8/ProGuard release configuration and mapping recovery | Updated |
+| `docs/security/LAYER-03-NATIVE.md` | Native dependency boundary and AGP debug-symbol handling | Updated |
+| `docs/song-sharing-url-contract.md` | Canonical song URL, Android App Links and acceptance evidence | Updated |
+| `memory-agent.md` | Concise project memory for coding agents | Updated |
+| `docs/documentation-audit-2026-11-15.md` | This synchronization's inventory, evidence, corrections and verification | Updated — newly created |
 
-## Historical and legal records
+No Markdown file from the initial inventory was skipped. The historical security report is preserved rather than rewritten as a current audit.
 
-- `fastlane/metadata/android/changelogs/*.txt` are version-specific release notes. Preserve them as historical records; do not rewrite them to describe current branch state.
-- `LICENSE` is the repository's authoritative license text. Do not edit it as routine documentation maintenance.
-- `packages/just_audio/LICENSE` is the local dependency fork's license notice. Preserve it with the fork.
-- Store title metadata remains unchanged while the product name remains MuziiNap.
+## Source-of-truth hierarchy
 
-## Source-of-truth references
-
-| Fact | Source of truth |
+| Subject | Authoritative source |
 | --- | --- |
-| Dart package, SDK constraint, app version, dependencies | `pubspec.yaml` |
-| Android namespace/application ID, NDK/build configuration | `android/app/build.gradle` and Android Gradle files |
-| Android app links and intent filters | `android/app/src/main/AndroidManifest.xml` |
-| Native channels and intent delivery | `android/app/src/main/kotlin/com/merrmist/muziinapmusic/MainActivity.kt` |
-| CI/release triggers and toolchains | `.github/workflows/*.yml` |
-| Current app behavior and feature wiring | `lib/`, `android/`, and `test/` |
-| Song sharing URL rules | `docs/song-sharing-url-contract.md` plus matching source/tests |
-| Branch policy | `docs/maintenance-branch-policy.md` |
+| Package name, configured version, Dart SDK constraint, dependencies and overrides | `pubspec.yaml` and `pubspec.lock` |
+| Flutter submodule URL and pinned commit | `.gitmodules` and the `flutter` gitlink |
+| Android namespace/application ID, NDK, Java/Kotlin targets, signing fallback, R8 and native symbol level | `android/app/build.gradle`, `android/settings.gradle`, Gradle wrapper |
+| Actual CI/release triggers, toolchain setup, build variants, permissions and artifacts | Workflow YAML files; `release.yml` is inspected on `main` |
+| Current app behavior | Dart/Kotlin source under `lib/` and `android/`, plus tests |
+| Update metadata endpoint and APK destination | `lib/services/update_checker.dart` |
+| Song URL and Android intent contract | `docs/song-sharing-url-contract.md` plus source and tests |
+| Branch roles | This index and `docs/maintenance-branch-policy.md`; GitHub currently defaults to `main` |
 
-## Current audited facts
+## Branch and workflow policy
 
-- Official maintenance branch: `dev`; GitHub default branch remains `main`.
+- `dev` is the documentation and routine maintenance branch.
+- `main` is the release/integration branch and remains GitHub's default branch.
+- At the inspected snapshot, both branches point to the same commit. Their equality was verified, not assumed.
+- `code_quality.yml` and `muziinap-apk.yml` run on pushes to `main` and `dev`, and on manual dispatch.
+- `release.yml` runs on `main` pushes and manual dispatch only. It has no tag trigger and does not run automatically on `dev` pushes.
+- The `release.yml` workflow uploads GitHub Actions artifacts; it does not create or publish a GitHub Release.
+- Documentation-only updates in this task are committed to `dev` only. Do not merge, cherry-pick, rebase, or write to `main`.
+
+## Current toolchain and release state
+
+- Current `pubspec.yaml` version: `1.0.0-beta.1+1`; target first production release: `v1.0.0`, not yet published.
 - Dart SDK constraint: `>=3.11.0 <4.0.0`.
-- CI Flutter: `3.47.5`; Java: `17`; Android NDK: `27.0.12077973`.
-- Android application ID: `com.merrmist.muziinapmusic`.
-- Deferred deep linking is not implemented and is outside accepted Android Phase 08 scope.
-- Website source/deployment is separate and is not verified by this Android repository documentation update.
+- Flutter CI action: `3.47.5`; Flutter submodule gitlink: `84abdf7372654171e0a66174be2846f53331f6ab`.
+- Java 17; Android Gradle Plugin 8.11.1; Gradle 8.14.2; Kotlin 2.2.20; Android NDK 28.2.13676358.
+- Android namespace/application ID: `com.merrmist.muziinapmusic`.
+- APK distribution: official Telegram channel, https://telegram.me/muziinap/3.
+- Version metadata: GitHub Releases API for the separate `squiraldot/MuziiNap-Official` repository. This is not APK hosting.
+- Owner-confirmed physical-device functional testing, including playback, is complete. This documentation audit did not execute a new device test.
+
+## Feature/architecture status notes
+
+- Playback is owned by the app-scoped `MyAudioHandler` (AudioService + just_audio), with a shared AudioSession policy, device-adaptive stream profile, network stream recovery/circuit breaker, queue prefetching and bounded cache trimming.
+- Stream resolution uses InnerTube as primary extractor with sequential external fallback providers; adaptive codec selection prefers Opus only on supported Android API/device/network profiles and retains AAC fallback.
+- Hive remains the active persistence owner for preferences, library and cache-related data. Isar has schema/service scaffolding and is initialized lazily; the Hive-to-Isar migration is not complete.
+- CredentialVault uses flutter_secure_storage for account/session secrets; Hive retains non-secret display/endpoint metadata. This is local at-rest protection, not server-side authorization.
+- APK integrity is a local package/signing identity signal. A mismatch is logged; startup continues. No Play Integrity integration or MuziiNap-owned backend verification exists.
+- Android DSP/equalizer implementation is Kotlin/JVM with Android audio effects; no first-party C/C++ DSP source is present.
+- Deferred deep linking is not implemented. Website implementation/deployment is outside this Android repository audit.
+
+## Historical and non-Markdown records
+
+- Preserve `LICENSE`, generated localization files, fastlane text metadata and version-specific text changelogs as their own artifacts; they are not Markdown files and are not part of this Markdown inventory.
+- Historical audit and acceptance evidence must retain its original date, commit and scope. Add dated status notes rather than rewriting history.
+- No Markdown inventory claim should be inferred from this index alone; re-run a recursive tree inventory when the repository tree changes.
+
+## Ownership and maintenance
+
+- Repository owner/maintainers own release signing secrets, Telegram APK publication, official update metadata and physical-device QA evidence.
+- Contributors maintain source-aligned docs on `dev`; release workflow changes require separate explicit authorization.
+- Before documenting CI success, inspect the workflow run for the exact commit. CI is not a substitute for physical-device evidence.
+- Update this index whenever a Markdown file is added, moved or removed. Keep relative links valid and preserve historical records.

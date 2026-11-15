@@ -15,6 +15,9 @@ This file is the concise project-specific memory. Detailed coding rules live in 
 - Dart SDK constraint: >=3.11.0 <4.0.0
 - CI Flutter version: 3.47.5
 - Java: 17
+- Android Gradle Plugin: 8.11.1; Gradle wrapper: 8.14.2; Kotlin: 2.2.20; NDK: 28.2.13676358
+- Flutter submodule gitlink: 84abdf7372654171e0a66174be2846f53331f6ab
+- Current configured app version: 1.0.0-beta.1+1; first production target v1.0.0 is not yet published
 
 Treat package name, application ID, namespace, release signing identity, and stored-data identifiers as compatibility-sensitive.
 
@@ -36,9 +39,9 @@ Treat package name, application ID, namespace, release signing identity, and sto
 
 ## Active workflows
 
-- .github/workflows/code_quality.yml — analyzer and Flutter tests
+- .github/workflows/code_quality.yml — main/dev push and manual validation: Android debug compile, Isar generation, native DSP unit tests, analyzer and Flutter tests
 - .github/workflows/muziinap-apk.yml — Android APK build and signature verification
-- .github/workflows/release.yml — release APK variants, SHA-256 checksums, and GitHub Release publication on version tags
+- .github/workflows/release.yml — main-push/manual universal and ABI APK builds, signer verification, SHA-256 checksums, encrypted Dart/R8 symbols, and Actions artifact upload; no tag trigger or GitHub Release publishing
 
 Use actual GitHub Actions results for the exact commit before reporting success. CI does not prove real-device behavior.
 
@@ -96,3 +99,12 @@ See `docs/song-sharing-url-contract.md`.
 ## Working style
 
 Inspect source and current branch state first. Make the smallest coherent change, preserve unrelated functionality, add regression tests for behavior changes, review the diff, and verify the exact commit's CI before final handoff. If Flutter/Android tools or a physical device are unavailable, say so explicitly.
+
+## APK distribution and version metadata
+
+- Official APK download channel: https://telegram.me/muziinap/3.
+- Version/release metadata API: https://api.github.com/repos/squiraldot/MuziiNap-Official/releases.
+- The checker filters draft/prerelease entries, compares semantic versions, displays release notes, and opens Telegram externally. It does not download GitHub APK assets or install/OTA-update the app.
+- `release.yml` uploads Actions artifacts and checksum files; it does not publish a GitHub Release.
+- Owner-confirmed physical-device functional testing, including playback, is complete; do not claim this documentation task ran a new device test.
+- Isar remains a lazy scaffold; Hive is still the active persistence source of truth.
