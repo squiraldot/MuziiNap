@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'credits_screen.dart';
+import 'donation_screen.dart';
 import '../../../services/update_checker.dart';
 import 'settings_screen_controller.dart';
 
@@ -155,6 +156,13 @@ class AboutScreen extends StatelessWidget {
                       )
                     : null,
               ),
+            ),
+            const SizedBox(height: 10),
+            _AboutLinkTile(
+              icon: Icons.lunch_dining_rounded,
+              title: 'Feed Our Developers (Burgerrrr🍔)',
+              subtitle: "We're Hungry but our Pocket is Lonely😭",
+              onTap: () => Get.to(() => const DonationScreen()),
             ),
             const SizedBox(height: 18),
             const Divider(color: _divider),
