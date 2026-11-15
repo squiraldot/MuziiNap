@@ -1,0 +1,165 @@
+name: Temporary APK Upgrade Emulator Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: temporary-apk-upgrade-emulator-test
+  cancel-in-progress: false
+
+jobs:
+  beta-to-production-upgrade:
+    name: Latest beta to v1.0.0 upgrade (Android 13)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Download latest beta APK artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/beta artifacts/production test-results
+          gh run download 43700640883 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name muziinap-release-apk \
+            --dir artifacts/beta
+
+      - name: Download v1.0.0 APK artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 43702318078 \
+            --repo "$GITHUB_REPOSITORY" \
+            --name muziinap-release-apk \
+            --dir artifacts/production
+
+      - name: Locate and validate APK artifacts
+        id: apks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BETA_APK="$(find artifacts/beta -type f -name '*.apk' -print -quit)"
+          PRODUCTION_APK="$(find artifacts/production -type f -name '*.apk' -print -quit)"
+
+          test -n "$BETA_APK" || { echo "::error::Beta APK not found in workflow run 43700640883."; exit 1; }
+          test -n "$PRODUCTION_APK" || { echo "::error::Production APK not found in workflow run 43702318078."; exit 1; }
+
+          echo "beta_apk=$GITHUB_WORKSPACE/$BETA_APK" >> "$GITHUB_OUTPUT"
+          echo "production_apk=$GITHUB_WORKSPACE/$PRODUCTION_APK" >> "$GITHUB_OUTPUT"
+
+          ls -lh "$BETA_APK" "$PRODUCTION_APK"
+
+      - name: Enable KVM for Android Emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install beta and test in-place production upgrade
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            set -uo pipefail
+
+            BETA_APK="${{ steps.apks.outputs.beta_apk }}"
+            PRODUCTION_APK="${{ steps.apks.outputs.production_apk }}"
+            RESULTS="$GITHUB_WORKSPACE/test-results"
+            mkdir -p "$RESULTS"
+
+            SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+            AAPT="$(find "$SDK_ROOT/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+            APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+
+            if [[ -z "$AAPT" || -z "$APKSIGNER" ]]; then
+              echo "::error::Android aapt or apksigner was not found."
+              exit 1
+            fi
+
+            {
+              echo "=== Emulator ==="
+              adb shell getprop ro.build.version.release
+              adb shell getprop ro.build.version.sdk
+              echo
+              echo "=== APK metadata ==="
+              echo "-- Beta --"
+              "$AAPT" dump badging "$BETA_APK" | head -n 1
+              echo "-- Production --"
+              "$AAPT" dump badging "$PRODUCTION_APK" | head -n 1
+              echo
+              echo "=== Signing certificates ==="
+              echo "-- Beta --"
+              "$APKSIGNER" verify --print-certs "$BETA_APK"
+              echo "-- Production --"
+              "$APKSIGNER" verify --print-certs "$PRODUCTION_APK"
+            } | tee "$RESULTS/preflight.txt"
+
+            BETA_PACKAGE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/.*name='\([^']*\)'.*/\1/p")"
+            PROD_PACKAGE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*name='\([^']*\)'.*/\1/p")"
+            BETA_CODE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/.*versionCode='\([^']*\)'.*/\1/p")"
+            PROD_CODE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*versionCode='\([^']*\)'.*/\1/p")"
+            BETA_CERT="$("$APKSIGNER" verify --print-certs "$BETA_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            PROD_CERT="$("$APKSIGNER" verify --print-certs "$PRODUCTION_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+
+            if [[ "$BETA_PACKAGE" != "$PROD_PACKAGE" ]]; then
+              echo "::error::Package ID mismatch: beta=$BETA_PACKAGE production=$PROD_PACKAGE"
+              exit 1
+            fi
+            if [[ "$BETA_CERT" != "$PROD_CERT" ]]; then
+              echo "::error::Signing certificate mismatch between beta and production APKs."
+              exit 1
+            fi
+            if ! [[ "$BETA_CODE" =~ ^[0-9]+$ && "$PROD_CODE" =~ ^[0-9]+$ ]] || (( PROD_CODE < BETA_CODE )); then
+              echo "::error::Production versionCode ($PROD_CODE) is lower than beta versionCode ($BETA_CODE)."
+              exit 1
+            fi
+
+            echo "Preflight passed: package ID, signer and versionCode are upgrade-compatible."
+
+            echo "=== Install beta APK ==="
+            if ! adb install "$BETA_APK" > "$RESULTS/beta-install.txt" 2>&1; then
+              cat "$RESULTS/beta-install.txt"
+              adb logcat -d -b all > "$RESULTS/logcat-beta-install-failure.txt" || true
+              exit 1
+            fi
+            cat "$RESULTS/beta-install.txt"
+            adb shell dumpsys package "$BETA_PACKAGE" > "$RESULTS/installed-beta-package.txt"
+
+            echo "=== Upgrade to production APK without uninstalling ==="
+            if adb install -r "$PRODUCTION_APK" > "$RESULTS/production-upgrade.txt" 2>&1; then
+              cat "$RESULTS/production-upgrade.txt"
+              echo "=== Verify installed production version ==="
+              adb shell dumpsys package "$PROD_PACKAGE" > "$RESULTS/installed-production-package.txt"
+              adb shell monkey -p "$PROD_PACKAGE" 1 > "$RESULTS/launch-app.txt" 2>&1 || true
+              echo "UPGRADE_TEST_RESULT=PASS" | tee "$RESULTS/result.txt"
+              echo "In-place beta-to-production upgrade succeeded."
+            else
+              INSTALL_EXIT=$?
+              cat "$RESULTS/production-upgrade.txt"
+              adb shell dumpsys package "$BETA_PACKAGE" > "$RESULTS/installed-package-after-failure.txt" || true
+              adb logcat -d -b all > "$RESULTS/logcat-upgrade-failure.txt" || true
+              echo "UPGRADE_TEST_RESULT=FAIL (adb install exit $INSTALL_EXIT)" | tee "$RESULTS/result.txt"
+              exit "$INSTALL_EXIT"
+            fi
+
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: muziinap-apk-upgrade-emulator-diagnostics
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
