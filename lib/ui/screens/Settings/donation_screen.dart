@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A compact, playful donation page using MuziiNap's shared text theme.
+/// A compact, playful donation page for the MuziiNap team.
 /// Payment processing is intentionally not connected yet.
 class DonationScreen extends StatefulWidget {
   const DonationScreen({super.key});
@@ -14,6 +14,7 @@ class _DonationScreenState extends State<DonationScreen> {
   static const Color _primaryText = Colors.white;
   static const Color _secondaryText = Color(0xFFB3B3B3);
   static const Color _border = Color(0xFF383838);
+  static const Color _divider = Color(0xFF292929);
 
   static const List<_MealOption> _meals = [
     _MealOption(amount: 29, title: 'Choti Fries', emoji: '🍟'),
@@ -26,7 +27,6 @@ class _DonationScreenState extends State<DonationScreen> {
   final TextEditingController _messageController = TextEditingController();
 
   int? _selectedAmount = 99;
-  bool _monthlySupport = false;
 
   @override
   void dispose() {
@@ -57,23 +57,11 @@ class _DonationScreenState extends State<DonationScreen> {
         backgroundColor: _background,
         foregroundColor: _primaryText,
         elevation: 0,
-        centerTitle: true,
-        title: Text(
-          'Support Us',
-          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        title: const Text('Support Us'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: _divider),
         ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
-            color: const Color(0xFF171717),
-            onSelected: (value) {
-              if (value == 'close') Navigator.maybePop(context);
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'close', child: Text('Close')),
-            ],
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -118,34 +106,6 @@ class _DonationScreenState extends State<DonationScreen> {
             ),
             const SizedBox(height: 10),
             _buildCustomAmount(textTheme),
-            const SizedBox(height: 16),
-            Text(
-              'How Often Will You Feed Us? 😂',
-              style: textTheme.titleMedium?.copyWith(
-                color: _primaryText,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _FrequencyOption(
-                    title: 'One-time Donation',
-                    selected: !_monthlySupport,
-                    onTap: () => setState(() => _monthlySupport = false),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _FrequencyOption(
-                    title: 'Monthly Support',
-                    selected: _monthlySupport,
-                    onTap: () => setState(() => _monthlySupport = true),
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 16),
             Text(
               'Leave a Message for These Hungry Humans 💌',
@@ -233,7 +193,8 @@ class _DonationScreenState extends State<DonationScreen> {
                   width: 108,
                   height: 108,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Text('🐿️', style: TextStyle(fontSize: 72)),
+                  errorBuilder: (_, __, ___) =>
+                      const Text('🐿️', style: TextStyle(fontSize: 72)),
                 ),
               ),
               const Positioned(
@@ -394,7 +355,7 @@ class _MealOption {
   final String title;
   final String emoji;
 
-  String get label => '₹$amount $title $emoji';
+  String get label => '₹$amount $title';
 }
 
 class _MealCard extends StatelessWidget {
@@ -455,67 +416,6 @@ class _MealCard extends StatelessWidget {
                 ],
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FrequencyOption extends StatelessWidget {
-  const _FrequencyOption({
-    required this.title,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String title;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: selected ? Colors.white : Colors.black,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: selected ? Colors.white : const Color(0xFFB3B3B3),
-              width: selected ? 1.3 : 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                color: selected ? Colors.black : Colors.white,
-                size: 17,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: selected ? Colors.black : Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),
