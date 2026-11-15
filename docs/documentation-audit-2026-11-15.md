@@ -76,7 +76,7 @@ Source `lib/services/update_checker.dart` confirms:
 - Gets installed version from `PackageInfo.fromPlatform()`; prompts only if the latest stable version is newer.
 - Displays release-body notes.
 - Uses a 7-second HTTP timeout; non-200 and malformed JSON are errors. Startup catches/logs failures without blocking app startup; concurrent checks are coalesced.
-- Startup check runs once per app process after Home mounts. The Download action opens `https://telegram.me/muziinap/3` externally.
+- Startup check runs once per app process after Home mounts when the compile-time `updateCheckFlag` is enabled. The checked-in `lib/utils/update_check_flag_file.dart` defaults to `false`; both `muziinap-apk.yml` and `release.yml` replace it with `true` in the CI build workspace. The Download action opens `https://telegram.me/muziinap/3` externally.
 - No automatic GitHub APK asset download, in-app APK installation, or OTA update is implemented.
 
 The Telegram channel is the official APK distribution destination. MuziiNap-Official is the version/release metadata source, not APK hosting.

@@ -142,6 +142,6 @@ The exact workflow run for the exact commit must be checked before reporting suc
 ## Production download and update contract
 
 - APK distribution is through the official Telegram channel: https://telegram.me/muziinap/3. Do not describe GitHub Releases as the APK download host.
-- In-app version metadata is fetched from `https://api.github.com/repos/squiraldot/MuziiNap-Official/releases`; the checker filters drafts/prereleases, compares semantic versions, displays the release body, and opens the Telegram URL externally.
+- In-app version metadata is fetched from `https://api.github.com/repos/squiraldot/MuziiNap-Official/releases`; the checker filters drafts/prereleases, compares semantic versions, displays the release body, and opens the Telegram URL externally. The checked-in startup flag defaults to false; both APK build workflows set it true in the build workspace.
 - GitHub Releases in MuziiNap-Official are metadata, not APK assets. The checker does not download a GitHub asset, install an APK, or perform OTA updates.
 - The upcoming first production release target is v1.0.0; do not claim publication before a real release exists.

@@ -59,6 +59,7 @@ No Markdown file from the initial inventory was skipped. The historical security
 - Java 17; Android Gradle Plugin 8.11.1; Gradle 8.14.2; Kotlin 2.2.20; Android NDK 28.2.13676358.
 - Android namespace/application ID: `com.merrmist.muziinapmusic`.
 - APK distribution: official Telegram channel, https://telegram.me/muziinap/3.
+- Update checker: reads stable release metadata from the MuziiNap-Official GitHub Releases API, displays notes, and opens Telegram. The checked-in compile-time startup flag defaults to false; both APK workflows set it true in their build workspace. No APK auto-download or auto-install.
 - Version metadata: GitHub Releases API for the separate `squiraldot/MuziiNap-Official` repository. This is not APK hosting.
 - Owner-confirmed physical-device functional testing, including playback, is complete. This documentation audit did not execute a new device test.
 

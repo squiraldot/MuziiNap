@@ -104,7 +104,7 @@ Inspect source and current branch state first. Make the smallest coherent change
 
 - Official APK download channel: https://telegram.me/muziinap/3.
 - Version/release metadata API: https://api.github.com/repos/squiraldot/MuziiNap-Official/releases.
-- The checker filters draft/prerelease entries, compares semantic versions, displays release notes, and opens Telegram externally. It does not download GitHub APK assets or install/OTA-update the app.
+- The checker filters draft/prerelease entries, compares semantic versions, displays release notes, and opens Telegram externally. The checked-in startup flag defaults to false; both APK workflows set it true during their build. It does not download GitHub APK assets or install/OTA-update the app.
 - `release.yml` uploads Actions artifacts and checksum files; it does not publish a GitHub Release.
 - Owner-confirmed physical-device functional testing, including playback, is complete; do not claim this documentation task ran a new device test.
 - Isar remains a lazy scaffold; Hive is still the active persistence source of truth.

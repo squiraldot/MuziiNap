@@ -54,7 +54,7 @@ The Dart package name is **muziinap**. The Android namespace/application ID is *
 
 Download the Android APK from the [official MuziiNap Telegram channel](https://telegram.me/muziinap/3). MuziiNap does **not** distribute its APK through GitHub Releases. In-place updates require an APK signed with the same release signing identity; do not uninstall an existing installation unless you understand the effect on local app data.
 
-The in-app version checker reads GitHub Releases metadata from the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official), selects the highest stable semantic version, and opens the Telegram channel link when an update is available. GitHub is the version-metadata source; Telegram is the APK download destination. The checker does not install APKs automatically.
+The in-app version checker reads GitHub Releases metadata from the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official), selects the highest stable semantic version, and opens the Telegram channel link when an update is available. The checked-in compile-time flag defaults to disabled, while both APK build workflows set it to `true` in their build workspace. GitHub is the version-metadata source; Telegram is the APK download destination. The checker does not install APKs automatically.
 
 ## Development
 
