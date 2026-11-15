@@ -26,8 +26,8 @@ fi
   "$APKSIGNER" verify --print-certs "$PRODUCTION_APK"
 } | tee "$RESULTS/preflight.txt"
 
-BETA_PACKAGE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/.*name='\\([^']*\\)'.*/\\1/p")"
-PROD_PACKAGE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*name='\\([^']*\\)'.*/\\1/p")"
+BETA_PACKAGE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/^package: name='\\([^']*\\)'.*/\\1/p")"
+PROD_PACKAGE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/^package: name='\\([^']*\\)'.*/\\1/p")"
 BETA_CODE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
 PROD_CODE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*versionCode='\\([^']*\\)'.*/\\1/p")"
 BETA_CERT="$("$APKSIGNER" verify --print-certs "$BETA_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | sed -n '1p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
@@ -60,9 +60,26 @@ echo "=== Upgrade to production APK without uninstalling ==="
 if adb install -r "$PRODUCTION_APK" > "$RESULTS/production-upgrade.txt" 2>&1; then
   cat "$RESULTS/production-upgrade.txt"
   adb shell dumpsys package "$PROD_PACKAGE" > "$RESULTS/installed-production-package.txt"
-  adb shell monkey -p "$PROD_PACKAGE" 1 > "$RESULTS/launch-app.txt" 2>&1 || true
+  RESOLVED_ACTIVITY="$(adb shell cmd package resolve-activity --brief "$PROD_PACKAGE" | tr -d '\\r' | tail -n 1)"
+  if [[ -z "$RESOLVED_ACTIVITY" || "$RESOLVED_ACTIVITY" != */* || "$RESOLVED_ACTIVITY" == "No activity found" ]]; then
+    echo "::error::No launcher activity could be resolved for $PROD_PACKAGE."
+    adb shell dumpsys package "$PROD_PACKAGE" > "$RESULTS/installed-production-package.txt" || true
+    exit 1
+  fi
+  echo "Resolved launcher activity: $RESOLVED_ACTIVITY" | tee "$RESULTS/launch-app.txt"
+  if ! adb shell am start -W -n "$RESOLVED_ACTIVITY" >> "$RESULTS/launch-app.txt" 2>&1; then
+    cat "$RESULTS/launch-app.txt"
+    adb logcat -d -b all > "$RESULTS/logcat-launch-failure.txt" || true
+    exit 1
+  fi
+  if ! grep -q "Status: ok" "$RESULTS/launch-app.txt"; then
+    cat "$RESULTS/launch-app.txt"
+    adb logcat -d -b all > "$RESULTS/logcat-launch-failure.txt" || true
+    echo "::error::Production app launcher did not report Status: ok."
+    exit 1
+  fi
   echo "UPGRADE_TEST_RESULT=PASS" | tee "$RESULTS/result.txt"
-  echo "In-place beta-to-production upgrade succeeded."
+  echo "In-place beta-to-production upgrade and launch succeeded."
 else
   INSTALL_EXIT=$?
   cat "$RESULTS/production-upgrade.txt"
