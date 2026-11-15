@@ -96,9 +96,9 @@ jobs:
               echo
               echo "=== APK metadata ==="
               echo "-- Beta --"
-              "$AAPT" dump badging "$BETA_APK" | head -n 1
+              "$AAPT" dump badging "$BETA_APK" | sed -n '1p'
               echo "-- Production --"
-              "$AAPT" dump badging "$PRODUCTION_APK" | head -n 1
+              "$AAPT" dump badging "$PRODUCTION_APK" | sed -n '1p'
               echo
               echo "=== Signing certificates ==="
               echo "-- Beta --"
@@ -111,8 +111,8 @@ jobs:
             PROD_PACKAGE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*name='\([^']*\)'.*/\1/p")"
             BETA_CODE="$("$AAPT" dump badging "$BETA_APK" | sed -n "1s/.*versionCode='\([^']*\)'.*/\1/p")"
             PROD_CODE="$("$AAPT" dump badging "$PRODUCTION_APK" | sed -n "1s/.*versionCode='\([^']*\)'.*/\1/p")"
-            BETA_CERT="$("$APKSIGNER" verify --print-certs "$BETA_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-            PROD_CERT="$("$APKSIGNER" verify --print-certs "$PRODUCTION_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            BETA_CERT="$("$APKSIGNER" verify --print-certs "$BETA_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | sed -n '1p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            PROD_CERT="$("$APKSIGNER" verify --print-certs "$PRODUCTION_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | sed -n '1p' | tr -d ':' | tr '[:lower:]' '[:upper:]')"
 
             if [[ "$BETA_PACKAGE" != "$PROD_PACKAGE" ]]; then
               echo "::error::Package ID mismatch: beta=$BETA_PACKAGE production=$PROD_PACKAGE"
