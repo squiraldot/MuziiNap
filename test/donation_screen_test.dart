@@ -3,6 +3,42 @@ import 'package:flutter_test/flutter_test.dart';
 import '../lib/ui/screens/Settings/donation_screen.dart';
 
 void main() {
+  testWidgets('uses the active app theme for donation controls and colors', (tester) async {
+    const appTheme = ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.black,
+      cardColor: Color(0xFF121212),
+      colorScheme: ColorScheme.dark(
+        primary: Colors.white,
+        onPrimary: Colors.black,
+        onSurface: Colors.white,
+      ),
+      dividerColor: Color(0x33FFFFFF),
+      textTheme: TextTheme(
+        titleLarge: TextStyle(color: Colors.white, fontSize: 23),
+        titleMedium: TextStyle(color: Colors.white),
+        bodyLarge: TextStyle(color: Colors.white),
+        bodyMedium: TextStyle(color: Colors.white70),
+        bodySmall: TextStyle(color: Colors.white70),
+      ),
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        theme: appTheme,
+        home: DonationScreen(),
+      ),
+    );
+
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, appTheme.scaffoldBackgroundColor);
+
+    final button = tester.widget<FilledButton>(find.byType(FilledButton));
+    final buttonStyle = button.style!;
+    expect(buttonStyle.backgroundColor!.resolve({}), appTheme.colorScheme.primary);
+    expect(buttonStyle.foregroundColor!.resolve({}), appTheme.colorScheme.onPrimary);
+  });
+
   testWidgets('starts with the burger meal selected and About-style header', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
