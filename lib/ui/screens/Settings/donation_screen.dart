@@ -315,7 +315,10 @@ class _DonationScreenState extends State<DonationScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        border: Border.all(color: _border, width: 1.2),
+        border: Border.all(
+          color: _customAmountController.text.isNotEmpty ? Colors.white : _border,
+          width: _customAmountController.text.isNotEmpty ? 2.0 : 1.2,
+        ),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
