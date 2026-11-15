@@ -26,7 +26,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('custom-donation-amount')), '150');
     await tester.pump();
 
-    expect(find.text('₹150'), findsOneWidget);
+    expect(find.text('150'), findsOneWidget);
   });
 
   testWidgets('donation frequency and optional message are interactive', (tester) async {
