@@ -10,11 +10,6 @@ class DonationScreen extends StatefulWidget {
 }
 
 class _DonationScreenState extends State<DonationScreen> {
-  static const Color _background = Colors.black;
-  static const Color _primaryText = Colors.white;
-  static const Color _secondaryText = Color(0xFFB3B3B3);
-  static const Color _border = Color(0xFF383838);
-  static const Color _divider = Color(0xFF292929);
 
   static const List<_MealOption> _meals = [
     _MealOption(amount: 29, title: 'Choti Fries', emoji: '🍟'),
@@ -52,15 +47,15 @@ class _DonationScreenState extends State<DonationScreen> {
     final textTheme = theme.textTheme;
 
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: _background,
-        foregroundColor: _primaryText,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
         title: const Text('Support Us'),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: _divider),
+          child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
         ),
       ),
       body: SafeArea(
@@ -70,19 +65,18 @@ class _DonationScreenState extends State<DonationScreen> {
           children: [
             _buildHero(textTheme),
             const SizedBox(height: 12),
-            _buildDivider(),
+            _buildDivider(theme),
             const SizedBox(height: 14),
             Text(
               'Choose Our Next Meal 🍟',
               style: textTheme.titleMedium?.copyWith(
-                color: _primaryText,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               'Pick a meal to keep the code (and us) running! 😅',
-              style: textTheme.bodyMedium?.copyWith(color: _secondaryText),
+              style: textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),
             GridView.builder(
@@ -105,12 +99,11 @@ class _DonationScreenState extends State<DonationScreen> {
               },
             ),
             const SizedBox(height: 10),
-            _buildCustomAmount(textTheme),
+            _buildCustomAmount(theme),
             const SizedBox(height: 16),
             Text(
               'Leave a Message for These Hungry Humans 💌',
               style: textTheme.titleMedium?.copyWith(
-                color: _primaryText,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -127,11 +120,11 @@ class _DonationScreenState extends State<DonationScreen> {
                 // Intentionally a no-op until payment is implemented.
                 onPressed: () {},
                 style: FilledButton.styleFrom(
-                  backgroundColor: _primaryText,
-                  foregroundColor: Colors.black,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   shape: const StadiumBorder(),
                   textStyle: textTheme.bodyLarge?.copyWith(
-                    color: Colors.black,
+                    color: theme.colorScheme.onPrimary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -149,12 +142,12 @@ class _DonationScreenState extends State<DonationScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock_rounded, color: _secondaryText, size: 13),
+                Icon(Icons.lock_rounded, color: theme.colorScheme.onSurface, size: 13),
                 const SizedBox(width: 5),
                 Flexible(
                   child: Text(
                     'Secure Payment • UPI, Cards, Wallets & More',
-                    style: textTheme.bodySmall?.copyWith(color: _secondaryText),
+                    style: textTheme.bodySmall,
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -169,6 +162,7 @@ class _DonationScreenState extends State<DonationScreen> {
   }
 
   Widget _buildHero(TextTheme textTheme) {
+    final primaryTextColor = textTheme.titleLarge?.color ?? Colors.white;
     return Column(
       children: [
         SizedBox(
@@ -214,7 +208,7 @@ class _DonationScreenState extends State<DonationScreen> {
           'Feed Our Developers😝\n(Burgerrrr🍔)',
           textAlign: TextAlign.center,
           style: textTheme.titleLarge?.copyWith(
-            color: _primaryText,
+            color: primaryTextColor,
             fontWeight: FontWeight.w800,
             height: 1.05,
           ),
@@ -224,7 +218,7 @@ class _DonationScreenState extends State<DonationScreen> {
           "We're Hungry but our Pocket is Lonely😭",
           textAlign: TextAlign.center,
           style: textTheme.bodyLarge?.copyWith(
-            color: _primaryText,
+            color: textTheme.bodyLarge?.color,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -232,10 +226,10 @@ class _DonationScreenState extends State<DonationScreen> {
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(ThemeData theme) {
     return Row(
       children: [
-        const Expanded(child: Divider(color: _secondaryText, thickness: 1)),
+        Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 10),
           child: Text('🍔', style: TextStyle(fontSize: 17)),
@@ -245,19 +239,20 @@ class _DonationScreenState extends State<DonationScreen> {
     );
   }
 
-  Widget _buildCustomAmount(TextTheme textTheme) {
+  Widget _buildCustomAmount(ThemeData theme) {
+    final textTheme = theme.textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         border: Border.all(
-          color: _customAmountController.text.isNotEmpty ? Colors.white : _border,
+          color: _customAmountController.text.isNotEmpty ? theme.colorScheme.primary : theme.dividerColor,
           width: _customAmountController.text.isNotEmpty ? 1.5 : 1,
         ),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          const Icon(Icons.edit_outlined, color: _primaryText, size: 21),
+          Icon(Icons.edit_outlined, color: theme.colorScheme.onSurface, size: 21),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
@@ -267,7 +262,6 @@ class _DonationScreenState extends State<DonationScreen> {
                 Text(
                   'Custom Amount',
                   style: textTheme.bodyLarge?.copyWith(
-                    color: _primaryText,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -292,18 +286,18 @@ class _DonationScreenState extends State<DonationScreen> {
               ),
               decoration: InputDecoration(
                 prefixText: '₹ ',
-                prefixStyle: textTheme.bodyLarge?.copyWith(color: _primaryText),
+                prefixStyle: textTheme.bodyLarge,
                 hintText: '0',
-                hintStyle: textTheme.bodyLarge?.copyWith(color: _secondaryText),
+                hintStyle: textTheme.bodyLarge,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _secondaryText),
+                  borderSide: BorderSide(color: theme.dividerColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _primaryText, width: 1.3),
+                  borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.3),
                 ),
               ),
             ),
@@ -314,25 +308,26 @@ class _DonationScreenState extends State<DonationScreen> {
   }
 
   Widget _buildMessageField(TextTheme textTheme) {
+    final theme = Theme.of(context);
     return TextField(
       key: const Key('donation-message'),
       controller: _messageController,
       maxLength: 200,
       maxLines: 2,
       minLines: 2,
-      style: textTheme.bodyMedium?.copyWith(color: _primaryText),
+      style: textTheme.bodyMedium,
       decoration: InputDecoration(
         hintText: 'Say something before we eat your money... 😂',
-        hintStyle: textTheme.bodyMedium?.copyWith(color: _secondaryText),
+        hintStyle: textTheme.bodyMedium,
         counterText: '${_messageController.text.length} / 200',
-        counterStyle: textTheme.bodySmall?.copyWith(color: _secondaryText),
+        counterStyle: textTheme.bodySmall,
         filled: true,
-        fillColor: const Color(0xFF080808),
+        fillColor: theme.cardColor,
         isDense: true,
         contentPadding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _border, width: 1),
+          borderSide: BorderSide(color: theme.dividerColor, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -371,13 +366,14 @@ class _MealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
     return Semantics(
       button: true,
       selected: selected,
       label: meal.label,
       child: Material(
-        color: const Color(0xFF080808),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(13),
         child: InkWell(
           onTap: onTap,
@@ -387,7 +383,7 @@ class _MealCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                color: selected ? Colors.white : const Color(0xFF383838),
+                color: selected ? theme.colorScheme.primary : theme.dividerColor,
                 width: selected ? 1.7 : 1,
               ),
             ),
@@ -404,7 +400,6 @@ class _MealCard extends StatelessWidget {
                       maxLines: 1,
                       softWrap: false,
                       style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -412,7 +407,7 @@ class _MealCard extends StatelessWidget {
                 ),
                 if (selected) ...[
                   const SizedBox(width: 3),
-                  const Icon(Icons.check_circle, color: Colors.white, size: 15),
+                  Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 15),
                 ],
               ],
             ),
