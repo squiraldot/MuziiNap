@@ -60,7 +60,7 @@ echo "=== Upgrade to production APK without uninstalling ==="
 if adb install -r "$PRODUCTION_APK" > "$RESULTS/production-upgrade.txt" 2>&1; then
   cat "$RESULTS/production-upgrade.txt"
   adb shell dumpsys package "$PROD_PACKAGE" > "$RESULTS/installed-production-package.txt"
-  RESOLVED_ACTIVITY="$(adb shell cmd package resolve-activity --brief "$PROD_PACKAGE" | tr -d '\\r' | tail -n 1)"
+  RESOLVED_ACTIVITY="$(adb shell cmd package resolve-activity --brief "$PROD_PACKAGE" | tr -d '\r' | tail -n 1)"
   if [[ -z "$RESOLVED_ACTIVITY" || "$RESOLVED_ACTIVITY" != */* || "$RESOLVED_ACTIVITY" == "No activity found" ]]; then
     echo "::error::No launcher activity could be resolved for $PROD_PACKAGE."
     adb shell dumpsys package "$PROD_PACKAGE" > "$RESULTS/installed-production-package.txt" || true
