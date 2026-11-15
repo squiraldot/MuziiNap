@@ -119,7 +119,7 @@ The Android canonical song URL contract is documented in `docs/song-sharing-url-
 
 ## Current workflows and toolchain
 
-- Flutter `3.47.5`, Java `17`, Android NDK `27.0.12077973`.
+- Flutter `3.47.5`, Java `17`, Android NDK `28.2.13676358`.
 - `code_quality.yml`: push validation for `main` and `dev`, plus manual dispatch; Flutter/Android debug build, Isar code generation, native DSP unit tests, analyzer and Flutter tests.
 - `muziinap-apk.yml`: `main`/`dev` push or manual; signed universal release APK, signature verification, Dart/R8/native symbol capture, encrypted symbol artifact, and APK Actions artifact.
 - `release.yml` (inspected on `main`): `main` push or manual dispatch only; signed universal and split-ABI APKs, Dart/R8 symbol encryption, signature checks, SHA-256 checksums, and Actions artifact upload. No tag trigger and no GitHub Release publishing step.

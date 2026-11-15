@@ -91,7 +91,7 @@ See `docs/song-sharing-url-contract.md`.
 
 ## Current toolchain and workflow triggers
 
-- Dart SDK: `>=3.11.0 <4.0.0`; Flutter CI: `3.47.5`; Java: `17`; NDK: `27.0.12077973`.
+- Dart SDK: `>=3.11.0 <4.0.0`; Flutter CI: `3.47.5`; Java: `17`; AGP: `8.11.1`; Gradle: `8.14.2`; Kotlin: `2.2.20`; NDK: `28.2.13676358`.
 - Code quality and APK artifact workflows run on `main` and `dev` pushes/manual dispatch.
 - Release workflow runs on `main`, `v*.*.*` tags, or manual dispatch; it builds universal/ABI APKs and publishes verified assets.
 - Check exact-commit Actions runs; CI does not replace physical-device QA.

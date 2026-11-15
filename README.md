@@ -58,7 +58,7 @@ The in-app version checker reads GitHub Releases metadata from the separate [Muz
 
 ## Development
 
-Use Flutter **3.47.5**, Java **17**, and Android NDK **27.0.12077973** to match CI.
+Use Flutter **3.47.5**, Java **17**, Android NDK **28.2.13676358**, AGP **8.11.1**, Gradle **8.14.2**, and Kotlin **2.2.20** to match the current CI/build configuration.
 
 ### Branch workflow
 

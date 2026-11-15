@@ -143,3 +143,12 @@ This note supplements, and does not rewrite, the 2026-11-14 audit baseline and e
 - The current `main` `release.yml` workflow creates and verifies GitHub Actions artifacts (universal/ABI APKs and checksums); it does not publish GitHub Releases and is triggered by `main` pushes or manual dispatch, not version tags.
 
 The audit's historical final classification remains valid for its stated scope: the security layers are not security-complete. General real-device QA confirmation does not convert local APK integrity into server-side enforcement or establish the unverified security tests above.
+
+### Historical errata — workflow trigger and NDK references
+
+The 2026-11-14 report above contains two statements that were not accurate for the repository workflow/configuration snapshot reviewed during this synchronization:
+
+1. The report's NDK 27.0.12077973 reference is superseded. The current `android/app/build.gradle` and active CI NDK installation pin `28.2.13676358`.
+2. The report's statement that `release.yml` has a version-tag trigger is incorrect for the inspected workflow file. The actual `main` workflow triggers on `main` pushes and manual dispatch only. It has no tag trigger and no GitHub Release publishing step; it uploads GitHub Actions artifacts.
+
+These corrections do not erase the audit's historical CI run evidence or other findings. They correct the stated configuration facts against the inspected workflow and Gradle source.

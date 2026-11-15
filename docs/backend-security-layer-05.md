@@ -2,7 +2,7 @@
 
 **Target branch:** `dev`  
 **Audit / implementation:** 2026-11-14  
-**Implementation status:** Secure-storage migration implemented; automated CI tests verified on `dev` commit `ff3eb59582bf8514efc42bcf0ea985bbadf0c505`; physical-device migration and authenticated-flow verification remain pending.
+**Implementation status:** Secure-storage migration implemented; automated CI tests were verified on historical `dev` commit `ff3eb59582bf8514efc42bcf0ea985bbadf0c505`. The owner confirms general physical-device functional testing, including playback, is complete (2026-11-15); CredentialVault migration and authenticated-flow-specific device verification remain separately pending.
 
 ## Executive summary
 
