@@ -53,8 +53,8 @@ class _DonationScreenState extends State<DonationScreen> {
         foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
         title: const Text('Support Us'),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
           child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
         ),
       ),
@@ -109,7 +109,7 @@ class _DonationScreenState extends State<DonationScreen> {
             ),
             Text(
               '(Optional)',
-              style: textTheme.bodyMedium?.copyWith(color: _secondaryText),
+              style: textTheme.bodyMedium,
             ),
             const SizedBox(height: 8),
             _buildMessageField(textTheme),
@@ -162,7 +162,7 @@ class _DonationScreenState extends State<DonationScreen> {
   }
 
   Widget _buildHero(TextTheme textTheme) {
-    final primaryTextColor = textTheme.titleLarge?.color ?? Colors.white;
+    final primaryTextColor = textTheme.titleLarge?.color ?? Theme.of(context).colorScheme.onSurface;
     return Column(
       children: [
         SizedBox(
@@ -191,15 +191,15 @@ class _DonationScreenState extends State<DonationScreen> {
                       const Text('🐿️', style: TextStyle(fontSize: 72)),
                 ),
               ),
-              const Positioned(
+              Positioned(
                 left: 64,
                 top: 14,
-                child: Text('✦', style: TextStyle(color: Colors.white, fontSize: 16)),
+                child: Text('✦', style: TextStyle(color: primaryTextColor, fontSize: 16)),
               ),
-              const Positioned(
+              Positioned(
                 right: 58,
                 top: 20,
-                child: Text('✧', style: TextStyle(color: Colors.white, fontSize: 17)),
+                child: Text('✧', style: TextStyle(color: primaryTextColor, fontSize: 17)),
               ),
             ],
           ),
@@ -234,7 +234,7 @@ class _DonationScreenState extends State<DonationScreen> {
           padding: EdgeInsets.symmetric(horizontal: 10),
           child: Text('🍔', style: TextStyle(fontSize: 17)),
         ),
-        const Expanded(child: Divider(color: _secondaryText, thickness: 1)),
+        Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
       ],
     );
   }
@@ -267,7 +267,7 @@ class _DonationScreenState extends State<DonationScreen> {
                 ),
                 Text(
                   'Enter your own amount',
-                  style: textTheme.bodySmall?.copyWith(color: _secondaryText),
+                  style: textTheme.bodySmall,
                 ),
               ],
             ),
@@ -281,7 +281,7 @@ class _DonationScreenState extends State<DonationScreen> {
               onChanged: _onCustomAmountChanged,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: textTheme.bodyLarge?.copyWith(
-                color: _primaryText,
+                color: theme.colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
               decoration: InputDecoration(
@@ -331,7 +331,7 @@ class _DonationScreenState extends State<DonationScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _primaryText, width: 1.3),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.3),
         ),
       ),
       onChanged: (_) => setState(() {}),
