@@ -6,18 +6,27 @@ void main() {
   testWidgets('starts with the burger meal selected', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
-    expect(find.text('₹99'), findsOneWidget);
+    expect(find.text('₹99 Burger 🍔'), findsOneWidget);
     expect(find.text("We're Hungry but our Pocket is Lonely😭"), findsOneWidget);
     expect(find.text('Feed These Hungry Devs 🍔'), findsOneWidget);
+  });
+
+  testWidgets('shows all four meal choices as single-line labels', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
+
+    expect(find.text('₹29 Choti Fries 🍟'), findsOneWidget);
+    expect(find.text('₹59 Cold Drink 🥤'), findsOneWidget);
+    expect(find.text('₹99 Burger 🍔'), findsOneWidget);
+    expect(find.text('₹199 Full Meal 🍕'), findsOneWidget);
   });
 
   testWidgets('selecting a meal updates the selected amount', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
-    await tester.tap(find.text('Choti Fries'));
+    await tester.tap(find.text('₹29 Choti Fries 🍟'));
     await tester.pumpAndSettle();
 
-    expect(find.text('₹29'), findsOneWidget);
+    expect(find.text('₹29 Choti Fries 🍟'), findsOneWidget);
   });
 
   testWidgets('custom amount input accepts a user-entered amount', (tester) async {
