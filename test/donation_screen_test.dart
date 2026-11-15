@@ -4,7 +4,7 @@ import '../lib/ui/screens/Settings/donation_screen.dart';
 
 void main() {
   testWidgets('uses the active app theme for donation controls and colors', (tester) async {
-    const appTheme = ThemeData(
+    final appTheme = ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: Colors.black,
       cardColor: Color(0xFF121212),
@@ -24,7 +24,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         theme: appTheme,
         home: DonationScreen(),
       ),
