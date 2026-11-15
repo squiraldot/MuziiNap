@@ -107,4 +107,4 @@ The current workflow definitions were inspected independently on `main` (the bra
 
 Neither workflow is the public APK distribution channel. The owner-provided distribution path is Telegram: https://telegram.me/muziinap/3. The separate `MuziiNap-Official` repository supplies release metadata to the app's version checker. GitHub Actions build artifacts and the encrypted diagnostic-symbol artifacts must not be described as public end-user APK releases.
 
-The first production release target is `v1.0.0`, not yet published. The current source version remains `1.0.0-beta.1+1` in `pubspec.yaml`.
+The configured production release version is `v1.0.0`; `pubspec.yaml` is `1.0.0+2` (`versionName` `1.0.0`, `versionCode` `2`). The `main` workflow uses this configured version in artifact and checksum names. It does not itself publish a GitHub Release or Telegram APK.

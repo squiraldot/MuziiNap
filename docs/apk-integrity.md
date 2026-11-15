@@ -80,4 +80,4 @@ Both workflows restore signing material from GitHub Actions Secrets. The release
 - Flutter action: `3.47.5`; Flutter git submodule commit: `84abdf7372654171e0a66174be2846f53331f6ab`.
 - Java: 17; Android Gradle Plugin: 8.11.1; Gradle wrapper: 8.14.2; Kotlin: 2.2.20; Android NDK: 28.2.13676358.
 - Dart SDK constraint: `>=3.11.0 <4.0.0`.
-- Current configured app version: `1.0.0-beta.1+1`; v1.0.0 is the upcoming first production release target, not a published release.
+- Current configured production app version: `1.0.0+2` (`versionName` `1.0.0`, Android `versionCode` `2`). The `release.yml` workflow derives artifact filenames and checksum names from this version. APK publication to Telegram remains a separate owner-operated step.

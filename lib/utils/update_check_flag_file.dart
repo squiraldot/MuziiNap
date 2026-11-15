@@ -1,4 +1,5 @@
 // this file is intended to disbale update check for F-Droid build
-// GitHub released apks are still be able to provide you new Version notification (will build locally after enabling this flag)
-// If you want to enable update check please enable this flag locally & build your apk
+// Official APK distribution is through the MuziiNap Telegram channel.
+// Version metadata is read from the separate MuziiNap-Official GitHub Releases API.
+// CI release workflows enable this flag in their build workspace; keep the source default disabled for F-Droid builds.
 const updateCheckFlag = false;

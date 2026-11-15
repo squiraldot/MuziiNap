@@ -43,4 +43,4 @@ The current `main` release workflow builds a universal APK plus ABI-specific APK
 
 The separate `muziinap-apk.yml` workflow builds a universal APK on `main`/`dev` pushes or manual dispatch and uploads build/symbol artifacts. Public APK distribution is through https://telegram.me/muziinap/3. The in-app checker obtains version metadata from https://github.com/squiraldot/MuziiNap-Official; that repository is not the APK distribution destination.
 
-Current toolchain: Flutter 3.47.5 (submodule commit `84abdf7372654171e0a66174be2846f53331f6ab`), Java 17, AGP 8.11.1, Gradle 8.14.2, Kotlin 2.2.20, NDK 28.2.13676358. Current `pubspec.yaml` version is `1.0.0-beta.1+1`; v1.0.0 is the upcoming first production release target, not yet published.
+Current toolchain: Flutter 3.47.5 (submodule commit `84abdf7372654171e0a66174be2846f53331f6ab`), Java 17, AGP 8.11.1, Gradle 8.14.2, Kotlin 2.2.20, NDK 28.2.13676358. Current `pubspec.yaml` version is `1.0.0+2` (`versionName` `1.0.0`, Android `versionCode` `2`); the configured production release version is `v1.0.0`.

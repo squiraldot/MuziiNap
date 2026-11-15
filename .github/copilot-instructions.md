@@ -15,7 +15,7 @@ These instructions describe the current repository configuration. If documentati
 - Dart package name: muziinap
 - Android namespace and application ID: com.merrmist.muziinapmusic
 - Dart SDK constraint: >=3.11.0 <4.0.0
-- Current source version: `1.0.0-beta.1+1` (`pubspec.yaml`); first production target: `v1.0.0`, not yet published.
+- Current production source version: `1.0.0+2` (`pubspec.yaml`): Android `versionName` 1.0.0 and `versionCode` 2. The release workflow builds artifacts only; publication/distribution is owner-operated.
 - CI Flutter version: 3.47.5 (Flutter submodule gitlink: `84abdf7372654171e0a66174be2846f53331f6ab`)
 - Java: 17; Gradle: 8.14.2; Android Gradle Plugin: 8.11.1; Kotlin: 2.2.20; Android NDK: 28.2.13676358
 - Keep the Android application ID, namespace, signing identity expectations, and persisted-data compatibility stable unless explicitly authorized.
@@ -144,4 +144,4 @@ The exact workflow run for the exact commit must be checked before reporting suc
 - APK distribution is through the official Telegram channel: https://telegram.me/muziinap/3. Do not describe GitHub Releases as the APK download host.
 - In-app version metadata is fetched from `https://api.github.com/repos/squiraldot/MuziiNap-Official/releases`; the checker filters drafts/prereleases, compares semantic versions, displays the release body, and opens the Telegram URL externally. The checked-in startup flag defaults to false; both APK build workflows set it true in the build workspace.
 - GitHub Releases in MuziiNap-Official are metadata, not APK assets. The checker does not download a GitHub asset, install an APK, or perform OTA updates.
-- The upcoming first production release target is v1.0.0; do not claim publication before a real release exists.
+- The configured production release version is v1.0.0. Do not claim a public release was published unless the owner confirms publication; this repository workflow only builds Actions artifacts.

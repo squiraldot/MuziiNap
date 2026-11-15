@@ -4,7 +4,7 @@
 **Repository:** `squiraldot/MuziiNap`  
 **Documentation target:** `dev` only  
 **Baseline commit:** `e643c8522924f01d633ad0a50ad61a1e52cb05ea`  
-**First production release target:** `v1.0.0` (not yet published)
+**Production release version after the subsequent dev-branch version update:** `v1.0.0` (`pubspec.yaml` `1.0.0+2`; Android `versionName` `1.0.0`, `versionCode` `2`).
 
 ## Branch verification
 
@@ -37,8 +37,7 @@ The initial recursive Git-tree scan found **13** Markdown files. All 13 were ind
 
 ## Source/configuration facts verified
 
-- Dart package: `muziinap`; configured version: `1.0.0-beta.1+1`; SDK constraint: `>=3.11.0 <4.0.0`.
-- First production target: `v1.0.0`, not yet published. No version configuration was changed.
+- Historical baseline for this audit: Dart package `muziinap`, version `1.0.0-beta.1+1`, SDK constraint `>=3.11.0 <4.0.0`. A subsequent version update changed the configured production version to `1.0.0+2` (`versionName` `1.0.0`, `versionCode` `2`).
 - Flutter CI action: 3.47.5; Flutter submodule gitlink: `84abdf7372654171e0a66174be2846f53331f6ab`.
 - Java 17; AGP 8.11.1; Gradle wrapper 8.14.2; Kotlin 2.2.20; Android NDK 28.2.13676358.
 - Android namespace/application ID: `com.merrmist.muziinapmusic`.
@@ -119,4 +118,14 @@ The README and maintained docs now point APK downloads to Telegram and distingui
 
 ## Change isolation gate
 
-Only `.md`, `.mdx`, and `.markdown` paths are allowed in the final diff. Source, dependency/lockfile, workflow, YAML/JSON, Gradle, Kotlin, Java, XML, localization, test, submodule and other non-Markdown paths must remain untouched. All documentation writes target the existing `dev` ref. No merge, cherry-pick, rebase, new branch, tag, APK upload, GitHub Release or v1.0.0 publication is part of this task.
+Only `.md`, `.mdx`, and `.markdown` paths are allowed in the final diff. Source, dependency/lockfile, workflow, YAML/JSON, Gradle, Kotlin, Java, XML, localization, test, submodule and other non-Markdown paths must remain untouched. All documentation writes target the existing `dev` ref. No merge, cherry-pick, rebase, new branch, tag, APK upload or GitHub Release publication was part of the documentation-only audit. A later, separately authorized version update is recorded in the production-version addendum.
+
+## Superseding production version update
+
+The original audit above recorded the beta version as it existed at that historical baseline. The subsequent production version update on `dev` sets:
+
+- `pubspec.yaml`: `1.0.0+2`
+- Android `versionName`: `1.0.0`
+- Android `versionCode`: `2`
+
+The prior beta version is retained only as historical baseline information. Release workflow definitions and distribution policy remain unchanged: the `main` workflow generates GitHub Actions artifacts; the owner separately distributes the APK through Telegram. This update does not claim that a public APK or GitHub Release has already been published.

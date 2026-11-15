@@ -17,7 +17,7 @@ This file is the concise project-specific memory. Detailed coding rules live in 
 - Java: 17
 - Android Gradle Plugin: 8.11.1; Gradle wrapper: 8.14.2; Kotlin: 2.2.20; NDK: 28.2.13676358
 - Flutter submodule gitlink: 84abdf7372654171e0a66174be2846f53331f6ab
-- Current configured app version: 1.0.0-beta.1+1; first production target v1.0.0 is not yet published
+- Current production app version: 1.0.0+2 (Android versionName 1.0.0, versionCode 2); release version v1.0.0
 
 Treat package name, application ID, namespace, release signing identity, and stored-data identifiers as compatibility-sensitive.
 

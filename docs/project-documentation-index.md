@@ -3,7 +3,7 @@
 **Repository:** `squiraldot/MuziiNap`  
 **Documentation branch:** `dev`  
 **Current source snapshot:** 15 November 2026 — `e643c8522924f01d633ad0a50ad61a1e52cb05ea`  
-**First production target:** `v1.0.0` (not yet published)
+**Configured production release version:** `v1.0.0`
 
 This index is the complete Markdown inventory for the current source snapshot. Every `.md`, `.mdx`, and `.markdown` file was enumerated recursively from the `dev` Git tree and inspected individually. The current inventory contains 13 pre-existing Markdown files; this synchronization adds the audit report, bringing the final inventory to 14.
 
@@ -53,7 +53,7 @@ No Markdown file from the initial inventory was skipped. The historical security
 
 ## Current toolchain and release state
 
-- Current `pubspec.yaml` version: `1.0.0-beta.1+1`; target first production release: `v1.0.0`, not yet published.
+- Current `pubspec.yaml` version: `1.0.0+2`; Android `versionName`: `1.0.0`; Android `versionCode`: `2`. This is the configured production release version.
 - Dart SDK constraint: `>=3.11.0 <4.0.0`.
 - Flutter CI action: `3.47.5`; Flutter submodule gitlink: `84abdf7372654171e0a66174be2846f53331f6ab`.
 - Java 17; Android Gradle Plugin 8.11.1; Gradle 8.14.2; Kotlin 2.2.20; Android NDK 28.2.13676358.
@@ -85,3 +85,11 @@ No Markdown file from the initial inventory was skipped. The historical security
 - Contributors maintain source-aligned docs on `dev`; release workflow changes require separate explicit authorization.
 - Before documenting CI success, inspect the workflow run for the exact commit. CI is not a substitute for physical-device evidence.
 - Update this index whenever a Markdown file is added, moved or removed. Keep relative links valid and preserve historical records.
+
+## Production versioning policy
+
+- Flutter package version: `1.0.0+2`.
+- Android user-visible `versionName`: `1.0.0`.
+- Android monotonically increasing `versionCode`: `2`, greater than the prior beta build code `1` so Android can update an existing beta installation when the signing identity matches.
+- Flutter Gradle integration derives the Android version values from the package version during Flutter builds. The explicit `android/app/build.gradle` fallback values are also aligned to `versionName 1.0.0` and `versionCode 2`.
+- Do not include the build suffix `+2` in user-facing release labels or APK release version names; use `v1.0.0`.

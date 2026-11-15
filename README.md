@@ -50,7 +50,7 @@ The Dart package name is **muziinap**. The Android namespace/application ID is *
 
 ## Download and update
 
-**First production release target: MuziiNap v1.0.0 (not yet published).** The current source configuration still declares `1.0.0-beta.1+1`; this documentation target does not change the configured app version.
+**Production release version: MuziiNap v1.0.0.** The source configures `versionName` `1.0.0` and Android `versionCode` `2` (`pubspec.yaml`: `1.0.0+2`).
 
 Download the Android APK from the [official MuziiNap Telegram channel](https://telegram.me/muziinap/3). MuziiNap does **not** distribute its APK through GitHub Releases. In-place updates require an APK signed with the same release signing identity; do not uninstall an existing installation unless you understand the effect on local app data.
 
@@ -95,7 +95,7 @@ Check the actual workflow run for the commit being evaluated before describing C
 
 ## First production release and distribution
 
-The planned first production release is **v1.0.0**. It has not been published as of this documentation snapshot. The official APK download destination is [Telegram](https://telegram.me/muziinap/3); the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official) supplies release metadata to the in-app checker. The repository's `release.yml` workflow creates GitHub Actions artifacts, not GitHub Releases.
+The configured production release version is **v1.0.0**. APK distribution remains through the [official Telegram channel](https://telegram.me/muziinap/3); the separate [MuziiNap-Official repository](https://github.com/squiraldot/MuziiNap-Official) supplies release metadata to the in-app checker. The repository's `release.yml` workflow creates GitHub Actions artifacts, not GitHub Releases. This documentation update does not itself publish an APK or GitHub Release.
 
 ## APK integrity
 

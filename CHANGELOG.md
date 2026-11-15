@@ -1,6 +1,6 @@
-## Unreleased
+## v1.0.0
 
-> First production release target: **MuziiNap v1.0.0**. This is a preparation target, not a published release. The current `pubspec.yaml` version remains `1.0.0-beta.1+1` until a separately authorized release change.
+> **Production version:** MuziiNap `v1.0.0` (`pubspec.yaml`: `1.0.0+2`; Android `versionName`: `1.0.0`; `versionCode`: `2`).
 
 ### Android release build security
 
