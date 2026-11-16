@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,8 +11,9 @@ class DonationScreen extends StatefulWidget {
 }
 
 class _DonationScreenState extends State<DonationScreen> {
-
   static const String _supportUrl = 'https://buymeacoffee.com/realmerrmist';
+  static const String _illustrationUrl =
+      'https://raw.githubusercontent.com/squiraldot/MuziiNap-Official/refs/heads/main/assets/donation_illustration.png';
 
   Future<void> _openSupportPage() async {
     final uri = Uri.parse(_supportUrl);
@@ -19,13 +21,17 @@ class _DonationScreenState extends State<DonationScreen> {
       final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the support page. Please try again.')),
+          const SnackBar(
+            content: Text('Could not open the support page. Please try again.'),
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the support page. Please try again.')),
+          const SnackBar(
+            content: Text('Could not open the support page. Please try again.'),
+          ),
         );
       }
     }
@@ -35,6 +41,7 @@ class _DonationScreenState extends State<DonationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final screenHeight = MediaQuery.sizeOf(context).height;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -51,19 +58,53 @@ class _DonationScreenState extends State<DonationScreen> {
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
           children: [
-            _buildHero(textTheme),
-            const SizedBox(height: 12),
-            _buildDivider(theme),
-            const SizedBox(height: 14),
-            SizedBox(
-              key: const Key('latest-supporters-reserved-space'),
-              height: MediaQuery.sizeOf(context).height * 0.42,
+            CachedNetworkImage(
+              key: const Key('donation-illustration'),
+              imageUrl: _illustrationUrl,
+              height: 226,
+              width: double.infinity,
+              fit: BoxFit.contain,
+              placeholder: (_, __) => const SizedBox(
+                height: 226,
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (_, __, ___) => SizedBox(
+                height: 226,
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Text(
+              'Feed our Developers\n(Pizzaa🍕)',
+              key: const Key('donation-heading'),
+              textAlign: TextAlign.center,
+              style: textTheme.headlineSmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontSize: 34,
+                fontWeight: FontWeight.w600,
+                height: 1.18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "We're Hungry but our Pocket is Lonely😭",
+              textAlign: TextAlign.center,
+              style: textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 28),
             SizedBox(
-              height: 48,
+              height: 54,
               child: FilledButton(
                 onPressed: _openSupportPage,
                 style: FilledButton.styleFrom(
@@ -79,124 +120,55 @@ class _DonationScreenState extends State<DonationScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('Buy a Pizzaa for Us!🍕'),
-                    SizedBox(width: 10),
-                    Icon(Icons.arrow_forward_rounded, size: 20),
+                    SizedBox(width: 12),
+                    Icon(Icons.arrow_forward_rounded, size: 21),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.lock_rounded, color: theme.colorScheme.onSurface, size: 13),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    'Secure Payment with Stripe',
-                    style: textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                Icon(
+                  Icons.lock_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 14,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  'Secure Payment with Stripe',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
+            ),
+            const SizedBox(height: 30),
+            Container(
+              key: const Key('latest-supporters-panel'),
+              height: (screenHeight * 0.46).clamp(320.0, 760.0),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(32),
+              ),
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Currently no one Feeding Us! (TT)',
+                textAlign: TextAlign.center,
+                style: textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.58,
+                  ),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildHero(TextTheme textTheme) {
-    final primaryTextColor = textTheme.titleLarge?.color ?? Theme.of(context).colorScheme.onSurface;
-    return Column(
-      children: [
-        SizedBox(
-          height: 112,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned(
-                left: 12,
-                bottom: 14,
-                child: _FoodEmoji('🍕', size: 34),
-              ),
-              Positioned(
-                right: 12,
-                bottom: 16,
-                child: _FoodEmoji('🥤', size: 32),
-              ),
-              Positioned(
-                top: 0,
-                child: Image.asset(
-                  'assets/icons/icon.png',
-                  width: 108,
-                  height: 108,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      const Text('🐿️', style: TextStyle(fontSize: 72)),
-                ),
-              ),
-              Positioned(
-                left: 64,
-                top: 14,
-                child: Text('✦', style: TextStyle(color: primaryTextColor, fontSize: 16)),
-              ),
-              Positioned(
-                right: 58,
-                top: 20,
-                child: Text('✧', style: TextStyle(color: primaryTextColor, fontSize: 17)),
-              ),
-            ],
-          ),
-        ),
-        Text(
-          'Feed Our Developers😝 (Pizzaa!🍕)',
-          textAlign: TextAlign.center,
-          style: textTheme.titleLarge?.copyWith(
-            color: primaryTextColor,
-            fontWeight: FontWeight.w800,
-            height: 1.05,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          "We're Hungry but our Pocket is Lonely😭",
-          textAlign: TextAlign.center,
-          style: textTheme.bodyLarge?.copyWith(
-            color: textTheme.bodyLarge?.color,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text('🍕', style: TextStyle(fontSize: 17)),
-        ),
-        Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
-      ],
-    );
-  }
-
-
-}
-
-class _FoodEmoji extends StatelessWidget {
-  const _FoodEmoji(this.emoji, {required this.size});
-
-  final String emoji;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(emoji, style: TextStyle(fontSize: size));
   }
 }
