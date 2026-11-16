@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,10 +37,18 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
     expect(find.text('Support Us'), findsOneWidget);
-    expect(find.text('Feed Our Developers😝 (Pizzaa!🍕)'), findsOneWidget);
+    expect(find.text('Feed our Developers\\n(Pizzaa🍕)'), findsOneWidget);
     expect(find.text('Buy a Pizzaa for Us!🍕'), findsOneWidget);
     expect(find.text('Secure Payment with Stripe'), findsOneWidget);
-    expect(find.byKey(const Key('latest-supporters-reserved-space')), findsOneWidget);
+    expect(find.byKey(const Key('latest-supporters-panel')), findsOneWidget);
+    expect(find.text('Currently no one Feeding Us! (TT)'), findsOneWidget);
+    final illustration = tester.widget<CachedNetworkImage>(
+      find.byKey(const Key('donation-illustration')),
+    );
+    expect(
+      illustration.imageUrl,
+      'https://raw.githubusercontent.com/squiraldot/MuziiNap-Official/refs/heads/main/assets/donation_illustration.png',
+    );
     expect(find.text('Choose Our Next Meal 🍟'), findsNothing);
     expect(find.text('Leave a Message for These Hungry Humans 💌'), findsNothing);
   });
