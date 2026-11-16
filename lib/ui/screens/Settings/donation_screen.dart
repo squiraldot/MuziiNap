@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// A compact, playful donation page for the MuziiNap team.
-/// Support page linking to the MuziiNap Buy Me a Coffee page.
+/// A playful MuziiNap support page linking to Buy Me a Coffee.
 class DonationScreen extends StatefulWidget {
   const DonationScreen({super.key});
 
@@ -180,7 +179,7 @@ class _DonationScreenState extends State<DonationScreen> {
         Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text('🍔', style: TextStyle(fontSize: 17)),
+          child: Text('🍕', style: TextStyle(fontSize: 17)),
         ),
         Expanded(child: Divider(color: theme.dividerColor, thickness: 1)),
       ],
