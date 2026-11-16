@@ -37,7 +37,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
     expect(find.text('Support Us'), findsOneWidget);
-    expect(find.text('Feed our Developers\\n(Pizzaa🍕)'), findsOneWidget);
+    expect(find.text('Feed our Developers\n(Pizzaa🍕)'), findsOneWidget);
     expect(find.text('Buy a Pizzaa for Us!🍕'), findsOneWidget);
     expect(find.text('Secure Payment with Stripe'), findsOneWidget);
     expect(find.byKey(const Key('latest-supporters-panel')), findsOneWidget);
