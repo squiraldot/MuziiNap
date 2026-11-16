@@ -188,3 +188,15 @@ class _DonationScreenState extends State<DonationScreen> {
 
 
 }
+
+class _FoodEmoji extends StatelessWidget {
+  const _FoodEmoji(this.emoji, {required this.size});
+
+  final String emoji;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(emoji, style: TextStyle(fontSize: size));
+  }
+}
