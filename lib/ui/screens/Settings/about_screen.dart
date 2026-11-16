@@ -160,8 +160,8 @@ class AboutScreen extends StatelessWidget {
             const SizedBox(height: 10),
             _AboutLinkTile(
               icon: Icons.lunch_dining_rounded,
-              title: 'Feed Our Developers (Burgerrrr🍔)',
-              subtitle: "We're Hungry but our Pocket is Lonely😭",
+              title: 'Feed Our Developers (Pizzaa🍕)',
+              subtitle: "Feed Us or we'll Cry 😭",
               onTap: () => Get.to(() => const DonationScreen()),
             ),
             const SizedBox(height: 18),
