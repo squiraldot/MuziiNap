@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/ui/screens/Settings/donation_screen.dart';
 
@@ -24,78 +25,53 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: appTheme,
-        home: DonationScreen(),
-      ),
+      MaterialApp(theme: appTheme, home: DonationScreen()),
     );
 
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
     expect(scaffold.backgroundColor, appTheme.scaffoldBackgroundColor);
-
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    final buttonStyle = button.style!;
-    expect(buttonStyle.backgroundColor!.resolve({}), appTheme.colorScheme.primary);
-    expect(buttonStyle.foregroundColor!.resolve({}), appTheme.colorScheme.onPrimary);
   });
 
-  testWidgets('starts with the burger meal selected and About-style header', (tester) async {
+  testWidgets('shows updated pizza copy and keeps the supporters area reserved', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
     expect(find.text('Support Us'), findsOneWidget);
-    expect(find.text('₹99 Burger'), findsOneWidget);
-    expect(find.text("We're Hungry but our Pocket is Lonely😭"), findsOneWidget);
-    expect(find.text('Feed These Hungry Devs 🍔'), findsOneWidget);
-    expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+    expect(find.text('Feed Our Developers😝 (Pizzaa!🍕)'), findsOneWidget);
+    expect(find.text('Buy a Pizzaa for Us!🍕'), findsOneWidget);
+    expect(find.text('Secure Payment with Stripe'), findsOneWidget);
+    expect(find.byKey(const Key('latest-supporters-reserved-space')), findsOneWidget);
+    expect(find.text('Choose Our Next Meal 🍟'), findsNothing);
+    expect(find.text('Leave a Message for These Hungry Humans 💌'), findsNothing);
   });
 
-  testWidgets('shows meal labels without repeating their leading emojis', (tester) async {
+  testWidgets('removes the retired meal and message form controls', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
 
-    expect(find.text('₹29 Choti Fries'), findsOneWidget);
-    expect(find.text('₹59 Cold Drink'), findsOneWidget);
-    expect(find.text('₹99 Burger'), findsOneWidget);
-    expect(find.text('₹199 Full Meal'), findsOneWidget);
-    expect(find.text('₹29 Choti Fries 🍟'), findsNothing);
-    expect(find.text('₹59 Cold Drink 🥤'), findsNothing);
+    expect(find.text('₹29 Choti Fries'), findsNothing);
+    expect(find.text('₹59 Cold Drink'), findsNothing);
+    expect(find.text('₹99 Burger'), findsNothing);
+    expect(find.text('₹199 Full Meal'), findsNothing);
+    expect(find.byKey(const Key('custom-donation-amount')), findsNothing);
+    expect(find.byKey(const Key('donation-message')), findsNothing);
   });
 
-  testWidgets('does not show donation frequency choices', (tester) async {
+  testWidgets('Buy a Pizzaa CTA opens the Buy Me a Coffee page', (tester) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    String? launchedUrl;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'launch') {
+        launchedUrl = call.arguments['url'] as String?;
+      }
+      return true;
+    });
+
     await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
-
-    expect(find.text('How Often Will You Feed Us? 😂'), findsNothing);
-    expect(find.text('One-time Donation'), findsNothing);
-    expect(find.text('Monthly Support'), findsNothing);
-  });
-
-  testWidgets('selecting a meal updates the selected amount', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
-
-    await tester.tap(find.text('₹29 Choti Fries'));
+    await tester.tap(find.text('Buy a Pizzaa for Us!🍕'));
     await tester.pumpAndSettle();
 
-    expect(find.text('₹29 Choti Fries'), findsOneWidget);
-  });
-
-  testWidgets('custom amount input accepts a user-entered amount', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
-
-    await tester.enterText(find.byKey(const Key('custom-donation-amount')), '150');
-    await tester.pump();
-
-    expect(find.text('150'), findsOneWidget);
-  });
-
-  testWidgets('optional message remains editable', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: DonationScreen()));
-
-    await tester.enterText(
-      find.byKey(const Key('donation-message')),
-      'Keep building!',
-    );
-    await tester.pump();
-
-    expect(find.text('Keep building!'), findsOneWidget);
-    expect(find.text('14 / 200'), findsOneWidget);
+    expect(launchedUrl, 'https://buymeacoffee.com/realmerrmist');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
   });
 }
