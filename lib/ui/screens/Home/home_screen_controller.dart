@@ -12,6 +12,7 @@ import '../../../models/album.dart';
 import '../../../models/playlist.dart';
 import '../../../models/quick_picks.dart';
 import '../../../utils/home_history.dart';
+import '../../../utils/home_load_generation.dart';
 import '../../../utils/youtube_auth.dart';
 import '../../../models/home_mood.dart';
 import '../../../services/music_service.dart';
@@ -31,6 +32,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   final List<ScrollController> contentScrollControllers = [];
   bool reverseAnimationtransiton = false;
   bool _homeRefreshInProgress = false;
+  final HomeLoadGeneration _homeLoadGeneration = HomeLoadGeneration();
   String _homeContextSignature = '';
   List<HomeMood> homeMoods = <HomeMood>[];
   /// Reactive snapshot of the currently authenticated YouTube account.
@@ -267,6 +269,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
     String contentType = box.get("discoverContentType") ?? "QP";
 
     networkError.value = false;
+    final loadGeneration = _homeLoadGeneration.begin();
     try {
       List middleContentTemp = [];
       final isAuthenticatedHome =
@@ -316,17 +319,24 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
             .value,
         allSections: isAuthenticatedHome,
         onInitialResults: isAuthenticatedHome
-            ? _applyAuthenticatedHomeSections
+            ? (sections) {
+                if (_homeLoadGeneration.isCurrent(loadGeneration)) {
+                  _applyAuthenticatedHomeSections(sections);
+                }
+              }
             : null,
       );
+      if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
 
       if (isAuthenticatedHome) {
         final authenticatedMoods = await authenticatedMoodsFuture;
+        if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
         homeMoods = authenticatedMoods.whereType<HomeMood>().toList();
       }
 
       if (!isAuthenticatedHome) {
         final independentSources = await independentSourcesFuture;
+        if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
         newReleaseSections = independentSources[0] is List
             ? List<dynamic>.from(independentSources[0] as List)
             : <dynamic>[];
@@ -371,6 +381,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         } catch (e) {
           printINFO("YouTube history unavailable: $e");
         }
+        if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
       }
 
       // For a signed-in YouTube Music account, use the complete personalized
@@ -389,6 +400,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
           _musicServices.getNewReleases(limit: 12).catchError((_) => <dynamic>[]),
           _musicServices.getHomeCharts(country: 'TR').catchError((_) => <dynamic>[]),
         ]);
+        if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
         newReleaseSections = fallbackSources[0] is List
             ? List<dynamic>.from(fallbackSources[0] as List)
             : <dynamic>[];
@@ -399,6 +411,8 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         middleContentTemp.addAll(chartSections);
       }
 
+      if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
+
       if (!isAuthenticatedHome && contentType == "TR") {
         final index = homeContentListMap
             .indexWhere((element) => element['title'] == "Trending");
@@ -408,6 +422,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
               title: "Trending");
         } else if (index == -1) {
           List charts = await _musicServices.getCharts(contentType);
+          if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
           final index = charts.indexWhere((element) =>
               element['title'] ==
               (contentType == "TMV" ? "Top Music Videos" : "Trending"));
@@ -427,6 +442,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
               title: con["title"]);
         } else if (index == -1) {
           List charts = await _musicServices.getCharts(contentType);
+          if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
           final index = charts.indexWhere((element) =>
               element['title'] ==
               (contentType == "TMV" ? "Top Music Videos" : "Trending"));
@@ -453,6 +469,8 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
               "Seems Based on last interaction content currently not available!");
         }
       }
+
+      if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
 
       if (!isAuthenticatedHome && quickPicks.value.songList.isEmpty) {
         final index = homeContentListMap
