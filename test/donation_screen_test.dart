@@ -59,6 +59,25 @@ void main() {
     expect(find.text('No pizza heroes yet!'), findsOneWidget);
   });
 
+  testWidgets('centers the supporters panel within a 640px maximum width',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(691, 1536);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(
+      home: DonationScreen(supportersService: _service(503, '{}')),
+    ));
+    await tester.pumpAndSettle();
+
+    final panelRect = tester.getRect(
+      find.byKey(const Key('latest-supporters-panel')),
+    );
+    expect(panelRect.width, lessThanOrEqualTo(640));
+    expect(panelRect.center.dx, closeTo(691 / 2, 0.5));
+  });
+
   testWidgets('CTA still opens Buy Me a Coffee', (tester) async {
     const channel = MethodChannel('plugins.flutter.io/url_launcher');
     String? launched;
