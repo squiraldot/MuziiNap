@@ -164,7 +164,12 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
                   color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
               ]),
               const SizedBox(height: 30),
-              Center(\n                child: ConstrainedBox(\n                  constraints: const BoxConstraints(maxWidth: 640),\n                  child: _supportersPanel(theme),\n                ),\n              ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: _supportersPanel(theme),
+                ),
+              ),
             ],
           ),
         ),
