@@ -21,6 +21,7 @@ import '../models/home_mood.dart';
 import 'constant.dart';
 import 'continuations.dart';
 import 'nav_parser.dart';
+import 'home_section_list.dart';
 
 enum AudioQuality {
   Low,
@@ -379,21 +380,33 @@ class MusicServices extends getx.GetxService {
     final data = Map.from(_context);
     data["browseId"] = "FEmusic_home";
     final response = await _sendRequest("browse", data);
-    final results = nav(response.data, single_column_tab + section_list);
-    final home = [...parseMixedContent(results)];
+
+    // Authenticated YouTube Music Home can use a two-column browse renderer
+    // instead of the legacy single-column tab path. Prefer the primary tab
+    // when available, then locate the actual shelf list recursively.
+    final primaryResults = nav(response.data, single_column_tab + section_list);
+    final primarySectionList =
+        nav(response.data, single_column_tab + ['sectionListRenderer']);
+    final sectionList = primarySectionList is Map &&
+            primarySectionList['contents'] is List
+        ? Map<String, dynamic>.from(primarySectionList)
+        : findHomeSectionList(response.data);
+    final results = primaryResults is List && primaryResults.isNotEmpty
+        ? primaryResults
+        : sectionList?['contents'];
+    final home = results is List
+        ? [...parseMixedContent(results)]
+        : <Map<String, dynamic>>[];
 
     // Let the Home screen render the first response immediately instead of
     // waiting for every personalized shelf continuation to finish.
     onInitialResults?.call(List<dynamic>.from(home));
-
-    final sectionList =
-        nav(response.data, single_column_tab + ['sectionListRenderer']);
     // YouTube Music Home is paginated. Authenticated accounts can expose
     // many more personalized shelves than the first response page.
     // allSections deliberately walks the Home continuation until exhausted
     // (bounded by a generous safety cap) instead of the app's normal shelf
     // count preference.
-    if (sectionList.containsKey('continuations')) {
+    if (sectionList != null && sectionList.containsKey('continuations')) {
       requestFunc(additionalParams) async {
         return (await _sendRequest("browse", data,
                 additionalParams: additionalParams))
