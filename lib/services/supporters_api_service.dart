@@ -37,7 +37,7 @@ class SupportersApiService {
       final response = await _dio.get<String>(
         supportersEndpoint,
         cancelToken: cancelToken,
-        options: Options(method: 'GET', responseType: ResponseType.plain),
+        options: Options(\n          method: 'GET',\n          responseType: ResponseType.plain,\n          validateStatus: (status) => status != null,\n        ),
       );
       if (response.statusCode == 503) throw const SupportersException(SupportersFailure.unavailable);
       if (response.statusCode == 405) throw const SupportersException(SupportersFailure.methodNotAllowed);
