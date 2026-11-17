@@ -58,10 +58,12 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
   }
 
   Future<void> _load() async {
-    if (mounted) setState(() {
-      _refreshing = _snapshot != null;
-      _failure = null;
-    });
+    if (mounted) {
+      setState(() {
+        _refreshing = _snapshot != null;
+        _failure = null;
+      });
+    }
     try {
       final result = await _service.fetchSupporters(cancelToken: _cancelToken);
       if (!mounted) return;
@@ -74,14 +76,12 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
       if (!mounted) return;
       setState(() {
         _failure = error;
-        _loading = false;
         _refreshing = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _failure = const SupportersException(SupportersFailure.server);
-        _loading = false;
         _refreshing = false;
       });
     }
