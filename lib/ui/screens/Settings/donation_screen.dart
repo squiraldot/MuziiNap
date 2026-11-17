@@ -20,7 +20,6 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
   SupportersResponse? _snapshot;
   SupportersException? _failure;
   Future<void>? _activeRequest;
-  bool _loading = true;
   bool _refreshing = false;
 
   @override
@@ -60,7 +59,6 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
 
   Future<void> _load() async {
     if (mounted) setState(() {
-      _loading = _snapshot == null;
       _refreshing = _snapshot != null;
       _failure = null;
     });
@@ -70,7 +68,6 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
       setState(() {
         _snapshot = result;
         _failure = null;
-        _loading = false;
         _refreshing = false;
       });
     } on SupportersException catch (error) {
@@ -246,38 +243,6 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
     );
   }
 
-  Widget _emptyState(ThemeData theme) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 4),
-    child: Center(child: Column(children: [
-      const Text('🍕', style: TextStyle(fontSize: 34)),
-      const SizedBox(height: 8),
-      Text('No pizza heroes yet!', textAlign: TextAlign.center,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 4),
-      Text('The first slice is waiting for someone! 😝', textAlign: TextAlign.center,
-        style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-    ])),
-  );
-
-  Widget _errorState(ThemeData theme) {
-    final unavailable = _failure?.failure == SupportersFailure.unavailable;
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
-      child: Column(children: [
-        Icon(unavailable ? Icons.hourglass_empty_rounded : Icons.cloud_off_rounded,
-          size: 30, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(height: 8),
-        Text(unavailable ? 'Supporter updates are getting ready.'
-          : (_failure?.userMessage ?? 'Could not load supporters.'),
-          key: const Key('supporters-error'), textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 10),
-        TextButton.icon(key: const Key('supporters-retry'),
-          onPressed: _activeRequest == null ? _refresh : null,
-          icon: const Icon(Icons.refresh_rounded), label: const Text('Retry')),
-      ]),
-    );
-  }
 }
 
 class _SupporterTile extends StatelessWidget {
