@@ -436,7 +436,7 @@ class MusicServices extends getx.GetxService {
     final sectionList = primarySectionList is Map
         ? Map<String, dynamic>.from(primarySectionList)
         : _findHomeSectionList(response.data);
-    final results = primaryResults is List
+    final results = primaryResults is List && primaryResults.isNotEmpty
         ? primaryResults
         : sectionList?['contents'];
     final home = results is List ? [...parseMixedContent(results)] : <dynamic>[];
@@ -449,7 +449,7 @@ class MusicServices extends getx.GetxService {
     // allSections deliberately walks the Home continuation until exhausted
     // (bounded by a generous safety cap) instead of the app's normal shelf
     // count preference.
-    if (sectionList.containsKey('continuations')) {
+    if (sectionList != null && sectionList.containsKey('continuations')) {
       requestFunc(additionalParams) async {
         return (await _sendRequest("browse", data,
                 additionalParams: additionalParams))
