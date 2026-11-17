@@ -23,7 +23,7 @@ void main() {
         },
       };
 
-      expect(findHomeSectionList(response), same(expected));
+      expect(findHomeSectionList(response), equals(expected));
     });
 
     test('prefers the primary tab Home feed over unrelated nested sections', () {
@@ -47,7 +47,7 @@ void main() {
         },
       };
 
-      expect(findHomeSectionList(response), same(primary));
+      expect(findHomeSectionList(response), equals(primary));
     });
 
     test('ignores section lists without a contents list', () {
