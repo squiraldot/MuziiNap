@@ -144,6 +144,35 @@ const musicPlaylistShelfRenderer = [
 List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
   final items = <Map<String, dynamic>>[];
 
+  String? readHeaderTitle(dynamic value) {
+    if (value is! Map) return null;
+
+    final title = value['title'];
+    if (title is Map) {
+      final runs = title['runs'];
+      if (runs is List && runs.isNotEmpty) {
+        final text = runs
+            .whereType<Map>()
+            .map((run) => run['text']?.toString() ?? '')
+            .join()
+            .trim();
+        if (text.isNotEmpty) return text;
+      }
+      final simpleText = title['simpleText']?.toString().trim();
+      if (simpleText != null && simpleText.isNotEmpty) return simpleText;
+    } else if (title is String && title.trim().isNotEmpty) {
+      return title.trim();
+    }
+
+    for (final child in value.values) {
+      if (child is Map) {
+        final found = readHeaderTitle(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
   String? readTitle(dynamic renderer) {
     if (renderer is! Map) return null;
     final candidates = [
@@ -184,7 +213,11 @@ List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
         return value.toString().trim();
       }
     }
-    return null;
+
+    // YouTube has several header renderer variants. Read the title from the
+    // header's title node instead of silently renaming an unknown shelf to
+    // "YouTube Music" when the renderer variant changes.
+    return readHeaderTitle(renderer['header']);
   }
 
   dynamic unwrapShelf(dynamic row) {
