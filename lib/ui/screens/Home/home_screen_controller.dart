@@ -504,6 +504,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       }
       // ignore: unused_catch_stack
     } on NetworkError catch (r, e) {
+      if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
       printERROR("Home Content not loaded due to ${r.message}");
       await Future.delayed(const Duration(seconds: 1));
       networkError.value = !silent;
