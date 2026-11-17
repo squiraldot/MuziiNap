@@ -141,3 +141,14 @@ MuziiNap is an independent community project and is not sponsored, affiliated wi
 - [LRCLIB](https://lrclib.net) for synced lyrics
 - [Piped](https://piped.video) for supported playlist/service integration
 - All upstream maintainers and contributors whose work this project builds upon
+
+
+## Public supporters feed
+
+The Donation Screen reads the public, read-only snapshot from `https://muziinap-site.vercel.app/api/supporters` using HTTPS GET. Website-side webhook verification and private storage remain server responsibilities; Android never contacts Buy Me a Coffee directly and contains no webhook secrets, payment IDs, or private storage details.
+
+The response contains `updated_at`, `total`, and `supporters`; each supporter may include `name`, `message`, `amount`, `currency`, and `supported_at`. Typed models live in `lib/models/supporter.dart`; the Dio client and safe failure mapping live in `lib/services/supporters_api_service.dart`. Unknown JSON keys are ignored, optional fields remain nullable, and the UI shows at most ten records in backend order.
+
+Only HTTP 200 with a valid response can produce the empty state. HTTP 503 is temporary unavailability, never an empty list. Failed refreshes retain the last successful snapshot. The screen refreshes on entry, app resume, pull-to-refresh, and retry; it does not poll in the background.
+
+Run focused checks: `flutter test test/models/supporter_test.dart`, `flutter test test/services/supporters_api_service_test.dart`, and `flutter test test/donation_screen_test.dart`.
