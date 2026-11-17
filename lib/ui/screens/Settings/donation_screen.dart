@@ -164,12 +164,13 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
                   color: theme.colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
               ]),
               const SizedBox(height: 30),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: _supportersPanel(theme),
+              if (_snapshot?.supporters.isNotEmpty == true)
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: _supportersPanel(theme),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -182,34 +183,66 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
     return Container(
       key: const Key('latest-supporters-panel'),
       width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 260),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(32)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text('Our Pizza Heroes 🍕', style: theme.textTheme.titleLarge?.copyWith(
-            color: colors.onSurface, fontWeight: FontWeight.w700))),
-          IconButton(key: const Key('supporters-refresh'), tooltip: 'Refresh supporters',
-            onPressed: _activeRequest == null ? _refresh : null,
-            icon: _refreshing ? const SizedBox(width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.refresh_rounded)),
-        ]),
-        if (_snapshot != null && _failure != null)
-          Padding(padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Could not refresh. Showing the last available supporter list.',
-              key: const Key('supporters-stale'),
-              style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant))),
-        if (_loading)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator(
-              key: Key('supporters-loading'), strokeWidth: 2)))
-        else if (_snapshot != null)
-          if (_snapshot!.supporters.isEmpty) _emptyState(theme)
-          else ..._snapshot!.supporters.map((s) => _SupporterTile(supporter: s))
-        else
-          _errorState(theme),
-      ]),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 44),
+                  child: Text(
+                    'Our Pizza Heroes 🍕',
+                    key: const Key('supporters-heading'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: colors.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    key: const Key('supporters-refresh'),
+                    tooltip: 'Refresh supporters',
+                    onPressed: _activeRequest == null ? _refresh : null,
+                    icon: _refreshing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                  ),
+                ),
+              ],
+            ),
+            if (_snapshot != null && _failure != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Could not refresh. Showing the last available supporter list.',
+                  key: const Key('supporters-stale'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            ..._snapshot!.supporters.map(
+              (supporter) => _SupporterTile(supporter: supporter),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -269,25 +302,50 @@ class _SupporterTile extends StatelessWidget {
       margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: colors.surface.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(18)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          CircleAvatar(radius: 17, backgroundColor: colors.primary.withValues(alpha: 0.16),
-            child: Icon(Icons.favorite_rounded, size: 17, color: colors.primary)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(supporter.name, key: const Key('supporter-name'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 17,
+            backgroundColor: colors.primary.withValues(alpha: 0.16),
+            child: Icon(Icons.favorite_rounded, size: 17, color: colors.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            supporter.name,
+            key: const Key('supporter-name'),
+            textAlign: TextAlign.center,
             style: theme.textTheme.titleSmall?.copyWith(
-              color: colors.onSurface, fontWeight: FontWeight.w700))),
-          if (details.isNotEmpty) Flexible(child: Text(details.join(' · '),
-            textAlign: TextAlign.end, style: theme.textTheme.labelSmall?.copyWith(
-              color: colors.onSurfaceVariant))),
-        ]),
-        if (supporter.message != null) ...[
-          const SizedBox(height: 9),
-          Text('“${supporter.message}”', key: const Key('supporter-message'),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colors.onSurfaceVariant, height: 1.35)),
+              color: colors.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (details.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              details.join(' · '),
+              key: const Key('supporter-details'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (supporter.message != null) ...[
+            const SizedBox(height: 9),
+            Text(
+              '“${supporter.message}”',
+              key: const Key('supporter-message'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
         ],
-      ]),
+      ),
     );
   }
 
