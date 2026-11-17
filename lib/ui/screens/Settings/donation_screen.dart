@@ -32,7 +32,7 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && mounted) _refresh();
+    if (state == AppLifecycleState.resumed && mounted &&\n        ModalRoute.of(context)?.isCurrent == true) {\n      _refresh();\n    }
   }
 
   @override
