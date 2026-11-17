@@ -17,6 +17,7 @@ import '../../../models/home_mood.dart';
 import '../../../services/music_service.dart';
 import '../../../services/credential_vault.dart';
 import '../../../utils/home_load_generation.dart';
+import '../../../utils/home_quick_picks_selection.dart';
 import '../Settings/settings_screen_controller.dart';
 
 class HomeScreenController extends GetxController with WidgetsBindingObserver {
@@ -502,13 +503,9 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
 
   void _applyAuthenticatedHomeSections(List<dynamic> sections) {
     final parsedHome = _setAuthenticatedHomeContent(sections);
-    if (parsedHome.isNotEmpty && parsedHome.first is QuickPicks) {
-      quickPicks.value = parsedHome.first as QuickPicks;
-      middleContent.value = parsedHome.skip(1).toList();
-    } else {
-      quickPicks.value = QuickPicks([]);
-      middleContent.value = parsedHome;
-    }
+    final selection = selectHomeQuickPicks(parsedHome);
+    quickPicks.value = selection.quickPicks ?? QuickPicks([]);
+    middleContent.value = selection.remainingSections;
     fixedContent.value = [];
     // Render the first page of the personalized feed immediately while
     // continuation pages are fetched in the background of the same request.
