@@ -31,10 +31,9 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   final isHomeSreenOnTop = true.obs;
   final List<ScrollController> contentScrollControllers = [];
   bool reverseAnimationtransiton = false;
-  bool _homeRefreshInProgress = false;
   final HomeLoadGeneration _homeLoadGeneration = HomeLoadGeneration();
   String _homeContextSignature = '';
-  List<HomeMood> homeMoods = <HomeMood>[];
+  final RxList<HomeMood> homeMoods = <HomeMood>[].obs;
   /// Reactive snapshot of the currently authenticated YouTube account.
   ///
   /// Home used to read Hive directly from the widget tree. That made the UI
@@ -61,18 +60,13 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> refreshHome({bool showLoading = true}) async {
-    if (_homeRefreshInProgress) return;
-    _homeRefreshInProgress = true;
     if (showLoading) {
       isContentFetched.value = false;
     }
-    try {
-      await loadContentFromNetwork(silent: false);
-      // Authentication state is persisted by the login flow; Home refresh
-      // itself does not need to track a separate timestamp.
-    } finally {
-      _homeRefreshInProgress = false;
-    }
+    // Never discard a refresh just because an older request is still running.
+    // loadContentFromNetwork assigns a new generation; older responses and
+    // callbacks are then ignored before they can overwrite the latest Home.
+    await loadContentFromNetwork(silent: false);
   }
 
   Future<void> loadContent() async {
@@ -331,7 +325,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       if (isAuthenticatedHome) {
         final authenticatedMoods = await authenticatedMoodsFuture;
         if (!_homeLoadGeneration.isCurrent(loadGeneration)) return;
-        homeMoods = authenticatedMoods.whereType<HomeMood>().toList();
+        homeMoods.assignAll(authenticatedMoods.whereType<HomeMood>());
       }
 
       if (!isAuthenticatedHome) {
@@ -343,9 +337,11 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         chartSections = independentSources[1] is List
             ? List<dynamic>.from(independentSources[1] as List)
             : <dynamic>[];
-        homeMoods = independentSources[2] is List
-            ? (independentSources[2] as List).whereType<HomeMood>().toList()
-            : <HomeMood>[];
+        homeMoods.assignAll(
+          independentSources[2] is List
+              ? (independentSources[2] as List).whereType<HomeMood>()
+              : <HomeMood>[],
+        );
       }
 
       // After YouTube login, Listen again must be account-scoped and
