@@ -370,6 +370,51 @@ class MusicServices extends getx.GetxService {
       throw NetworkError();
     }
   }
+  Map<String, dynamic>? _findHomeSectionList(dynamic value) {
+    if (value is Map) {
+      final renderer = value['sectionListRenderer'];
+      if (renderer is Map && renderer['contents'] is List) {
+        return Map<String, dynamic>.from(renderer);
+      }
+
+      // Prefer the primary tab content before traversing unrelated metadata.
+      for (final key in const [
+        'tabs',
+        'tabRenderer',
+        'content',
+        'twoColumnBrowseResultsRenderer',
+        'secondaryContents',
+        'contents',
+      ]) {
+        final child = value[key];
+        if (child is Map || child is List) {
+          final found = _findHomeSectionList(child);
+          if (found != null) return found;
+        }
+      }
+      for (final entry in value.entries) {
+        if (const {
+          'responseContext',
+          'trackingParams',
+          'frameworkUpdates',
+        }.contains(entry.key)) {
+          continue;
+        }
+        final child = entry.value;
+        if (child is Map || child is List) {
+          final found = _findHomeSectionList(child);
+          if (found != null) return found;
+        }
+      }
+    } else if (value is List) {
+      for (final child in value) {
+        final found = _findHomeSectionList(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
   Future<dynamic> getHome({
     int limit = 4,
     bool allSections = false,
@@ -379,15 +424,26 @@ class MusicServices extends getx.GetxService {
     final data = Map.from(_context);
     data["browseId"] = "FEmusic_home";
     final response = await _sendRequest("browse", data);
-    final results = nav(response.data, single_column_tab + section_list);
-    final home = [...parseMixedContent(results)];
+
+    // YouTube Music does not always keep Home under the single-column
+    // renderer. Signed-in accounts can receive a two-column/secondary
+    // sectionListRenderer response. Prefer the legacy path, then locate the
+    // actual Home section list recursively so authenticated shelves are not
+    // silently treated as an empty feed when YouTube changes its wrapper.
+    final primaryResults = nav(response.data, single_column_tab + section_list);
+    final primarySectionList =
+        nav(response.data, single_column_tab + ['sectionListRenderer']);
+    final sectionList = primarySectionList is Map
+        ? Map<String, dynamic>.from(primarySectionList)
+        : _findHomeSectionList(response.data);
+    final results = primaryResults is List
+        ? primaryResults
+        : sectionList?['contents'];
+    final home = results is List ? [...parseMixedContent(results)] : <dynamic>[];
 
     // Let the Home screen render the first response immediately instead of
     // waiting for every personalized shelf continuation to finish.
     onInitialResults?.call(List<dynamic>.from(home));
-
-    final sectionList =
-        nav(response.data, single_column_tab + ['sectionListRenderer']);
     // YouTube Music Home is paginated. Authenticated accounts can expose
     // many more personalized shelves than the first response page.
     // allSections deliberately walks the Home continuation until exhausted
