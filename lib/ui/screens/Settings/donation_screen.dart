@@ -6,15 +6,16 @@ import '../../../models/supporter.dart';
 import '../../../services/supporters_api_service.dart';
 
 class DonationScreen extends StatefulWidget {
-  const DonationScreen({super.key, this.supportersService});
+  const DonationScreen({super.key, this.supportersService, this.illustration});
+  static const String illustrationUrl = 'https://raw.githubusercontent.com/squiraldot/MuziiNap-Official/refs/heads/main/assets/donation_illustration.png';
   final SupportersApiService? supportersService;
+  final Widget? illustration;
   @override
   State<DonationScreen> createState() => _DonationScreenState();
 }
 
 class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObserver {
   static const String _supportUrl = 'https://buymeacoffee.com/realmerrmist';
-  static const String _illustrationUrl = 'https://raw.githubusercontent.com/squiraldot/MuziiNap-Official/refs/heads/main/assets/donation_illustration.png';
   late final SupportersApiService _service = widget.supportersService ?? SupportersApiService();
   final CancelToken _cancelToken = CancelToken();
   SupportersResponse? _snapshot;
@@ -122,9 +123,9 @@ class _DonationScreenState extends State<DonationScreen> with WidgetsBindingObse
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
             children: [
-              CachedNetworkImage(
+              widget.illustration ?? CachedNetworkImage(
                 key: const Key('donation-illustration'),
-                imageUrl: _illustrationUrl,
+                imageUrl: DonationScreen.illustrationUrl,
                 height: 226, width: double.infinity, fit: BoxFit.contain,
                 placeholder: (_, __) => const SizedBox(height: 226,
                   child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
