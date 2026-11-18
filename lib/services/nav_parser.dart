@@ -220,6 +220,48 @@ List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
     return readHeaderTitle(renderer['header']);
   }
 
+  // Quick picks is not reliably named in the listener's language. YouTube
+  // encodes its defining behavior in each row's play endpoint: the row starts
+  // its own RDAMVM radio (playlistId == "RDAMVM" + videoId). This is the same
+  // structural discriminator used by current independent YT Music clients.
+  bool startsQuickPicksRadios(List<dynamic> rawContents) {
+    final rows = rawContents
+        .map((item) => nav(item, [mrlir]))
+        .whereType<Map>()
+        .toList();
+    if (rows.isEmpty) return false;
+
+    var radioRows = 0;
+    for (final row in rows) {
+      final watch = nav(row, [
+            'overlay',
+            'musicItemThumbnailOverlayRenderer',
+            'content',
+            'musicPlayButtonRenderer',
+            'playNavigationEndpoint',
+            'watchEndpoint',
+          ]) ??
+          nav(row, [
+            'thumbnailOverlay',
+            'musicItemThumbnailOverlayRenderer',
+            'content',
+            'musicPlayButtonRenderer',
+            'playNavigationEndpoint',
+            'watchEndpoint',
+          ]);
+      if (watch is! Map) continue;
+      final videoId = watch['videoId']?.toString();
+      final playlistId = watch['playlistId']?.toString();
+      if (videoId != null &&
+          videoId.isNotEmpty &&
+          playlistId == 'RDAMVM$videoId') {
+        radioRows++;
+      }
+    }
+
+    return radioRows * 2 > rows.length;
+  }
+
   dynamic unwrapShelf(dynamic row) {
     if (row is! Map) return null;
     const shelfKeys = [
@@ -435,7 +477,12 @@ List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
     final rawContents = renderer['contents'] ?? renderer['items'];
     if (rawContents is! List || rawContents.isEmpty) continue;
 
-    final title = readTitle(renderer) ?? readTitle(row);
+    final isQuickPicks = startsQuickPicksRadios(rawContents);
+    // Keep the dedicated Home shelf stable across YouTube UI translations.
+    // The source title is not a reliable identifier; the radio endpoint is.
+    final title = isQuickPicks
+        ? 'Quick picks'
+        : (readTitle(renderer) ?? readTitle(row));
     final contents = <dynamic>[];
     final seen = <String>{};
 
@@ -631,13 +678,43 @@ MediaItem parseSongFlat(Map<String, dynamic> data) {
 
   Map<String, dynamic> song = {
     'title': nav(columns[0], text_run_text),
-    'videoId': nav(columns[0], text_run + navigation_video_id,
+    // Responsive Home rows can expose the playable ID on the row's play
+    // button or playlistItemData, not only on the title text's endpoint.
+    'videoId': nav(data, ['playlistItemData', 'videoId']) ??
+        nav(data, [
+          'overlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          'videoId',
+        ]) ??
+        nav(data, [
+          'thumbnailOverlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          'videoId',
+        ]) ??
+        nav(columns[0], text_run + navigation_video_id,
             noneIfAbsent: true, funName: "parseSongFlat") ??
         nav(columns[0], text_run + navigation_browse_id,
             noneIfAbsent: true, funName: "parseSongFlat"),
     'artists': parseSongArtists(data, 1),
-    'thumbnails': nav(data, thumbnails),
-    'videoType': nav(data, navigation_video_type),
+    'thumbnails': nav(data, thumbnails) ?? nav(data, thumbnail_renderer),
+    'videoType': nav(data, navigation_video_type) ??
+        nav(data, [
+          'overlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          ...navigation_video_type.skip(1),
+        ]),
     //'isExplicit': nav(data, badge_label, noneIfAbsent: true) != null
   };
 //checkpoint .contains
