@@ -46,7 +46,7 @@ void main() {
 
   testWidgets('renders live supporter fields', (tester) async {
     await tester.pumpWidget(MaterialApp(home: DonationScreen(supportersService: _service(200,
-      '{"total":1,"supporters":[{"name":"Alex","message":"Keep up the music!","amount":15,"currency":"USD","supported_at":"2026-11-15T10:00:00.000Z"}]}'), illustration: _testIllustration()));
+      '{"total":1,"supporters":[{"name":"Alex","message":"Keep up the music!","amount":15,"currency":"USD","supported_at":"2026-11-15T10:00:00.000Z"}]}'), illustration: _testIllustration())));
     await tester.pumpAndSettle();
     expect(find.text('Alex'), findsOneWidget);
     expect(find.text('“Keep up the music!”'), findsOneWidget);
