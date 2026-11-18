@@ -144,6 +144,35 @@ const musicPlaylistShelfRenderer = [
 List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
   final items = <Map<String, dynamic>>[];
 
+  String? readHeaderTitle(dynamic value) {
+    if (value is! Map) return null;
+
+    final title = value['title'];
+    if (title is Map) {
+      final runs = title['runs'];
+      if (runs is List && runs.isNotEmpty) {
+        final text = runs
+            .whereType<Map>()
+            .map((run) => run['text']?.toString() ?? '')
+            .join()
+            .trim();
+        if (text.isNotEmpty) return text;
+      }
+      final simpleText = title['simpleText']?.toString().trim();
+      if (simpleText != null && simpleText.isNotEmpty) return simpleText;
+    } else if (title is String && title.trim().isNotEmpty) {
+      return title.trim();
+    }
+
+    for (final child in value.values) {
+      if (child is Map) {
+        final found = readHeaderTitle(child);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
   String? readTitle(dynamic renderer) {
     if (renderer is! Map) return null;
     final candidates = [
@@ -184,7 +213,53 @@ List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
         return value.toString().trim();
       }
     }
-    return null;
+
+    // YouTube has several header renderer variants. Read the title from the
+    // header's title node instead of silently renaming an unknown shelf to
+    // "YouTube Music" when the renderer variant changes.
+    return readHeaderTitle(renderer['header']);
+  }
+
+  // Quick picks is not reliably named in the listener's language. YouTube
+  // encodes its defining behavior in each row's play endpoint: the row starts
+  // its own RDAMVM radio (playlistId == "RDAMVM" + videoId). This is the same
+  // structural discriminator used by current independent YT Music clients.
+  bool startsQuickPicksRadios(List<dynamic> rawContents) {
+    final rows = rawContents
+        .map((item) => nav(item, [mrlir]))
+        .whereType<Map>()
+        .toList();
+    if (rows.isEmpty) return false;
+
+    var radioRows = 0;
+    for (final row in rows) {
+      final watch = nav(row, [
+            'overlay',
+            'musicItemThumbnailOverlayRenderer',
+            'content',
+            'musicPlayButtonRenderer',
+            'playNavigationEndpoint',
+            'watchEndpoint',
+          ]) ??
+          nav(row, [
+            'thumbnailOverlay',
+            'musicItemThumbnailOverlayRenderer',
+            'content',
+            'musicPlayButtonRenderer',
+            'playNavigationEndpoint',
+            'watchEndpoint',
+          ]);
+      if (watch is! Map) continue;
+      final videoId = watch['videoId']?.toString();
+      final playlistId = watch['playlistId']?.toString();
+      if (videoId != null &&
+          videoId.isNotEmpty &&
+          playlistId == 'RDAMVM$videoId') {
+        radioRows++;
+      }
+    }
+
+    return radioRows * 2 > rows.length;
   }
 
   dynamic unwrapShelf(dynamic row) {
@@ -402,7 +477,12 @@ List<Map<String, dynamic>> parseMixedContent(List<dynamic> rows) {
     final rawContents = renderer['contents'] ?? renderer['items'];
     if (rawContents is! List || rawContents.isEmpty) continue;
 
-    final title = readTitle(renderer) ?? readTitle(row);
+    final isQuickPicks = startsQuickPicksRadios(rawContents);
+    // Keep the dedicated Home shelf stable across YouTube UI translations.
+    // The source title is not a reliable identifier; the radio endpoint is.
+    final title = isQuickPicks
+        ? 'Quick picks'
+        : (readTitle(renderer) ?? readTitle(row));
     final contents = <dynamic>[];
     final seen = <String>{};
 
@@ -598,13 +678,43 @@ MediaItem parseSongFlat(Map<String, dynamic> data) {
 
   Map<String, dynamic> song = {
     'title': nav(columns[0], text_run_text),
-    'videoId': nav(columns[0], text_run + navigation_video_id,
+    // Responsive Home rows can expose the playable ID on the row's play
+    // button or playlistItemData, not only on the title text's endpoint.
+    'videoId': nav(data, ['playlistItemData', 'videoId']) ??
+        nav(data, [
+          'overlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          'videoId',
+        ]) ??
+        nav(data, [
+          'thumbnailOverlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          'videoId',
+        ]) ??
+        nav(columns[0], text_run + navigation_video_id,
             noneIfAbsent: true, funName: "parseSongFlat") ??
         nav(columns[0], text_run + navigation_browse_id,
             noneIfAbsent: true, funName: "parseSongFlat"),
     'artists': parseSongArtists(data, 1),
-    'thumbnails': nav(data, thumbnails),
-    'videoType': nav(data, navigation_video_type),
+    'thumbnails': nav(data, thumbnails) ?? nav(data, thumbnail_renderer),
+    'videoType': nav(data, navigation_video_type) ??
+        nav(data, [
+          'overlay',
+          'musicItemThumbnailOverlayRenderer',
+          'content',
+          'musicPlayButtonRenderer',
+          'playNavigationEndpoint',
+          'watchEndpoint',
+          ...navigation_video_type.skip(1),
+        ]),
     //'isExplicit': nav(data, badge_label, noneIfAbsent: true) != null
   };
 //checkpoint .contains

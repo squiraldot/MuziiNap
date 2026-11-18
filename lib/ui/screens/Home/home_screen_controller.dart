@@ -16,6 +16,8 @@ import '../../../utils/youtube_auth.dart';
 import '../../../models/home_mood.dart';
 import '../../../services/music_service.dart';
 import '../../../services/credential_vault.dart';
+import '../../../utils/home_load_generation.dart';
+import '../../../utils/home_quick_picks_selection.dart';
 import '../Settings/settings_screen_controller.dart';
 
 class HomeScreenController extends GetxController with WidgetsBindingObserver {
@@ -30,7 +32,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   final isHomeSreenOnTop = true.obs;
   final List<ScrollController> contentScrollControllers = [];
   bool reverseAnimationtransiton = false;
-  bool _homeRefreshInProgress = false;
+  final HomeLoadGeneration _homeLoadGeneration = HomeLoadGeneration();
   String _homeContextSignature = '';
   List<HomeMood> homeMoods = <HomeMood>[];
   /// Reactive snapshot of the currently authenticated YouTube account.
@@ -59,18 +61,12 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> refreshHome({bool showLoading = true}) async {
-    if (_homeRefreshInProgress) return;
-    _homeRefreshInProgress = true;
     if (showLoading) {
       isContentFetched.value = false;
     }
-    try {
-      await loadContentFromNetwork(silent: false);
-      // Authentication state is persisted by the login flow; Home refresh
-      // itself does not need to track a separate timestamp.
-    } finally {
-      _homeRefreshInProgress = false;
-    }
+    // A login/account switch must supersede any older anonymous Home request.
+    // loadContentFromNetwork assigns a new generation to every refresh.
+    await loadContentFromNetwork(silent: false);
   }
 
   Future<void> loadContent() async {
@@ -263,6 +259,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> loadContentFromNetwork({bool silent = false}) async {
+    final generation = _homeLoadGeneration.begin();
     final box = Hive.box(appPrefsBoxName);
     String contentType = box.get("discoverContentType") ?? "QP";
 
@@ -316,17 +313,25 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
             .value,
         allSections: isAuthenticatedHome,
         onInitialResults: isAuthenticatedHome
-            ? _applyAuthenticatedHomeSections
+            ? (sections) {
+                if (_homeLoadGeneration.isCurrent(generation)) {
+                  _applyAuthenticatedHomeSections(sections);
+                }
+              }
             : null,
       );
 
+      if (!_homeLoadGeneration.isCurrent(generation)) return;
+
       if (isAuthenticatedHome) {
         final authenticatedMoods = await authenticatedMoodsFuture;
+        if (!_homeLoadGeneration.isCurrent(generation)) return;
         homeMoods = authenticatedMoods.whereType<HomeMood>().toList();
       }
 
       if (!isAuthenticatedHome) {
         final independentSources = await independentSourcesFuture;
+        if (!_homeLoadGeneration.isCurrent(generation)) return;
         newReleaseSections = independentSources[0] is List
             ? List<dynamic>.from(independentSources[0] as List)
             : <dynamic>[];
@@ -345,6 +350,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         try {
           final remoteHistory =
               await _musicServices.getYouTubeHistory(limit: recentlyPlayedLimit);
+          if (!_homeLoadGeneration.isCurrent(generation)) return;
 
           if (remoteHistory.isNotEmpty) {
             final listenAgainIndex = homeContentListMap.indexWhere((section) {
@@ -389,6 +395,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
           _musicServices.getNewReleases(limit: 12).catchError((_) => <dynamic>[]),
           _musicServices.getHomeCharts(country: 'TR').catchError((_) => <dynamic>[]),
         ]);
+        if (!_homeLoadGeneration.isCurrent(generation)) return;
         newReleaseSections = fallbackSources[0] is List
             ? List<dynamic>.from(fallbackSources[0] as List)
             : <dynamic>[];
@@ -469,6 +476,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
         middleContentTemp.addAll(chartSections);
       }
 
+      if (!_homeLoadGeneration.isCurrent(generation)) return;
       middleContent.value = isAuthenticatedHome
           ? middleContentTemp
           : _setContentList(middleContentTemp);
@@ -486,6 +494,7 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
       }
       // ignore: unused_catch_stack
     } on NetworkError catch (r, e) {
+      if (!_homeLoadGeneration.isCurrent(generation)) return;
       printERROR("Home Content not loaded due to ${r.message}");
       await Future.delayed(const Duration(seconds: 1));
       networkError.value = !silent;
@@ -494,13 +503,9 @@ class HomeScreenController extends GetxController with WidgetsBindingObserver {
 
   void _applyAuthenticatedHomeSections(List<dynamic> sections) {
     final parsedHome = _setAuthenticatedHomeContent(sections);
-    if (parsedHome.isNotEmpty && parsedHome.first is QuickPicks) {
-      quickPicks.value = parsedHome.first as QuickPicks;
-      middleContent.value = parsedHome.skip(1).toList();
-    } else {
-      quickPicks.value = QuickPicks([]);
-      middleContent.value = parsedHome;
-    }
+    final selection = selectHomeQuickPicks(parsedHome);
+    quickPicks.value = selection.quickPicks ?? QuickPicks([]);
+    middleContent.value = selection.remainingSections;
     fixedContent.value = [];
     // Render the first page of the personalized feed immediately while
     // continuation pages are fetched in the background of the same request.
