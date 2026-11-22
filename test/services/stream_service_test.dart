@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/services/device_adaptive_stream_selector.dart';
 import 'package:muziinap/services/stream_service.dart';
+import 'package:muziinap/services/stream_request_policy.dart';
+import 'package:dio/dio.dart';
 import 'package:muziinap/services/youtube/po_token/po_token_policy.dart';
 
 void main() {
@@ -477,35 +479,135 @@ void main() {
     });
   });
 
+  group('Adaptive stream request policy', () {
+    test('gives mobile data a longer Piped deadline than Wi-Fi', () {
+      const wifi = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      const mobile = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.mobile,
+      );
+
+      expect(
+        StreamRequestPolicy.pipedInstanceTimeout(mobile),
+        greaterThan(StreamRequestPolicy.pipedInstanceTimeout(wifi)),
+      );
+      expect(
+        StreamRequestPolicy.pipedOverallTimeout(mobile),
+        greaterThan(StreamRequestPolicy.pipedOverallTimeout(wifi)),
+      );
+    });
+
+    test('keeps an offline network deadline bounded', () {
+      const offline = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.offline,
+      );
+      expect(
+        StreamRequestPolicy.innerTubeTimeout(
+          offline,
+          isInitialAttempt: true,
+        ),
+        const Duration(seconds: 4),
+      );
+    });
+
+    test('classifies request cancellation separately from timeout', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/player'),
+        type: DioExceptionType.cancel,
+        message: 'another client won',
+      );
+
+      expect(
+        StreamRequestDiagnostic.classify(error),
+        StreamRequestFailureKind.cancelled,
+      );
+      expect(
+        StreamRequestDiagnostic.describe('ANDROID', error),
+        'ANDROID: request cancelled',
+      );
+    });
+
+    test('classifies response timeout separately from cancellation', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/player'),
+        type: DioExceptionType.receiveTimeout,
+      );
+
+      expect(
+        StreamRequestDiagnostic.classify(error),
+        StreamRequestFailureKind.timeout,
+      );
+      expect(
+        StreamRequestDiagnostic.describe('VISIONOS', error),
+        'VISIONOS: response timeout',
+      );
+    });
+
+    test('preserves HTTP status in provider diagnostics', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/player'),
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: RequestOptions(path: '/player'),
+          statusCode: 403,
+        ),
+      );
+
+      expect(
+        StreamRequestDiagnostic.describe('WEB_REMIX', error),
+        'WEB_REMIX: HTTP 403',
+      );
+    });
+  });
+
   group('InnerTube request and media transport policy', () {
-    test('uses a bounded 1.5 second first-choice VISIONOS handshake', () {
-      expect(
-        StreamProvider.requestTimeoutForClient('VISIONOS'),
-        const Duration(milliseconds: 1500),
-      );
-    });
-
-    test('uses the normal timeout for other clients in the race', () {
-      expect(
-        StreamProvider.requestTimeoutForClient('ANDROID'),
-        const Duration(seconds: 5),
-      );
-    });
-
-    test('does not apply the fast deadline when VISIONOS is later in the race', () {
+    test('uses a network-aware deadline for the first VISIONOS attempt', () {
       expect(
         StreamProvider.requestTimeoutForClient(
           'VISIONOS',
-          isInitialAttempt: false,
+          deviceProfile: const DeviceStreamProfile(
+            androidApiLevel: 35,
+            isLowRamDevice: false,
+            networkType: DeviceNetworkType.wifi,
+          ),
         ),
-        const Duration(seconds: 5),
+        const Duration(seconds: 8),
       );
     });
 
-    test('does not shorten the WEB_REMIX fallback timeout', () {
+    test('allows a longer initial deadline on mobile data', () {
       expect(
-        StreamProvider.requestTimeoutForClient('WEB_REMIX'),
-        const Duration(seconds: 5),
+        StreamProvider.requestTimeoutForClient(
+          'VISIONOS',
+          deviceProfile: const DeviceStreamProfile(
+            androidApiLevel: 35,
+            isLowRamDevice: false,
+            networkType: DeviceNetworkType.mobile,
+          ),
+        ),
+        const Duration(seconds: 15),
+      );
+    });
+
+    test('adds bounded grace for staggered fallback clients', () {
+      expect(
+        StreamProvider.requestTimeoutForClient(
+          'ANDROID',
+          isInitialAttempt: false,
+          deviceProfile: const DeviceStreamProfile(
+            androidApiLevel: 35,
+            isLowRamDevice: false,
+            networkType: DeviceNetworkType.wifi,
+          ),
+        ),
+        const Duration(seconds: 10),
       );
     });
 
@@ -759,6 +861,26 @@ void main() {
         StreamProvider.clientNamesFor(preferredClient: 'ANDROID'),
         ['VISIONOS', 'ANDROID', 'WEB_REMIX', 'WEB_EMBEDDED', 'ANDROID_VR',
           'TVHTML5_SIMPLY_EMBEDDED_PLAYER'],
+      );
+    });
+
+    test('increases future deadlines after a slow successful player request', () {
+      const wifi = DeviceStreamProfile(
+        androidApiLevel: 35,
+        isLowRamDevice: false,
+        networkType: DeviceNetworkType.wifi,
+      );
+      StreamRequestPolicy.recordLatency(
+        wifi,
+        const Duration(seconds: 10),
+      );
+
+      expect(
+        StreamRequestPolicy.innerTubeTimeout(
+          wifi,
+          isInitialAttempt: true,
+        ),
+        const Duration(seconds: 24),
       );
     });
   });

@@ -1580,6 +1580,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       if (streamInfo == null) {
         Map<String, String>? authenticatedHeaders;
+        MusicServices? musicServices;
+        if (Get.isRegistered<MusicServices>()) {
+          musicServices = Get.find<MusicServices>();
+          try {
+            // Restore persisted visitor/session state before stream resolution
+            // snapshots preferences and starts its InnerTube client attempts.
+            await musicServices.ensureReady();
+          } catch (error) {
+            printINFO('YouTube session initialization did not complete: ${error.runtimeType}');
+          }
+        }
         try {
           authenticatedHeaders = InnerTubeSessionManager()
               .getAuthenticatedHeaders('https://music.youtube.com');
@@ -1604,8 +1615,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           authenticatedHeaders: authenticatedHeaders,
           deviceProfile: deviceProfile,
           refreshVisitorId: () async {
-            if (!Get.isRegistered<MusicServices>()) return null;
-            return Get.find<MusicServices>().genrateVisitorId();
+            if (musicServices == null) return null;
+            return musicServices.genrateVisitorId();
           },
         );
         final streamInfoJson = resolved.hmStreamingData
