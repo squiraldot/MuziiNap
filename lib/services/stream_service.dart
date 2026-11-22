@@ -605,7 +605,7 @@ class StreamProvider {
       primaryResult = StreamProvider(
         playable: false,
         statusMSG:
-            '${primary.name}: request timed out after ${requestTimeoutForClient(primary.name).inMilliseconds} ms',
+            '${primary.name}: request timed out after ${requestTimeoutForClient(primary.name, deviceProfile: deviceProfile).inMilliseconds} ms',
       );
     } catch (error) {
       final message = error is DioException
