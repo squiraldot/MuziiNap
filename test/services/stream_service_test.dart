@@ -550,6 +550,22 @@ void main() {
       );
     });
 
+    test('classifies response transform timeout as a timeout', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/player'),
+        type: DioExceptionType.transformTimeout,
+      );
+
+      expect(
+        StreamRequestDiagnostic.classify(error),
+        StreamRequestFailureKind.timeout,
+      );
+      expect(
+        StreamRequestDiagnostic.describe('VISIONOS', error),
+        'VISIONOS: response transform timeout',
+      );
+    });
+
     test('preserves HTTP status in provider diagnostics', () {
       final error = DioException(
         requestOptions: RequestOptions(path: '/player'),

@@ -107,6 +107,7 @@ class StreamRequestDiagnostic {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
         return StreamRequestFailureKind.timeout;
       case DioExceptionType.cancel:
         return StreamRequestFailureKind.cancelled;
@@ -127,6 +128,7 @@ class StreamRequestDiagnostic {
           DioExceptionType.connectionTimeout => 'connection',
           DioExceptionType.sendTimeout => 'send',
           DioExceptionType.receiveTimeout => 'response',
+          DioExceptionType.transformTimeout => 'response transform',
           _ => 'request',
         };
         return '$provider: $phase timeout';
