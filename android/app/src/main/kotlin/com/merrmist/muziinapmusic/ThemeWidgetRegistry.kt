@@ -101,17 +101,17 @@ internal object ThemeWidgetRegistry {
     }
 
     private class WidgetDatabase(context: Context) :
-        SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+        SQLiteOpenHelper(context, "muziinap_theme_widgets.db", null, 1) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
-                """CREATE TABLE $TABLE_WIDGETS (
+                """CREATE TABLE widget_instances (
                     app_widget_id INTEGER PRIMARY KEY,
                     provider_class TEXT NOT NULL,
                     created_at INTEGER NOT NULL
                 )""".trimIndent()
             )
             db.execSQL(
-                """CREATE TABLE $TABLE_PLAYBACK (
+                """CREATE TABLE playback_state (
                     id INTEGER PRIMARY KEY CHECK(id = 1),
                     title TEXT NOT NULL,
                     artist TEXT NOT NULL,
