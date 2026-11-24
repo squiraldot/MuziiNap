@@ -82,6 +82,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/widget_assets/
     - assets/fonts/
     - assets/videos/muziinap_intro.MP4
   fonts:
