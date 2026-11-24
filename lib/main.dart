@@ -20,6 +20,7 @@ import 'services/deep_link_service.dart';
 import './services/audio_handler.dart';
 import './services/audio_playback_service.dart';
 import './services/home_lyrics_widget_coordinator.dart';
+import './services/theme_widget_coordinator.dart';
 import './services/isar_database_service.dart';
 import './services/innertube_auth_interceptor.dart';
 import './ui/screens/Settings/youtube_login_screen.dart';
@@ -245,6 +246,14 @@ Future<void> startApplicationServices() async {
   // the lifecycle or visibility of the Player Screen controller.
   await Get.putAsync<HomeLyricsWidgetCoordinator>(() async {
     final coordinator = HomeLyricsWidgetCoordinator(
+      audioHandler: Get.find<AudioHandler>(),
+    );
+    await coordinator.start();
+    return coordinator;
+  }, permanent: true);
+  // Theme music widgets follow the app-scoped AudioHandler, not a player route.
+  await Get.putAsync<ThemeWidgetCoordinator>(() async {
+    final coordinator = ThemeWidgetCoordinator(
       audioHandler: Get.find<AudioHandler>(),
     );
     await coordinator.start();

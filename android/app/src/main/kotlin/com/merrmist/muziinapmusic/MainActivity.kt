@@ -268,6 +268,23 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/theme_music_widget")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "updatePlayback" -> {
+                        val title = call.argument<String>("title") ?: "Nothing playing"
+                        val artist = call.argument<String>("artist") ?: ""
+                        val isPlaying = call.argument<Boolean>("isPlaying") ?: false
+                        ThemeWidgetRegistry.updatePlaybackState(
+                            applicationContext, title, artist, isPlaying
+                        )
+                        ThemeMusicWidgetRenderer.updateAll(applicationContext)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
         handlePresetIntent(intent)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, downloadNotificationChannel)
