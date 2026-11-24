@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - dev
+      - widget_feature
   workflow_dispatch:
 
 concurrency:
