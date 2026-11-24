@@ -18,6 +18,7 @@ import 'youtube/po_token/po_token_provider.dart';
 import 'youtube/po_token/bgutil_http_po_token_provider.dart';
 
 import 'device_adaptive_stream_selector.dart';
+import 'stream_request_policy.dart';
 
 import '../utils/helper.dart';
 import 'constant.dart';
@@ -51,17 +52,16 @@ class StreamProvider {
     ),
   )..httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () => HttpClient()
-        ..connectionTimeout = _requestTimeout,
+        ..connectionTimeout = _transportConnectionTimeout,
     );
 
   static const Duration _requestTimeout = Duration(seconds: 5);
+  static const Duration _transportConnectionTimeout = Duration(seconds: 20);
   static final PlayerJsService _playerJsService = PlayerJsService();
   static final StreamUrlDecipherer _streamUrlDecipherer = StreamUrlDecipherer(
     nsig: NsigDecipherService(_playerJsService),
     signature: SignatureDecipherService(_playerJsService),
   );
-  static const Duration _initialHandshakeTimeout =
-      Duration(milliseconds: 1500);
 
   static const PoTokenPolicy _poTokenPolicy = PoTokenPolicy();
   static PoTokenManager _poTokenManager = PoTokenManager(
@@ -191,16 +191,20 @@ class StreamProvider {
         'Accept': '*/*',
       };
 
-  /// Bound the first-choice VISIONOS handshake; other clients remain available
-  /// as staggered fallbacks if the primary endpoint is slow or unavailable.
+  /// Selects a network-aware, latency-adjusted deadline for each client request.
   static Duration requestTimeoutForClient(
     String clientName, {
     bool isInitialAttempt = true,
+    DeviceStreamProfile? deviceProfile,
   }) {
-    if (clientName == 'VISIONOS' && isInitialAttempt) {
-      return _initialHandshakeTimeout;
-    }
-    return _requestTimeout;
+    final timeout = StreamRequestPolicy.innerTubeTimeout(
+      deviceProfile,
+      isInitialAttempt: isInitialAttempt,
+    );
+    // WEB_REMIX may need one additional bounded attestation-provider round trip.
+    return clientName == 'WEB_REMIX'
+        ? timeout + const Duration(seconds: 3)
+        : timeout;
   }
 
   static Future<StreamProvider> fetch(
@@ -356,10 +360,10 @@ class StreamProvider {
       cleanId,
       deviceProfile: deviceProfile,
     );
-    if (youtubeExplode != null && youtubeExplode.playable) {
-      return youtubeExplode;
+    if (youtubeExplode.playable) return youtubeExplode;
+    if (youtubeExplode.statusMSG.isNotEmpty) {
+      lastFailure = '$lastFailure; ${youtubeExplode.statusMSG}';
     }
-    lastFailure = '$lastFailure; YouTubeExplode fallback unavailable';
 
     // 3. Optional last resort: configured/public Piped instances.
     final piped = await _fetchPipedStreams(
@@ -368,8 +372,13 @@ class StreamProvider {
       deviceProfile: deviceProfile,
     );
     if (piped != null && piped.playable) return piped;
-    lastFailure = '$lastFailure; Piped fallback unavailable';
+    if (piped != null && piped.statusMSG.isNotEmpty) {
+      lastFailure = '$lastFailure; ${piped.statusMSG}';
+    } else {
+      lastFailure = '$lastFailure; Piped: no configured instances';
+    }
 
+    printINFO('Stream resolution failed for $cleanId: $lastFailure');
     return StreamProvider(playable: false, statusMSG: lastFailure);
   }
 
@@ -584,7 +593,10 @@ class StreamProvider {
         requestTimeout: requestTimeoutForClient(
           primary.name,
           isInitialAttempt: true,
+          deviceProfile: deviceProfile,
         ),
+        authenticatedHeaders:
+            primary.name == 'WEB_REMIX' ? authenticatedHeaders : null,
         deviceProfile: deviceProfile,
         language: language,
         country: country,
@@ -593,21 +605,13 @@ class StreamProvider {
       primaryResult = StreamProvider(
         playable: false,
         statusMSG:
-            '${primary.name}: request timed out after ${requestTimeoutForClient(primary.name).inMilliseconds} ms',
+            '${primary.name}: request timed out after ${requestTimeoutForClient(primary.name, deviceProfile: deviceProfile).inMilliseconds} ms',
       );
     } catch (error) {
-      final message = error is DioException &&
-              error.type == DioExceptionType.cancel
-          ? '${primary.name}: request cancelled or timed out'
-          : error is DioException && error.response?.statusCode != null
-              ? '${primary.name}: HTTP ${error.response!.statusCode}'
-              : error is DioException &&
-                      (error.type == DioExceptionType.connectionTimeout ||
-                          error.type == DioExceptionType.sendTimeout ||
-                          error.type == DioExceptionType.receiveTimeout)
-                  ? '${primary.name}: request timed out'
-                  : '${primary.name}: request failed';
-      printINFO('InnerTube ${primary.name} failed: $error');
+      final message = error is DioException
+          ? StreamRequestDiagnostic.describe(primary.name, error)
+          : '${primary.name}: request failed';
+      printINFO('InnerTube ${primary.name} failed: $message');
       primaryResult = StreamProvider(playable: false, statusMSG: message);
     }
 
@@ -624,6 +628,7 @@ class StreamProvider {
       final requestTimeout = requestTimeoutForClient(
         client.name,
         isInitialAttempt: false,
+        deviceProfile: deviceProfile,
       );
       final startDelay = clientStartDelayFor(index);
       final cancelToken = CancelToken();
@@ -662,13 +667,10 @@ class StreamProvider {
                 '${client.name}: request timed out after ${requestTimeout.inMilliseconds} ms',
           );
         } catch (error) {
-          final message = error is DioException &&
-                  error.type == DioExceptionType.cancel
-              ? '${client.name}: request cancelled or timed out'
-              : error is DioException && error.response?.statusCode != null
-                  ? '${client.name}: HTTP ${error.response!.statusCode}'
-                  : '${client.name}: request failed';
-          printINFO('InnerTube ${client.name} failed: $error');
+          final message = error is DioException
+              ? StreamRequestDiagnostic.describe(client.name, error)
+              : '${client.name}: request failed';
+          printINFO('InnerTube ${client.name} failed: $message');
           return StreamProvider(playable: false, statusMSG: message);
         }
       }());
@@ -712,10 +714,7 @@ class StreamProvider {
     bool poTokenRetried = false,
   }) async {
     final requestCancelToken = cancelToken ?? CancelToken();
-    final timeoutTimer = Timer(
-      requestTimeout,
-      () => requestCancelToken.cancel('InnerTube handshake deadline exceeded'),
-    );
+    final requestStopwatch = Stopwatch()..start();
     try {
       final uri = Uri.parse(
         'https://music.youtube.com/youtubei/v1/player?key=$_innerTubeApiKey',
@@ -764,11 +763,14 @@ class StreamProvider {
         cancelToken: requestCancelToken,
         options: Options(
           headers: headers,
+          connectTimeout: requestTimeout,
           sendTimeout: requestTimeout,
           receiveTimeout: requestTimeout,
         ),
         data: bodyWithToken,
       );
+      requestStopwatch.stop();
+      StreamRequestPolicy.recordLatency(deviceProfile, requestStopwatch.elapsed);
       if (response.statusCode != HttpStatus.ok) {
         return StreamProvider(
           playable: false,
@@ -932,7 +934,7 @@ class StreamProvider {
         streamHeaders: buildMediaRequestHeaders(userAgent),
       );
     } finally {
-      timeoutTimer.cancel();
+      if (requestStopwatch.isRunning) requestStopwatch.stop();
     }
   }
 
@@ -1091,21 +1093,27 @@ class StreamProvider {
     );
   }
 
-  static Future<StreamProvider?> _fetchYoutubeExplode(
+  static Future<StreamProvider> _fetchYoutubeExplode(
     String videoId, {
     DeviceStreamProfile? deviceProfile,
   }) async {
+    final timeout = StreamRequestPolicy.youtubeExplodeTimeout(deviceProfile);
     final yt = YoutubeExplode();
     try {
       final manifest = await yt.videos.streamsClient
           .getManifest(videoId, requireWatchPage: false)
-          .timeout(const Duration(seconds: 8));
+          .timeout(timeout);
       final audio = manifest.audioOnly.where((stream) {
         return isValidAudioFormatUrl(stream.url.toString()) &&
             _codecFromName(stream.audioCodec) != null;
       }).toList();
 
-      if (audio.isEmpty) return null;
+      if (audio.isEmpty) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'YouTubeExplode: no compatible audio formats',
+        );
+      }
       final formats = _applyDeviceProfile(audio.map((stream) => Audio(
         itag: stream.tag,
         audioCodec: _codecFromName(stream.audioCodec)!,
@@ -1116,7 +1124,12 @@ class StreamProvider {
         size: stream.size.totalBytes,
       )).toList(), deviceProfile);
 
-      if (formats.isEmpty) return null;
+      if (formats.isEmpty) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'YouTubeExplode: no device-compatible audio formats',
+        );
+      }
       printINFO('YouTubeExplode fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
@@ -1128,9 +1141,14 @@ class StreamProvider {
           'Referer': 'https://www.youtube.com/',
         },
       );
+    } on TimeoutException {
+      const message = 'YouTubeExplode: request timed out';
+      printINFO(message);
+      return StreamProvider(playable: false, statusMSG: message);
     } catch (error) {
-      printINFO('YouTubeExplode fallback failed: $error');
-      return null;
+      const message = 'YouTubeExplode: request failed';
+      printINFO('$message (${error.runtimeType})');
+      return StreamProvider(playable: false, statusMSG: message);
     } finally {
       yt.close();
     }
@@ -1143,74 +1161,115 @@ class StreamProvider {
   }) async {
     if (instances.isEmpty) return null;
 
-    // Piped remains the final provider fallback. Its configured instances may
-    // be checked concurrently, but only after InnerTube and YouTubeExplode fail.
-    final completer = Completer<StreamProvider?>();
+    // Query independent instances concurrently and retain their failure reasons.
+    final overallTimeout =
+        StreamRequestPolicy.pipedOverallTimeout(deviceProfile);
+    final instanceTimeout =
+        StreamRequestPolicy.pipedInstanceTimeout(deviceProfile);
+    final completer = Completer<StreamProvider>();
+    final failures = <String>[];
     var pending = instances.length;
+
     for (final instance in instances) {
       _fetchPipedInstance(
         instance,
         videoId,
         deviceProfile: deviceProfile,
-      )
-          .timeout(const Duration(seconds: 5), onTimeout: () => null)
-          .then((result) {
-        if (result != null && result.playable) {
+        timeout: instanceTimeout,
+      ).then((result) {
+        if (result.playable) {
           if (!completer.isCompleted) completer.complete(result);
           return;
         }
+        if (result.statusMSG.isNotEmpty) failures.add(result.statusMSG);
         pending--;
         if (pending == 0 && !completer.isCompleted) {
-          completer.complete(null);
+          completer.complete(StreamProvider(
+            playable: false,
+            statusMSG: failures.isEmpty
+                ? 'Piped: no instance returned compatible audio'
+                : failures.join('; '),
+          ));
         }
       }, onError: (Object error) {
+        failures.add('Piped: instance request failed');
         pending--;
         if (pending == 0 && !completer.isCompleted) {
-          completer.complete(null);
+          completer.complete(StreamProvider(
+            playable: false,
+            statusMSG: failures.join('; '),
+          ));
         }
       });
     }
-    return completer.future.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => null,
-    );
+
+    try {
+      return await completer.future.timeout(overallTimeout);
+    } on TimeoutException {
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'Piped: fallback deadline exceeded',
+      );
+    }
   }
 
-  static Future<StreamProvider?> _fetchPipedInstance(
+  static Future<StreamProvider> _fetchPipedInstance(
     String baseUrl,
     String videoId, {
     DeviceStreamProfile? deviceProfile,
+    required Duration timeout,
   }) async {
     final base = Uri.tryParse(baseUrl);
     if (base == null || base.scheme != 'https' || base.host.isEmpty) {
-      return null;
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'Piped: invalid instance URL',
+      );
     }
 
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 3);
+    final basePath = base.path.endsWith('/')
+        ? base.path.substring(0, base.path.length - 1)
+        : base.path;
+    final client = HttpClient()..connectionTimeout = timeout;
+    final deadline = DateTime.now().add(timeout);
+    Duration remaining() {
+      final value = deadline.difference(DateTime.now());
+      if (value <= Duration.zero) {
+        throw TimeoutException('Piped request deadline exceeded');
+      }
+      return value;
+    }
+
     try {
       final request = await client
-          .getUrl(base.replace(
-            path: '${base.path.replaceFirst(RegExp(r'/$'), '')}/streams/$videoId',
-          ))
-          .timeout(const Duration(seconds: 4));
-      final response = await request.close().timeout(const Duration(seconds: 4));
-      if (response.statusCode != HttpStatus.ok) return null;
+          .getUrl(base.replace(path: '$basePath/streams/$videoId'))
+          .timeout(remaining());
+      final response = await request.close().timeout(remaining());
+      if (response.statusCode != HttpStatus.ok) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'Piped ' + base.host + ': HTTP ' + response.statusCode.toString(),
+        );
+      }
 
       final body = await response
           .transform(utf8.decoder)
           .join()
-          .timeout(const Duration(seconds: 4));
+          .timeout(remaining());
       final decoded = jsonDecode(body);
-      if (decoded is! Map || decoded['audioStreams'] is! List) return null;
+      if (decoded is! Map || decoded['audioStreams'] is! List) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'Piped ' + base.host + ': invalid stream response',
+        );
+      }
 
       final formats = <Audio>[];
       for (final item in decoded['audioStreams'] as List) {
         if (item is! Map || _isSpatialOrWrappedAudio(item)) continue;
         final rawUrl = item['url']?.toString();
         final mimeType = item['mimeType']?.toString();
-        final codecName =
-            (item['codec'] ?? mimeType ?? '').toString();
+        final codecName = (item['codec'] ?? mimeType ?? '').toString();
         if (!isValidAudioFormatUrl(rawUrl)) continue;
         final codec = _codecFromName(codecName) ?? _codecFromMimeType(mimeType);
         if (codec == null) continue;
@@ -1231,16 +1290,27 @@ class StreamProvider {
       }
 
       final selectedFormats = _applyDeviceProfile(formats, deviceProfile);
-      if (selectedFormats.isEmpty) return null;
+      if (selectedFormats.isEmpty) {
+        return StreamProvider(
+          playable: false,
+          statusMSG: 'Piped ' + base.host + ': no compatible audio formats',
+        );
+      }
       printINFO('Piped last-resort fallback returned validated audio formats');
       return StreamProvider(
         playable: true,
         statusMSG: 'OK',
         audioFormats: selectedFormats,
       );
+    } on TimeoutException {
+      return StreamProvider(
+        playable: false,
+        statusMSG: 'Piped ' + base.host + ': request timed out',
+      );
     } catch (error) {
-      printINFO('Piped fallback failed: $error');
-      return null;
+      final message = 'Piped ' + base.host + ': request failed';
+      printINFO(message + ' (' + error.runtimeType.toString() + ')');
+      return StreamProvider(playable: false, statusMSG: message);
     } finally {
       client.close(force: true);
     }

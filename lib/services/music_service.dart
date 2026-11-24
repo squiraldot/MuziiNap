@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart' as getx;
 import 'package:hive/hive.dart';
 
+import 'async_single_flight.dart';
+
 import '../models/album.dart';
 import '../models/artist.dart';
 import '../models/playlist.dart';
@@ -101,6 +103,8 @@ class MusicServices extends getx.GetxService {
     receiveTimeout: const Duration(seconds: 15),
   ));
   late Future<void> _initFuture;
+  final AsyncSingleFlight<String?> _visitorIdRequests =
+      AsyncSingleFlight<String?>();
 
   Future<void> init() async {
     //check visitor id in data base, if not generate one , set lang code
@@ -333,19 +337,25 @@ class MusicServices extends getx.GetxService {
     _context['context']['client']['gl'] = code.toUpperCase();
   }
 
-  Future<String?> genrateVisitorId() async {
+  /// Coalesces concurrent visitor-data refreshes so startup and playback
+  /// cannot issue duplicate bootstrap requests at the same time.
+  Future<String?> genrateVisitorId() =>
+      _visitorIdRequests.run(_fetchVisitorId);
+
+  Future<String?> _fetchVisitorId() async {
     try {
       final response =
           await dio.get(domain, options: Options(headers: _headers));
       final reg = RegExp(r'ytcfg\.set\s*\(\s*({.+?})\s*\)\s*;');
       final matches = reg.firstMatch(response.data.toString());
-      String? visitorId;
-      if (matches != null) {
-        final ytcfg = json.decode(matches.group(1).toString());
-        visitorId = ytcfg['VISITOR_DATA']?.toString();
-      }
-      return visitorId;
-    } catch (e) {
+      if (matches == null) return null;
+      final ytcfg = json.decode(matches.group(1).toString());
+      final visitorId = ytcfg['VISITOR_DATA']?.toString();
+      if (visitorId == null || visitorId.trim().isEmpty) return null;
+      _headers['X-Goog-Visitor-Id'] = visitorId.trim();
+      _context['context']['client']['visitorData'] = visitorId.trim();
+      return visitorId.trim();
+    } catch (_) {
       return null;
     }
   }
