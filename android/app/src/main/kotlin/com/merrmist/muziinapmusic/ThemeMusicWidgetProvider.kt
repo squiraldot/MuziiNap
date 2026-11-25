@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import android.view.KeyEvent
+import android.view.View
 import android.widget.RemoteViews
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,7 +23,7 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
             if (ThemeWidgetRegistry.registerWidget(context, id, javaClass.name)) {
                 ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout)
             } else {
-                manager.deleteAppWidgetId(id)
+                ThemeMusicWidgetRenderer.renderLimitReached(context, manager, id, widgetLayout)
             }
         }
     }
@@ -81,6 +82,23 @@ internal object ThemeMusicWidgetRenderer {
             R.id.music_theme_widget_next,
             mediaButtonPendingIntent(context, widgetId, KeyEvent.KEYCODE_MEDIA_NEXT, 3)
         )
+        manager.updateAppWidget(widgetId, views)
+    }
+
+    /** Android's AppWidgetManager cannot delete host-owned widget IDs; show a clear cap message instead. */
+    fun renderLimitReached(
+        context: Context, manager: AppWidgetManager, widgetId: Int, layoutId: Int
+    ) {
+        val views = RemoteViews(context.packageName, layoutId).apply {
+            setTextViewText(R.id.music_theme_widget_title, "Widget limit reached")
+            setTextViewText(
+                R.id.music_theme_widget_artist,
+                "Remove a theme widget to add this one"
+            )
+            setViewVisibility(R.id.music_theme_widget_previous, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_play_pause, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_next, View.GONE)
+        }
         manager.updateAppWidget(widgetId, views)
     }
 
