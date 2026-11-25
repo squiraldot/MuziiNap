@@ -1,5 +1,7 @@
 package com.merrmist.muziinapmusic
 
+import android.content.Context
+
 /** Resolves only validated theme/design/size asset paths from the bundled registry. */
 internal object ThemeWidgetAssetPath {
     private val safeId = Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -21,6 +23,22 @@ internal object ThemeWidgetAssetPath {
             part.replaceFirstChar { it.uppercase() }
         }
         return "assets/widget_assets/$themeDirectory/$widgetFolder/$designDirectory/$fileName"
+    }
+
+    fun assetsAvailable(
+        context: Context,
+        themeId: String,
+        designId: String,
+        widgetFolder: String
+    ): Boolean {
+        return try {
+            listOf("Background.png", "Border.png", "Character.png").all { fileName ->
+                val path = "flutter_assets/" + resolve(themeId, designId, widgetFolder, fileName)
+                context.assets.open(path).use { true }
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /** Compatibility overload for Phase 02's original Dragon Ball Z asset tests. */

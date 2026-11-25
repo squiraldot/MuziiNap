@@ -22,10 +22,11 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { id ->
-            if (ThemeWidgetRegistry.registerWidget(context, id, javaClass.name)) {
+            if (ThemeMusicWidgetRenderer.assetsAvailable(context, id, widgetFolder) &&
+                ThemeWidgetRegistry.registerWidget(context, id, javaClass.name)) {
                 ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout, widgetFolder)
             } else {
-                ThemeMusicWidgetRenderer.renderLimitReached(context, manager, id, widgetLayout)
+                ThemeMusicWidgetRenderer.renderUnavailable(context, manager, id, widgetLayout)
             }
         }
     }
@@ -38,10 +39,11 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(
         context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
     ) {
-        if (ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name)) {
+        if (ThemeMusicWidgetRenderer.assetsAvailable(context, appWidgetId, widgetFolder) &&
+            ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name)) {
             ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout, widgetFolder)
         } else {
-            ThemeMusicWidgetRenderer.renderLimitReached(context, manager, appWidgetId, widgetLayout)
+            ThemeMusicWidgetRenderer.renderUnavailable(context, manager, appWidgetId, widgetLayout)
         }
         super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions)
     }
@@ -103,6 +105,29 @@ internal object ThemeMusicWidgetRenderer {
             actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_SHUFFLE, 4))
         views.setOnClickPendingIntent(R.id.music_theme_widget_repeat,
             actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_REPEAT, 5))
+        manager.updateAppWidget(widgetId, views)
+    }
+
+    fun assetsAvailable(context: Context, widgetId: Int, widgetFolder: String): Boolean {
+        val registration = ThemeWidgetRegistry.registeredWidget(context, widgetId)
+        val themeId = registration?.themeId ?: "dragon-ball-z"
+        val designId = registration?.designId ?: "widget-1"
+        return ThemeWidgetAssetPath.assetsAvailable(context, themeId, designId, widgetFolder)
+    }
+
+    fun renderUnavailable(
+        context: Context, manager: AppWidgetManager, widgetId: Int, layoutId: Int
+    ) {
+        val views = RemoteViews(context.packageName, layoutId).apply {
+            setTextViewText(R.id.music_theme_widget_title, "Theme assets unavailable")
+            setTextViewText(R.id.music_theme_widget_artist, "Remove this widget and choose an available design")
+            setViewVisibility(R.id.music_theme_widget_previous, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_play_pause, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_next, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_shuffle, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_repeat, View.GONE)
+            setViewVisibility(R.id.music_theme_widget_progress, View.GONE)
+        }
         manager.updateAppWidget(widgetId, views)
     }
 
@@ -221,10 +246,11 @@ internal object ThemeMusicWidgetRenderer {
         )
         providers.forEach { provider ->
             manager.getAppWidgetIds(ComponentName(context, provider.javaClass)).forEach { id ->
-                if (ThemeWidgetRegistry.registerWidget(context, id, provider.javaClass.name)) {
+                if (assetsAvailable(context, id, provider.widgetFolder) &&
+                    ThemeWidgetRegistry.registerWidget(context, id, provider.javaClass.name)) {
                     render(context, manager, id, provider.widgetLayout, provider.widgetFolder)
                 } else {
-                    renderLimitReached(context, manager, id, provider.widgetLayout)
+                    renderUnavailable(context, manager, id, provider.widgetLayout)
                 }
             }
         }
