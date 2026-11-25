@@ -12,6 +12,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.RemoteViews
+import io.flutter.FlutterInjector
 import java.util.concurrent.ConcurrentHashMap
 
 /** Fixed-size Android adapters delegate all behavior to one shared renderer. */
@@ -55,8 +56,8 @@ class MusicThemeWidget4x3Provider : ThemeMusicWidgetProvider() {
 
 internal object ThemeMusicWidgetRenderer {
     private const val TAG = "MuziiNapThemeWidget"
-    private const val ASSET_PREFIX =
-        "flutter_assets/assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/"
+    private const val ASSET_DIRECTORY = "assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/"
+    private const val MAX_DECODED_EDGE_PX = 720
     private val bitmapCache = ConcurrentHashMap<String, Bitmap>()
 
     fun render(context: Context, manager: AppWidgetManager, widgetId: Int, layoutId: Int) {
@@ -107,19 +108,50 @@ internal object ThemeMusicWidgetRenderer {
     }
 
     private fun setAsset(context: Context, views: RemoteViews, viewId: Int, fileName: String) {
-        val path = ASSET_PREFIX + fileName
+        val assetName = ASSET_DIRECTORY + fileName
+        val assetKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(assetName)
         try {
-            val bitmap = bitmapCache[path] ?: synchronized(bitmapCache) {
-                bitmapCache[path] ?: context.assets.open(path).use { stream ->
-                    BitmapFactory.decodeStream(
-                        stream, null, BitmapFactory.Options().apply { inSampleSize = 2 }
-                    )
-                }?.also { bitmapCache[path] = it }
+            val bitmap = bitmapCache[assetKey] ?: synchronized(bitmapCache) {
+                bitmapCache[assetKey] ?: decodeAsset(context, assetKey)?.also {
+                    bitmapCache[assetKey] = it
+                }
             }
-            if (bitmap != null) views.setImageViewBitmap(viewId, bitmap)
+            if (bitmap == null) {
+                Log.e(TAG, "Flutter asset decoded to null: $assetName (key=$assetKey)")
+            } else {
+                views.setImageViewBitmap(viewId, bitmap)
+                Log.d(TAG, "Loaded widget image $assetName: ${bitmap.width}x${bitmap.height}")
+            }
         } catch (error: Exception) {
-            Log.w(TAG, "Could not load bundled widget image $path", error)
+            Log.e(TAG, "Could not load widget image $assetName (key=$assetKey)", error)
+        } catch (error: OutOfMemoryError) {
+            Log.e(TAG, "Not enough memory to decode widget image $assetName", error)
         }
+    }
+
+    private fun decodeAsset(context: Context, assetKey: String): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.assets.open(assetKey).use { BitmapFactory.decodeStream(it, null, bounds) }
+
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            Log.e(TAG, "Invalid widget image dimensions for $assetKey")
+            return null
+        }
+
+        var sampleSize = 1
+        while (
+            bounds.outWidth / (sampleSize * 2) >= MAX_DECODED_EDGE_PX ||
+            bounds.outHeight / (sampleSize * 2) >= MAX_DECODED_EDGE_PX
+        ) {
+            sampleSize *= 2
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+            inScaled = false
+        }
+        return context.assets.open(assetKey).use { BitmapFactory.decodeStream(it, null, options) }
     }
 
     private fun launchPendingIntent(context: Context, widgetId: Int): PendingIntent {
