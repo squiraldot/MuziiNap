@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Fixed-size Android adapters delegate all behavior to one shared renderer. */
 abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
-    protected abstract val widgetLayout: Int
+    internal abstract val widgetLayout: Int
     internal abstract val widgetFolder: String
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
