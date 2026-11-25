@@ -180,6 +180,17 @@ internal object ThemeWidgetRegistry {
         }
     }
 
+    fun reservationSize(context: Context, token: String): String? {
+        if (token.isBlank()) return null
+        return helper(context).readableDatabase.query(
+            TABLE_RESERVATIONS, arrayOf("widget_size"), "token = ?",
+            arrayOf(token), null, null, null
+        ).use { if (it.moveToFirst()) it.getString(0) else null }
+    }
+
+    fun pendingReservationCount(context: Context): Int =
+        scalarCount(helper(context).readableDatabase, TABLE_RESERVATIONS)
+
     fun releaseReservation(context: Context, token: String) {
         if (token.isBlank()) return
         helper(context).writableDatabase.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))

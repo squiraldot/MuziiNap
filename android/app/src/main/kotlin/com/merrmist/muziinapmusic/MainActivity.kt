@@ -22,7 +22,7 @@ import com.ryanheise.just_audio.MuziiNapDspController
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentHashMap\nimport java.util.UUID\nimport android.appwidget.AppWidgetManager\nimport android.content.ComponentName
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.hypot
 
@@ -271,6 +271,77 @@ class MainActivity : AudioServiceActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/theme_music_widget")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "requestPin" -> {
+                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                        val themeId = call.argument<String>("themeId") ?: ""
+                        val designId = call.argument<String>("designId") ?: ""
+                        val widgetSize = call.argument<String>("widgetSize") ?: ""
+                        val provider = when (widgetSize) {
+                            "4x2" -> MusicThemeWidget4x2Provider::class.java
+                            "4x3" -> MusicThemeWidget4x3Provider::class.java
+                            else -> null
+                        }
+                        if (provider == null) {
+                            result.error("invalid_size", "Unsupported widget size.", null)
+                            return@setMethodCallHandler
+                        }
+                        val manager = AppWidgetManager.getInstance(applicationContext)
+                        if (!manager.isRequestPinAppWidgetSupported) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                        val token = UUID.randomUUID().toString()
+                        if (!ThemeWidgetRegistry.reservePin(
+                                applicationContext, token, themeId, designId, widgetSize
+                            )) {
+                            result.error(
+                                "widget_unavailable",
+                                "The design is already installed or both widget slots are occupied.",
+                                null
+                            )
+                            return@setMethodCallHandler
+                        }
+                        val callbackIntent = Intent(applicationContext, ThemeWidgetPinReceiver::class.java)
+                            .putExtra(ThemeWidgetPinReceiver.EXTRA_RESERVATION_TOKEN, token)
+                        val callback = android.app.PendingIntent.getBroadcast(
+                            applicationContext,
+                            token.hashCode(),
+                            callbackIntent,
+                            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                                android.app.PendingIntent.FLAG_IMMUTABLE
+                        )
+                        val accepted = manager.requestPinAppWidget(
+                            ComponentName(applicationContext, provider),
+                            Bundle().apply {
+                                putString("themeId", themeId)
+                                putString("designId", designId)
+                                putString("widgetSize", widgetSize)
+                            },
+                            callback
+                        )
+                        if (!accepted) ThemeWidgetRegistry.releaseReservation(applicationContext, token)
+                        result.success(accepted)
+                    }
+                    "getWidgetStatus" -> {
+                        val widgets = ThemeWidgetRegistry.registeredWidgets(applicationContext)
+                        result.success(mapOf(
+                            "activeCount" to widgets.size,
+                            "pendingCount" to ThemeWidgetRegistry.pendingReservationCount(applicationContext),
+                            "remainingCapacity" to (2 - widgets.size - ThemeWidgetRegistry.pendingReservationCount(applicationContext)).coerceAtLeast(0),
+                            "recoveryConflict" to (widgets.size > 2),
+                            "widgets" to widgets.map { widget -> mapOf(
+                                "appWidgetId" to widget.appWidgetId,
+                                "uuid" to widget.internalUuid,
+                                "themeId" to widget.themeId,
+                                "designId" to widget.designId,
+                                "size" to widget.widgetSize,
+                                "state" to widget.lifecycleState
+                            ) }
+                        ))
+                    }
                     "updatePlayback" -> {
                         val title = call.argument<String>("title") ?: "Nothing playing"
                         val artist = call.argument<String>("artist") ?: ""
