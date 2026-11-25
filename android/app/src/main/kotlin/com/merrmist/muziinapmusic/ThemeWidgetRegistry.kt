@@ -129,7 +129,10 @@ internal object ThemeWidgetRegistry {
 
     private fun pruneExpiredReservations(db: SQLiteDatabase) {
         // Allow launchers a day to deliver their pin callback before releasing a lost reservation.
-        val expiry = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+        // Android does not send a negative callback when the launcher dismisses
+        // the pin sheet. Keep abandoned reservations short-lived, then release
+        // them on the next registry reconciliation/status refresh.
+        val expiry = System.currentTimeMillis() - 10L * 60L * 1000L
         db.delete(TABLE_RESERVATIONS, "created_at < ?", arrayOf(expiry.toString()))
     }
 
