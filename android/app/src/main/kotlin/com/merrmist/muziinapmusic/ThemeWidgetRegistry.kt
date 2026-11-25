@@ -109,6 +109,11 @@ internal object ThemeWidgetRegistry {
     fun isRegisteredWidget(context: Context, widgetId: Int): Boolean =
         findWidget(helper(context).readableDatabase, widgetId) != null
 
+    private fun hasRecoveryConflict(db: SQLiteDatabase): Boolean =
+        db.query(TABLE_WIDGETS, arrayOf("app_widget_id"), "lifecycle_state = ?",
+            arrayOf("RECOVERY_CONFLICT"), null, null, null).use { it.moveToFirst() } ||
+            scalarCount(db, TABLE_WIDGETS) > WidgetReservationPolicy.MAX_WIDGETS
+
     private fun pruneExpiredReservations(db: SQLiteDatabase) {
         // Allow launchers a day to deliver their pin callback before releasing a lost reservation.
         val expiry = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
@@ -140,7 +145,7 @@ internal object ThemeWidgetRegistry {
             val pendingIdentities = readIdentities(db, TABLE_RESERVATIONS)
             val identity = ThemeWidgetIdentity(themeId, designId)
             if (!WidgetReservationPolicy.canReserve(
-                    count, pending, identity, identities, pendingIdentities, false
+                    count, pending, identity, identities, pendingIdentities, hasRecoveryConflict(db)
                 )) return false
 
             val now = System.currentTimeMillis()
@@ -188,7 +193,7 @@ internal object ThemeWidgetRegistry {
             val pendingIdentities = readIdentities(db, TABLE_RESERVATIONS)
             if (!WidgetReservationPolicy.canReserve(
                     activeCount, pendingCount, ThemeWidgetIdentity(themeId, designId),
-                    activeIdentities, pendingIdentities, false
+                    activeIdentities, pendingIdentities, hasRecoveryConflict(db)
                 )) return false
             db.insertOrThrow(TABLE_RESERVATIONS, null, ContentValues().apply {
                 put("token", token)
@@ -225,6 +230,15 @@ internal object ThemeWidgetRegistry {
             } ?: return false
             val existing = findWidget(db, widgetId)
             if (existing != null) {
+                db.update(TABLE_WIDGETS, ContentValues().apply {
+                    put("provider_class", providerClass)
+                    put("theme_id", reservation.first)
+                    put("design_id", reservation.second)
+                    put("widget_size", reservation.third)
+                    put("lifecycle_state", "ACTIVE")
+                    put("pending_pin_token", token)
+                    put("updated_at", System.currentTimeMillis())
+                }, "app_widget_id = ?", arrayOf(widgetId.toString()))
                 db.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))
                 db.setTransactionSuccessful()
                 return true
@@ -387,7 +401,7 @@ internal object ThemeWidgetRegistry {
         }
 
     private class WidgetDatabase(context: Context) :
-        SQLiteOpenHelper(context, "muziinap_theme_widgets.db", null, 2) {
+        SQLiteOpenHelper(context, "muziinap_theme_widgets.db", null, 3) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL("""CREATE TABLE widget_instances (
                 app_widget_id INTEGER PRIMARY KEY,
@@ -456,6 +470,10 @@ internal object ThemeWidgetRegistry {
                     token TEXT PRIMARY KEY, theme_id TEXT NOT NULL, design_id TEXT NOT NULL,
                     widget_size TEXT NOT NULL, created_at INTEGER NOT NULL
                 )""".trimIndent())
+            }
+            if (oldVersion < 3) {
+                // Repair any non-UUID placeholder written by an earlier Phase 03 migration.
+                db.execSQL("UPDATE widget_instances SET internal_uuid = ''")
             }
         }
     }

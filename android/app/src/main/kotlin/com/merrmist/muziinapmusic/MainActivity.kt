@@ -360,7 +360,7 @@ class MainActivity : AudioServiceActivity() {
                             "activeCount" to widgets.size,
                             "pendingCount" to ThemeWidgetRegistry.pendingReservationCount(applicationContext),
                             "remainingCapacity" to (2 - widgets.size - ThemeWidgetRegistry.pendingReservationCount(applicationContext)).coerceAtLeast(0),
-                            "recoveryConflict" to (widgets.size > 2),
+                            "recoveryConflict" to (widgets.size > 2 || widgets.any { it.lifecycleState == "RECOVERY_CONFLICT" }),
                             "widgets" to widgets.map { widget -> mapOf(
                                 "appWidgetId" to widget.appWidgetId,
                                 "uuid" to widget.internalUuid,
