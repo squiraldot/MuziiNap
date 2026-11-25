@@ -190,7 +190,9 @@ internal object ThemeMusicWidgetRenderer {
         try {
             val bitmap = bitmapCache[assetKey] ?: synchronized(bitmapCache) {
                 bitmapCache[assetKey] ?: decodeAsset(context, assetKey)?.let { decoded ->
-                    val displayBitmap = if (fileName == "Background.png") {
+                    val displayBitmap = if (
+                        fileName == "Background.png" || fileName == "Border.png"
+                    ) {
                         roundBackgroundCorners(decoded)
                     } else {
                         decoded
@@ -213,9 +215,9 @@ internal object ThemeMusicWidgetRenderer {
     }
 
     /**
-     * Clip only the background image to a proportional rounded rectangle.
-     * The border PNG remains untouched and is drawn above it, so its glow and
-     * transparent outer corners are preserved on every widget host/launcher.
+     * Clip the background and border images to the same proportional rounded
+     * rectangle before assigning them to RemoteViews. This keeps their outer
+     * corners aligned consistently across widget hosts and launchers.
      */
     private fun roundBackgroundCorners(source: Bitmap): Bitmap {
         val radius = WidgetImageCornerPolicy.backgroundRadius(source.width, source.height)
