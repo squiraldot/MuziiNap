@@ -9,6 +9,7 @@ import android.view.KeyEvent
 /** Validates every widget action before forwarding it to the existing audio session. */
 class ThemeWidgetActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != ACTION_WIDGET_COMMAND) return
         val widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, -1)
         val command = intent.getStringExtra(EXTRA_COMMAND) ?: return
         if (widgetId < 0 || !ThemeWidgetRegistry.isRegisteredWidget(context, widgetId)) return
@@ -36,6 +37,7 @@ class ThemeWidgetActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        const val ACTION_WIDGET_COMMAND = "com.merrmist.muziinapmusic.WIDGET_ACTION"
         const val EXTRA_WIDGET_ID = "muziinap.widget.APP_WIDGET_ID"
         const val EXTRA_COMMAND = "muziinap.widget.COMMAND"
         const val EXTRA_PENDING_ACTION = "muziinap.widget.PENDING_ACTION"

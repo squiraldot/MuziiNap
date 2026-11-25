@@ -236,7 +236,7 @@ internal object ThemeMusicWidgetRenderer {
         actionSlot: Int
     ): PendingIntent {
         val intent = Intent(context, ThemeWidgetActionReceiver::class.java).apply {
-            action = "com.merrmist.muziinapmusic.WIDGET_ACTION"
+            action = ThemeWidgetActionReceiver.ACTION_WIDGET_COMMAND
             data = Uri.parse("muziinap-widget://$widgetId/$command")
             putExtra(ThemeWidgetActionReceiver.EXTRA_WIDGET_ID, widgetId)
             putExtra(ThemeWidgetActionReceiver.EXTRA_COMMAND, command)

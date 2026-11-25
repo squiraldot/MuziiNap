@@ -94,8 +94,12 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        pendingThemeWidgetAction = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
-        pendingThemeWidgetAction?.let { themeWidgetChannel?.invokeMethod("widgetActionAvailable", it) }
+        val action = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
+        pendingThemeWidgetAction = action
+        if (action != null && themeWidgetChannel != null) {
+            pendingThemeWidgetAction = null
+            themeWidgetChannel?.invokeMethod("widgetActionAvailable", action)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -334,6 +338,7 @@ class MainActivity : AudioServiceActivity() {
                             return@setMethodCallHandler
                         }
                         val callbackIntent = Intent(applicationContext, ThemeWidgetPinReceiver::class.java)
+                            .setData(Uri.parse("muziinap-pin://$token"))
                             .putExtra(ThemeWidgetPinReceiver.EXTRA_RESERVATION_TOKEN, token)
                         val callback = android.app.PendingIntent.getBroadcast(
                             applicationContext,

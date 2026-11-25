@@ -120,7 +120,7 @@ internal object ThemeWidgetRegistry {
     }
 
     fun isRegisteredWidget(context: Context, widgetId: Int): Boolean =
-        findWidget(helper(context).readableDatabase, widgetId) != null
+        findWidget(helper(context).readableDatabase, widgetId)?.lifecycleState == "ACTIVE"
 
     private fun hasRecoveryConflict(db: SQLiteDatabase): Boolean =
         db.query(TABLE_WIDGETS, arrayOf("app_widget_id"), "lifecycle_state = ?",
