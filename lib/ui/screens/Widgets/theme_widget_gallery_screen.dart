@@ -290,7 +290,8 @@ class _ThemeDesignDetailScreen extends StatefulWidget {
   State<_ThemeDesignDetailScreen> createState() => _ThemeDesignDetailScreenState();
 }
 
-class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
+class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen>
+    with WidgetsBindingObserver {
   static const MethodChannel _channel = MethodChannel('muziinap/theme_music_widget');
   String _selectedSize = '4x2';
   String? _message;
@@ -302,7 +303,19 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refreshAvailability();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshAvailability();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _refreshAvailability() async {
