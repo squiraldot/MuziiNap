@@ -79,6 +79,7 @@ internal object ThemeMusicWidgetRenderer {
         val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.music_theme_widget_title, state.title)
         views.setTextViewText(R.id.music_theme_widget_artist, state.artist)
+        applyControlVisibility(views, WidgetControlVisibilityPolicy.forMode(WidgetRenderMode.ACTIVE))
         views.setImageViewResource(
             R.id.music_theme_widget_play_pause,
             if (state.isPlaying) android.R.drawable.ic_media_pause
@@ -130,11 +131,7 @@ internal object ThemeMusicWidgetRenderer {
         val views = RemoteViews(context.packageName, layoutId).apply {
             setTextViewText(R.id.music_theme_widget_title, "Theme assets unavailable")
             setTextViewText(R.id.music_theme_widget_artist, "Remove this widget and choose an available design")
-            setViewVisibility(R.id.music_theme_widget_previous, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_play_pause, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_next, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_shuffle, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_repeat, View.GONE)
+            applyControlVisibility(this, WidgetControlVisibilityPolicy.forMode(WidgetRenderMode.UNAVAILABLE))
             setViewVisibility(R.id.music_theme_widget_progress, View.GONE)
         }
         manager.updateAppWidget(widgetId, views)
@@ -150,11 +147,21 @@ internal object ThemeMusicWidgetRenderer {
                 R.id.music_theme_widget_artist,
                 "Remove a theme widget to add this one"
             )
-            setViewVisibility(R.id.music_theme_widget_previous, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_play_pause, View.GONE)
-            setViewVisibility(R.id.music_theme_widget_next, View.GONE)
+            applyControlVisibility(this, WidgetControlVisibilityPolicy.forMode(WidgetRenderMode.LIMIT_REACHED))
         }
         manager.updateAppWidget(widgetId, views)
+    }
+
+    private fun applyControlVisibility(
+        views: RemoteViews,
+        visibility: WidgetControlVisibility
+    ) {
+        val state = if (visibility.visible) View.VISIBLE else View.GONE
+        views.setViewVisibility(R.id.music_theme_widget_previous, state)
+        views.setViewVisibility(R.id.music_theme_widget_play_pause, state)
+        views.setViewVisibility(R.id.music_theme_widget_shuffle, state)
+        views.setViewVisibility(R.id.music_theme_widget_repeat, state)
+        views.setViewVisibility(R.id.music_theme_widget_next, state)
     }
 
     private fun setAsset(
