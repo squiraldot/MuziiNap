@@ -18,5 +18,12 @@ void main() {
     test('does not invent a remote preview URL when none is registered', () {
       expect(bundledThemeWidgetCatalog.single.designs.single.remotePreviewUrl, isNull);
     });
+
+    test('uses the bundled 4x2 artwork for a local Gallery preview', () {
+      final design = bundledThemeWidgetCatalog.single.designs.single;
+      expect(design.previewBackgroundAsset, endsWith('/Background.png'));
+      expect(design.previewBorderAsset, endsWith('/Border.png'));
+      expect(design.previewCharacterAsset, endsWith('/Character.png'));
+    });
   });
 }
