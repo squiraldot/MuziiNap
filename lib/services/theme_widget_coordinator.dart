@@ -115,23 +115,28 @@ class ThemeWidgetCoordinator extends GetxService {
   }
 
   Future<void> _applyWidgetAction(String? command) async {
+    if (command != 'shuffle' && command != 'repeat') return;
     try {
+      final playback = _playbackState ??
+          await _audioHandler.playbackState.first.timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => PlaybackState(),
+          );
       if (command == 'shuffle') {
-        final enabled = _playbackState?.shuffleMode != AudioServiceShuffleMode.none;
+        final enabled = playback.shuffleMode != AudioServiceShuffleMode.none;
         await _audioHandler.setShuffleMode(
           enabled ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all,
         );
-      } else if (command == 'repeat') {
-        final current = _playbackState?.repeatMode ?? AudioServiceRepeatMode.none;
-        final next = switch (current) {
+      } else {
+        final next = switch (playback.repeatMode) {
           AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
           AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
           _ => AudioServiceRepeatMode.none,
         };
         await _audioHandler.setRepeatMode(next);
       }
-    } on PlatformException catch (error) {
-      debugPrint('Could not apply native widget command: ${error.message}');
+    } catch (error) {
+      debugPrint('Could not apply native widget command: $error');
     }
   }
 
