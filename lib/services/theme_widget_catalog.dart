@@ -5,12 +5,18 @@ class ThemeWidgetDesignDefinition {
     required this.name,
     required this.supportedSizes,
     this.remotePreviewUrl,
+    this.previewBackgroundAsset,
+    this.previewBorderAsset,
+    this.previewCharacterAsset,
   });
 
   final String designId;
   final String name;
   final List<String> supportedSizes;
   final String? remotePreviewUrl;
+  final String? previewBackgroundAsset;
+  final String? previewBorderAsset;
+  final String? previewCharacterAsset;
 }
 
 class ThemeWidgetPackDefinition {
@@ -35,6 +41,9 @@ const List<ThemeWidgetPackDefinition> bundledThemeWidgetCatalog =
         designId: 'widget-1',
         name: 'Widget 1',
         supportedSizes: <String>['4x2'],
+        previewBackgroundAsset: 'assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/Background.png',
+        previewBorderAsset: 'assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/Border.png',
+        previewCharacterAsset: 'assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/Character.png',
       ),
     ],
   ),
