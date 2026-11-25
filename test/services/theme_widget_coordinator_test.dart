@@ -1,10 +1,16 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:muziinap/services/theme_widget_coordinator.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const widgetChannel = MethodChannel('muziinap/theme_music_widget');
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(widgetChannel, (call) async => null);
+
   group('ThemeWidgetCoordinator', () {
     late _FakeAudioHandler handler;
     late List<ThemeWidgetPlaybackSnapshot> published;
