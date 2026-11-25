@@ -22,11 +22,32 @@ class ThemeWidgetAssetPathTest {
     }
 
     @Test
+    fun resolvesThemeAndDesignFromStableIdentifiers() {
+        assertEquals(
+            "assets/widget_assets/Dragon_Ball_Z/4x2/Widget2/Character.png",
+            ThemeWidgetAssetPath.resolve("dragon-ball-z", "widget-2", "4x2", "Character.png")
+        )
+    }
+
+    @Test
     fun resolvesFourByThreeImagesOnlyFromFourByThreeFolder() {
         assertEquals(
             "assets/widget_assets/Dragon_Ball_Z/4x3/Widget1/Background.png",
             ThemeWidgetAssetPath.resolve("4x3", "Background.png")
         )
+    }
+
+    @Test
+    fun rejectsUnsafeIdentifiersAndUnknownAssetFiles() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ThemeWidgetAssetPath.resolve("../outside", "widget-1", "4x2", "Character.png")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ThemeWidgetAssetPath.resolve("dragon-ball-z", "../widget", "4x2", "Character.png")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ThemeWidgetAssetPath.resolve("4x2", "artwork.jpg")
+        }
     }
 
     @Test

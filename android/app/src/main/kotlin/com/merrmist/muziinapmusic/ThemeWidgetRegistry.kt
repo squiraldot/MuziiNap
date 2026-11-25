@@ -248,6 +248,9 @@ internal object ThemeWidgetRegistry {
         }
     }
 
+    fun registeredWidget(context: Context, widgetId: Int): RegisteredThemeWidget? =
+        findWidget(helper(context).readableDatabase, widgetId)
+
     fun registeredWidgets(context: Context): List<RegisteredThemeWidget> {
         return helper(context).readableDatabase.query(
             TABLE_WIDGETS,
@@ -381,6 +384,21 @@ internal object ThemeWidgetRegistry {
                 widget_size TEXT NOT NULL,
                 created_at INTEGER NOT NULL
             )""".trimIndent())
+        }
+
+        override fun onOpen(db: SQLiteDatabase) {
+            super.onOpen(db)
+            db.query(TABLE_WIDGETS, arrayOf("app_widget_id"), "internal_uuid = ''", null,
+                null, null, null).use { cursor ->
+                val ids = mutableListOf<Int>()
+                while (cursor.moveToNext()) ids.add(cursor.getInt(0))
+                ids.forEach { id ->
+                    db.update(TABLE_WIDGETS, ContentValues().apply {
+                        put("internal_uuid", UUID.randomUUID().toString())
+                        put("updated_at", System.currentTimeMillis())
+                    }, "app_widget_id = ?", arrayOf(id.toString()))
+                }
+            }
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {

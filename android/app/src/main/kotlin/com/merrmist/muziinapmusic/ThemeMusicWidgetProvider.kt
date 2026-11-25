@@ -79,9 +79,9 @@ internal object ThemeMusicWidgetRenderer {
             if (state.isPlaying) android.R.drawable.ic_media_pause
             else android.R.drawable.ic_media_play
         )
-        setAsset(context, views, R.id.music_theme_widget_background, widgetFolder, "Background.png")
-        setAsset(context, views, R.id.music_theme_widget_border, widgetFolder, "Border.png")
-        setAsset(context, views, R.id.music_theme_widget_character, widgetFolder, "Character.png")
+        setAsset(context, views, widgetId, R.id.music_theme_widget_background, widgetFolder, "Background.png")
+        setAsset(context, views, widgetId, R.id.music_theme_widget_border, widgetFolder, "Border.png")
+        setAsset(context, views, widgetId, R.id.music_theme_widget_character, widgetFolder, "Character.png")
 
         val progress = if (state.durationMs > 0L) {
             ((state.positionMs.coerceIn(0L, state.durationMs) * 1000L) / state.durationMs).toInt()
@@ -126,11 +126,17 @@ internal object ThemeMusicWidgetRenderer {
     private fun setAsset(
         context: Context,
         views: RemoteViews,
+        widgetId: Int,
         viewId: Int,
         widgetFolder: String,
         fileName: String
     ) {
-        val assetName = ThemeWidgetAssetPath.resolve(widgetFolder, fileName)
+        val registration = ThemeWidgetRegistry.registeredWidget(context, widgetId)
+        val assetName = if (registration != null) {
+            ThemeWidgetAssetPath.resolve(registration.themeId, registration.designId, widgetFolder, fileName)
+        } else {
+            ThemeWidgetAssetPath.resolve(widgetFolder, fileName)
+        }
         // Flutter stores declared assets under assets/flutter_assets in the APK.
         // Using this documented AssetManager path also works when the widget host
         // starts the receiver before a FlutterEngine has been created.
