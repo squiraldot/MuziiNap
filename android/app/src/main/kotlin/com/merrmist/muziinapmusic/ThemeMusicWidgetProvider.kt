@@ -36,7 +36,11 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(
         context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
     ) {
-        ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout)
+        if (ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name)) {
+            ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout)
+        } else {
+            ThemeMusicWidgetRenderer.renderLimitReached(context, manager, appWidgetId, widgetLayout)
+        }
         super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions)
     }
 }
@@ -147,7 +151,11 @@ internal object ThemeMusicWidgetRenderer {
             MusicThemeWidget4x3Provider::class.java
         ).forEach { provider ->
             manager.getAppWidgetIds(ComponentName(context, provider)).forEach { id ->
-                render(context, manager, id, R.layout.music_theme_widget)
+                if (ThemeWidgetRegistry.registerWidget(context, id, provider.name)) {
+                    render(context, manager, id, R.layout.music_theme_widget)
+                } else {
+                    renderLimitReached(context, manager, id, R.layout.music_theme_widget)
+                }
             }
         }
     }
