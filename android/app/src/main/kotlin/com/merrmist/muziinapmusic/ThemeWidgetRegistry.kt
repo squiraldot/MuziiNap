@@ -294,6 +294,23 @@ internal object ThemeWidgetRegistry {
     fun pendingReservationCount(context: Context): Int =
         scalarCount(helper(context).readableDatabase, TABLE_RESERVATIONS)
 
+    fun pendingReservations(context: Context): List<Map<String, String>> {
+        val db = helper(context).readableDatabase
+        return db.query(
+            TABLE_RESERVATIONS,
+            arrayOf("theme_id", "design_id", "widget_size"),
+            null, null, null, null, "created_at ASC"
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(mapOf(
+                    "themeId" to cursor.getString(0),
+                    "designId" to cursor.getString(1),
+                    "size" to cursor.getString(2)
+                ))
+            }
+        }
+    }
+
     fun releaseReservation(context: Context, token: String) {
         if (token.isBlank()) return
         helper(context).writableDatabase.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))
