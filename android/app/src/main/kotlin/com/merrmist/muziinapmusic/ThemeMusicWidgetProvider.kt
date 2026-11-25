@@ -12,17 +12,17 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.RemoteViews
-import io.flutter.FlutterInjector
 import java.util.concurrent.ConcurrentHashMap
 
 /** Fixed-size Android adapters delegate all behavior to one shared renderer. */
 abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
     protected abstract val widgetLayout: Int
+    internal abstract val widgetFolder: String
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { id ->
             if (ThemeWidgetRegistry.registerWidget(context, id, javaClass.name)) {
-                ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout)
+                ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout, widgetFolder)
             } else {
                 ThemeMusicWidgetRenderer.renderLimitReached(context, manager, id, widgetLayout)
             }
@@ -38,7 +38,7 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
         context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
     ) {
         if (ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name)) {
-            ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout)
+            ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout, widgetFolder)
         } else {
             ThemeMusicWidgetRenderer.renderLimitReached(context, manager, appWidgetId, widgetLayout)
         }
@@ -48,19 +48,27 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
 
 class MusicThemeWidget4x2Provider : ThemeMusicWidgetProvider() {
     override val widgetLayout: Int = R.layout.music_theme_widget
+    override val widgetFolder: String = "4x2"
 }
 
 class MusicThemeWidget4x3Provider : ThemeMusicWidgetProvider() {
     override val widgetLayout: Int = R.layout.music_theme_widget
+    override val widgetFolder: String = "4x3"
 }
 
 internal object ThemeMusicWidgetRenderer {
     private const val TAG = "MuziiNapThemeWidget"
-    private const val ASSET_DIRECTORY = "assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/"
-    private const val MAX_DECODED_EDGE_PX = 720
+    private const val ASSET_DIRECTORY = "assets/widget_assets/Dragon_Ball_Z"
+    private const val MAX_DECODED_EDGE_PX = 256
     private val bitmapCache = ConcurrentHashMap<String, Bitmap>()
 
-    fun render(context: Context, manager: AppWidgetManager, widgetId: Int, layoutId: Int) {
+    fun render(
+        context: Context,
+        manager: AppWidgetManager,
+        widgetId: Int,
+        layoutId: Int,
+        widgetFolder: String
+    ) {
         val state = ThemeWidgetRegistry.playbackState(context)
         val views = RemoteViews(context.packageName, layoutId)
         views.setTextViewText(R.id.music_theme_widget_title, state.title)
@@ -70,9 +78,9 @@ internal object ThemeMusicWidgetRenderer {
             if (state.isPlaying) android.R.drawable.ic_media_pause
             else android.R.drawable.ic_media_play
         )
-        setAsset(context, views, R.id.music_theme_widget_background, "Background.png")
-        setAsset(context, views, R.id.music_theme_widget_border, "Border.png")
-        setAsset(context, views, R.id.music_theme_widget_character, "Character.png")
+        setAsset(context, views, R.id.music_theme_widget_background, widgetFolder, "Background.png")
+        setAsset(context, views, R.id.music_theme_widget_border, widgetFolder, "Border.png")
+        setAsset(context, views, R.id.music_theme_widget_character, widgetFolder, "Character.png")
 
         views.setOnClickPendingIntent(R.id.music_theme_widget_root, launchPendingIntent(context, widgetId))
         views.setOnClickPendingIntent(
@@ -107,9 +115,18 @@ internal object ThemeMusicWidgetRenderer {
         manager.updateAppWidget(widgetId, views)
     }
 
-    private fun setAsset(context: Context, views: RemoteViews, viewId: Int, fileName: String) {
-        val assetName = ASSET_DIRECTORY + fileName
-        val assetKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(assetName)
+    private fun setAsset(
+        context: Context,
+        views: RemoteViews,
+        viewId: Int,
+        widgetFolder: String,
+        fileName: String
+    ) {
+        val assetName = ThemeWidgetAssetPath.resolve(widgetFolder, fileName)
+        // Flutter stores declared assets under assets/flutter_assets in the APK.
+        // Using this documented AssetManager path also works when the widget host
+        // starts the receiver before a FlutterEngine has been created.
+        val assetKey = "flutter_assets/$assetName"
         try {
             val bitmap = bitmapCache[assetKey] ?: synchronized(bitmapCache) {
                 bitmapCache[assetKey] ?: decodeAsset(context, assetKey)?.also {
@@ -117,13 +134,13 @@ internal object ThemeMusicWidgetRenderer {
                 }
             }
             if (bitmap == null) {
-                Log.e(TAG, "Flutter asset decoded to null: $assetName (key=$assetKey)")
+                Log.e(TAG, "Widget image decoded to null: $assetName (APK key=$assetKey)")
             } else {
                 views.setImageViewBitmap(viewId, bitmap)
-                Log.d(TAG, "Loaded widget image $assetName: ${bitmap.width}x${bitmap.height}")
+                Log.i(TAG, "Loaded widget image $assetName: ${bitmap.width}x${bitmap.height}, ${bitmap.byteCount} bytes")
             }
         } catch (error: Exception) {
-            Log.e(TAG, "Could not load widget image $assetName (key=$assetKey)", error)
+            Log.e(TAG, "Could not load widget image $assetName (APK key=$assetKey)", error)
         } catch (error: OutOfMemoryError) {
             Log.e(TAG, "Not enough memory to decode widget image $assetName", error)
         }
@@ -178,15 +195,16 @@ internal object ThemeMusicWidgetRenderer {
 
     fun updateAll(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
-        listOf(
-            MusicThemeWidget4x2Provider::class.java,
-            MusicThemeWidget4x3Provider::class.java
-        ).forEach { provider ->
-            manager.getAppWidgetIds(ComponentName(context, provider)).forEach { id ->
-                if (ThemeWidgetRegistry.registerWidget(context, id, provider.name)) {
-                    render(context, manager, id, R.layout.music_theme_widget)
+        val providers = listOf(
+            MusicThemeWidget4x2Provider(),
+            MusicThemeWidget4x3Provider()
+        )
+        providers.forEach { provider ->
+            manager.getAppWidgetIds(ComponentName(context, provider.javaClass)).forEach { id ->
+                if (ThemeWidgetRegistry.registerWidget(context, id, provider.javaClass.name)) {
+                    render(context, manager, id, provider.widgetLayout, provider.widgetFolder)
                 } else {
-                    renderLimitReached(context, manager, id, R.layout.music_theme_widget)
+                    renderLimitReached(context, manager, id, provider.widgetLayout)
                 }
             }
         }

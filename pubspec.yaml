@@ -83,6 +83,7 @@ flutter:
   assets:
     - assets/icons/
     - assets/widget_assets/
+    - assets/widget_assets/Dragon_Ball_Z/4x2/Widget1/
     - assets/fonts/
     - assets/videos/muziinap_intro.MP4
   fonts:
