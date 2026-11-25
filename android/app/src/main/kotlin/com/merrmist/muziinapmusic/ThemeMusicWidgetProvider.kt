@@ -33,6 +33,7 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
 
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         ThemeWidgetRegistry.unregisterWidget(context, appWidgetIds)
+        ThemeMusicWidgetRenderer.releaseUnusedAssets(context)
         super.onDeleted(context, appWidgetIds)
     }
 
@@ -106,6 +107,12 @@ internal object ThemeMusicWidgetRenderer {
         views.setOnClickPendingIntent(R.id.music_theme_widget_repeat,
             actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_REPEAT, 5))
         manager.updateAppWidget(widgetId, views)
+    }
+
+    fun releaseUnusedAssets(context: Context) {
+        if (ThemeWidgetRegistry.registeredWidgets(context).isEmpty()) {
+            bitmapCache.clear()
+        }
     }
 
     fun assetsAvailable(context: Context, widgetId: Int, widgetFolder: String): Boolean {

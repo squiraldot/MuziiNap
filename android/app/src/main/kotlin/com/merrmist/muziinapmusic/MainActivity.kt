@@ -309,6 +309,16 @@ class MainActivity : AudioServiceActivity() {
                             result.success(false)
                             return@setMethodCallHandler
                         }
+                        if (!ThemeWidgetAssetPath.assetsAvailable(
+                                applicationContext, themeId, designId, widgetSize
+                            )) {
+                            result.error(
+                                "assets_unavailable",
+                                "This design does not contain the required assets for the selected size.",
+                                null
+                            )
+                            return@setMethodCallHandler
+                        }
                         val token = UUID.randomUUID().toString()
                         if (!ThemeWidgetRegistry.reservePin(
                                 applicationContext, token, themeId, designId, widgetSize

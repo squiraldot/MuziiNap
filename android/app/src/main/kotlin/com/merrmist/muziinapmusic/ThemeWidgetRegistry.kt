@@ -53,14 +53,50 @@ internal object ThemeWidgetRegistry {
         val db = helper(context).writableDatabase
         db.beginTransaction()
         try {
+            val registeredIds = mutableSetOf<Int>()
             db.query(TABLE_WIDGETS, arrayOf("app_widget_id"), null, null, null, null, null).use { cursor ->
                 val staleIds = mutableListOf<Int>()
                 while (cursor.moveToNext()) {
                     val id = cursor.getInt(0)
-                    if (id !in activeIds) staleIds.add(id)
+                    if (id !in activeIds) staleIds.add(id) else registeredIds.add(id)
                 }
                 staleIds.forEach { id ->
                     db.delete(TABLE_WIDGETS, "app_widget_id = ?", arrayOf(id.toString()))
+                }
+            }
+
+            // Recover launcher instances whose provider update or pin callback was lost.
+            // Existing platform widgets are never deleted, even if recovery finds >2.
+            (activeIds - registeredIds).forEach { id ->
+                val providerInfo = manager.getAppWidgetInfo(id) ?: return@forEach
+                val providerClass = providerInfo.provider.className
+                val size = if (providerClass.contains("4x3")) "4x3" else "4x2"
+                val reservation = db.query(
+                    TABLE_RESERVATIONS,
+                    arrayOf("token", "theme_id", "design_id"),
+                    "widget_size = ?", arrayOf(size), null, null, "created_at ASC"
+                ).use { cursor ->
+                    if (!cursor.moveToFirst()) null else Triple(
+                        cursor.getString(0), cursor.getString(1), cursor.getString(2)
+                    )
+                }
+                val themeId = reservation?.second ?: "dragon-ball-z"
+                val designId = reservation?.third ?: "widget-1"
+                val now = System.currentTimeMillis()
+                db.insertWithOnConflict(TABLE_WIDGETS, null, ContentValues().apply {
+                    put("app_widget_id", id)
+                    put("provider_class", providerClass)
+                    put("created_at", now)
+                    put("internal_uuid", UUID.randomUUID().toString())
+                    put("theme_id", themeId)
+                    put("design_id", designId)
+                    put("widget_size", size)
+                    put("lifecycle_state", "ACTIVE")
+                    putNull("pending_pin_token")
+                    put("updated_at", now)
+                }, SQLiteDatabase.CONFLICT_IGNORE)
+                reservation?.first?.let { token ->
+                    db.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))
                 }
             }
             pruneExpiredReservations(db)
