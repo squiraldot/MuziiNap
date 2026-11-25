@@ -129,14 +129,12 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.palette_outlined, size: 32),
+                      SizedBox(
+                        width: 104,
+                        height: 64,
+                        child: pack.designs.isEmpty
+                            ? const _PreviewPlaceholder()
+                            : _BundledWidgetPreview(design: pack.designs.first),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -197,6 +195,61 @@ class _ThemePackDetailScreen extends StatelessWidget {
               )),
             ),
           )),
+        ],
+      ),
+    );
+  }
+}
+
+class _BundledWidgetPreview extends StatelessWidget {
+  const _BundledWidgetPreview({required this.design});
+
+  final ThemeWidgetDesignDefinition design;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = design.previewBackgroundAsset;
+    final border = design.previewBorderAsset;
+    final character = design.previewCharacterAsset;
+    if (background == null || border == null || character == null) {
+      if (design.remotePreviewUrl == null) return const _PreviewPlaceholder();
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          design.remotePreviewUrl!,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const _PreviewPlaceholder(),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            background,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const _PreviewPlaceholder(),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.42,
+              heightFactor: 1,
+              child: Image.asset(
+                character,
+                fit: BoxFit.contain,
+                alignment: Alignment.bottomRight,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          Image.asset(
+            border,
+            fit: BoxFit.fill,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
         ],
       ),
     );
@@ -324,23 +377,10 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (widget.design.remotePreviewUrl != null)
-            AspectRatio(
-              aspectRatio: 2,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  widget.design.remotePreviewUrl!,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const _PreviewPlaceholder(),
-                ),
-              ),
-            )
-          else
-            AspectRatio(
-              aspectRatio: 2,
-              child: _PreviewPlaceholder(),
-            ),
+          AspectRatio(
+            aspectRatio: 2,
+            child: _BundledWidgetPreview(design: widget.design),
+          ),
           const SizedBox(height: 20),
           Text('Widget size', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
