@@ -111,6 +111,8 @@ class ThemeWidgetCoordinator extends GetxService {
       await _applyWidgetAction(command);
     } on PlatformException catch (error) {
       debugPrint('Could not consume native widget command: ${error.message}');
+    } on MissingPluginException {
+      // Theme music widgets are Android-only; other platforms have no native bridge.
     }
   }
 
