@@ -9,6 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.BitmapShader
+import android.graphics.Shader
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -184,8 +189,14 @@ internal object ThemeMusicWidgetRenderer {
         val assetKey = "flutter_assets/$assetName"
         try {
             val bitmap = bitmapCache[assetKey] ?: synchronized(bitmapCache) {
-                bitmapCache[assetKey] ?: decodeAsset(context, assetKey)?.also {
-                    bitmapCache[assetKey] = it
+                bitmapCache[assetKey] ?: decodeAsset(context, assetKey)?.let { decoded ->
+                    val displayBitmap = if (fileName == "Background.png") {
+                        roundBackgroundCorners(decoded)
+                    } else {
+                        decoded
+                    }
+                    bitmapCache[assetKey] = displayBitmap
+                    displayBitmap
                 }
             }
             if (bitmap == null) {
@@ -199,6 +210,27 @@ internal object ThemeMusicWidgetRenderer {
         } catch (error: OutOfMemoryError) {
             Log.e(TAG, "Not enough memory to decode widget image $assetName", error)
         }
+    }
+
+    /**
+     * Clip only the background image to a proportional rounded rectangle.
+     * The border PNG remains untouched and is drawn above it, so its glow and
+     * transparent outer corners are preserved on every widget host/launcher.
+     */
+    private fun roundBackgroundCorners(source: Bitmap): Bitmap {
+        val radius = WidgetImageCornerPolicy.backgroundRadius(source.width, source.height)
+        val output = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            shader = BitmapShader(source, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        }
+        Canvas(output).drawRoundRect(
+            RectF(0f, 0f, source.width.toFloat(), source.height.toFloat()),
+            radius,
+            radius,
+            paint
+        )
+        if (source !== output && !source.isRecycled) source.recycle()
+        return output
     }
 
     private fun decodeAsset(context: Context, assetKey: String): Bitmap? {
