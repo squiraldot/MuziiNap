@@ -8,7 +8,8 @@ class ThemeWidgetGalleryScreen extends StatefulWidget {
   State<ThemeWidgetGalleryScreen> createState() => _ThemeWidgetGalleryScreenState();
 }
 
-class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen> {
+class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
+    with WidgetsBindingObserver {
   static const MethodChannel _channel = MethodChannel('muziinap/theme_music_widget');
   Map<String, dynamic> _status = const <String, dynamic>{};
   bool _loading = false;
@@ -17,7 +18,19 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _refresh() async {

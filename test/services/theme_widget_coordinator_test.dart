@@ -44,6 +44,7 @@ void main() {
       expect(published.last.shuffleEnabled, isTrue);
       expect(published.last.repeatMode, 'ONE');
       expect(published.last.toChannelArguments().containsKey('artUri'), isFalse);
+      expect(published.last.revision, greaterThan(0));
       coordinator.onClose();
     });
 
