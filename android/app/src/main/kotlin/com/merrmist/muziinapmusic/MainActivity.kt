@@ -44,6 +44,7 @@ class MainActivity : AudioServiceActivity() {
     private val bgutilsSetupGate = BgUtilsSetupGate()
     @Volatile private var bgutilsSetupThread: Thread? = null
     private var notificationPermissionRequestScheduled = false
+    private var pendingThemeWidgetAction: String? = null
 
     /**
      * Ask once on the first app launch on Android 13+. Notification denial
@@ -81,8 +82,15 @@ class MainActivity : AudioServiceActivity() {
         // Retain the unparsed Android URL before Dart Uri normalization.
         intent?.dataString?.let(pendingDeepLinks::addLast)
         super.onCreate(savedInstanceState)
+        pendingThemeWidgetAction = intent?.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
         ThemeWidgetRegistry.reconcile(applicationContext)
         ApkIntegrityVerifier.verifyAtStartup(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingThemeWidgetAction = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -272,6 +280,9 @@ class MainActivity : AudioServiceActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/theme_music_widget")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "consumePendingWidgetAction" -> {
+                        result.success(pendingThemeWidgetAction.also { pendingThemeWidgetAction = null })
+                    }
                     "requestPin" -> {
                         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                             result.success(false)

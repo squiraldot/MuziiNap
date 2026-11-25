@@ -96,6 +96,29 @@ class ThemeWidgetCoordinator extends GetxService {
         debugPrint('Theme widget playback stream failed: $error');
       },
     );
+    unawaited(_consumePendingWidgetAction());
+  }
+
+  Future<void> _consumePendingWidgetAction() async {
+    try {
+      final command = await _channel.invokeMethod<String>('consumePendingWidgetAction');
+      if (command == 'shuffle') {
+        final enabled = _playbackState?.shuffleMode != AudioServiceShuffleMode.none;
+        await _audioHandler.setShuffleMode(
+          enabled ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all,
+        );
+      } else if (command == 'repeat') {
+        final current = _playbackState?.repeatMode ?? AudioServiceRepeatMode.none;
+        final next = switch (current) {
+          AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
+          AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
+          _ => AudioServiceRepeatMode.none,
+        };
+        await _audioHandler.setRepeatMode(next);
+      }
+    } on PlatformException catch (error) {
+      debugPrint('Could not apply native widget command: ${error.message}');
+    }
   }
 
   void _publish() {

@@ -139,6 +139,14 @@
         </receiver>
 
         <receiver
+            android:name=".ThemeWidgetActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ThemeWidgetPinReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".LyricsHomeWidgetProvider"
             android:exported="true">
             <intent-filter>

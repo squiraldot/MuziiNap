@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
+import android.net.Uri
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -82,19 +83,26 @@ internal object ThemeMusicWidgetRenderer {
         setAsset(context, views, R.id.music_theme_widget_border, widgetFolder, "Border.png")
         setAsset(context, views, R.id.music_theme_widget_character, widgetFolder, "Character.png")
 
+        val progress = if (state.durationMs > 0L) {
+            ((state.positionMs.coerceIn(0L, state.durationMs) * 1000L) / state.durationMs).toInt()
+        } else 0
+        views.setProgressBar(R.id.music_theme_widget_progress, 1000, progress, false)
+        views.setViewVisibility(R.id.music_theme_widget_progress,
+            if (state.durationMs > 0L) View.VISIBLE else View.GONE)
+        views.setFloat(R.id.music_theme_widget_shuffle, "setAlpha", if (state.shuffleEnabled) 1f else 0.45f)
+        views.setFloat(R.id.music_theme_widget_repeat, "setAlpha", if (state.repeatMode == "OFF") 0.45f else 1f)
+        views.setContentDescription(R.id.music_theme_widget_repeat, "Repeat ${state.repeatMode.lowercase()}")
         views.setOnClickPendingIntent(R.id.music_theme_widget_root, launchPendingIntent(context, widgetId))
-        views.setOnClickPendingIntent(
-            R.id.music_theme_widget_previous,
-            mediaButtonPendingIntent(context, widgetId, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 1)
-        )
-        views.setOnClickPendingIntent(
-            R.id.music_theme_widget_play_pause,
-            mediaButtonPendingIntent(context, widgetId, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, 2)
-        )
-        views.setOnClickPendingIntent(
-            R.id.music_theme_widget_next,
-            mediaButtonPendingIntent(context, widgetId, KeyEvent.KEYCODE_MEDIA_NEXT, 3)
-        )
+        views.setOnClickPendingIntent(R.id.music_theme_widget_previous,
+            actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_PREVIOUS, 1))
+        views.setOnClickPendingIntent(R.id.music_theme_widget_play_pause,
+            actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_PLAY_PAUSE, 2))
+        views.setOnClickPendingIntent(R.id.music_theme_widget_next,
+            actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_NEXT, 3))
+        views.setOnClickPendingIntent(R.id.music_theme_widget_shuffle,
+            actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_SHUFFLE, 4))
+        views.setOnClickPendingIntent(R.id.music_theme_widget_repeat,
+            actionPendingIntent(context, widgetId, ThemeWidgetActionReceiver.COMMAND_REPEAT, 5))
         manager.updateAppWidget(widgetId, views)
     }
 
@@ -181,12 +189,18 @@ internal object ThemeMusicWidgetRenderer {
         )
     }
 
-    private fun mediaButtonPendingIntent(
-        context: Context, widgetId: Int, keyCode: Int, actionSlot: Int
+    private fun actionPendingIntent(
+        context: Context,
+        widgetId: Int,
+        command: String,
+        actionSlot: Int
     ): PendingIntent {
-        val intent = Intent(Intent.ACTION_MEDIA_BUTTON)
-            .setComponent(ComponentName(context, "com.ryanheise.audioservice.MediaButtonReceiver"))
-            .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        val intent = Intent(context, ThemeWidgetActionReceiver::class.java).apply {
+            action = "com.merrmist.muziinapmusic.WIDGET_ACTION"
+            data = Uri.parse("muziinap-widget://$widgetId/$command")
+            putExtra(ThemeWidgetActionReceiver.EXTRA_WIDGET_ID, widgetId)
+            putExtra(ThemeWidgetActionReceiver.EXTRA_COMMAND, command)
+        }
         return PendingIntent.getBroadcast(
             context, widgetId * 10 + actionSlot, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
