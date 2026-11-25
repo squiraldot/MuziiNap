@@ -367,10 +367,12 @@ class MainActivity : AudioServiceActivity() {
                         result.success(accepted)
                     }
                     "getWidgetStatus" -> {
+                        ThemeWidgetRegistry.reconcile(applicationContext)
                         val widgets = ThemeWidgetRegistry.registeredWidgets(applicationContext)
                         result.success(mapOf(
                             "activeCount" to widgets.size,
                             "pendingCount" to ThemeWidgetRegistry.pendingReservationCount(applicationContext),
+                            "pendingWidgets" to ThemeWidgetRegistry.pendingReservations(applicationContext),
                             "remainingCapacity" to (2 - widgets.size - ThemeWidgetRegistry.pendingReservationCount(applicationContext)).coerceAtLeast(0),
                             "recoveryConflict" to (widgets.size > 2 || widgets.any { it.lifecycleState == "RECOVERY_CONFLICT" }),
                             "widgets" to widgets.map { widget -> mapOf(
