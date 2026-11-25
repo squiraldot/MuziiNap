@@ -94,12 +94,19 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        val action = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
-        pendingThemeWidgetAction = action
-        if (action != null && themeWidgetChannel != null) {
+
+        val widgetAction = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
+        pendingThemeWidgetAction = widgetAction
+        if (widgetAction != null && themeWidgetChannel != null) {
             pendingThemeWidgetAction = null
-            themeWidgetChannel?.invokeMethod("widgetActionAvailable", action)
+            themeWidgetChannel?.invokeMethod("widgetActionAvailable", widgetAction)
         }
+
+        intent.dataString?.let { rawUrl ->
+            val sink = deepLinkEventSink
+            if (sink != null) sink.success(rawUrl) else pendingDeepLinks.addLast(rawUrl)
+        }
+        handlePresetIntent(intent)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -561,16 +568,6 @@ class MainActivity : AudioServiceActivity() {
             } catch (_: RuntimeException) {
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        intent.dataString?.let { rawUrl ->
-            val sink = deepLinkEventSink
-            if (sink != null) sink.success(rawUrl) else pendingDeepLinks.addLast(rawUrl)
-        }
-        handlePresetIntent(intent)
     }
 
     private fun handlePresetIntent(intent: Intent?) {
