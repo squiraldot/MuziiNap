@@ -275,11 +275,17 @@ class MainActivity : AudioServiceActivity() {
                         val title = call.argument<String>("title") ?: "Nothing playing"
                         val artist = call.argument<String>("artist") ?: ""
                         val isPlaying = call.argument<Boolean>("isPlaying") ?: false
-                        ThemeWidgetRegistry.updatePlaybackState(
-                            applicationContext, title, artist, isPlaying
+                        val positionMs = (call.argument<Number>("positionMs") ?: 0).toLong()
+                        val durationMs = (call.argument<Number>("durationMs") ?: 0).toLong()
+                        val shuffleEnabled = call.argument<Boolean>("shuffleEnabled") ?: false
+                        val repeatMode = call.argument<String>("repeatMode") ?: "OFF"
+                        val revision = (call.argument<Number>("revision") ?: System.currentTimeMillis()).toLong()
+                        val accepted = ThemeWidgetRegistry.updatePlaybackState(
+                            applicationContext, title, artist, isPlaying, positionMs,
+                            durationMs, shuffleEnabled, repeatMode, revision
                         )
-                        ThemeMusicWidgetRenderer.updateAll(applicationContext)
-                        result.success(null)
+                        if (accepted) ThemeMusicWidgetRenderer.updateAll(applicationContext)
+                        result.success(accepted)
                     }
                     else -> result.notImplemented()
                 }
