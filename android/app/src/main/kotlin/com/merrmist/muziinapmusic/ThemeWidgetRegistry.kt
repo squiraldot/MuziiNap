@@ -80,7 +80,7 @@ internal object ThemeWidgetRegistry {
                         Triple(cursor.getString(0), cursor.getString(1), cursor.getString(2))
                     )
                 }
-                val canPairReservation = reservations.size == 1 && ids.size == 1
+                val canPairReservation = WidgetRecoveryPolicy.canAssociateReservation(reservations.size, ids.size)
                 ids.forEach { id ->
                     val providerClass = manager.getAppWidgetInfo(id)?.provider?.className
                         ?: "unknown"
