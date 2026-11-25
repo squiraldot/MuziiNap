@@ -65,38 +65,51 @@ internal object ThemeWidgetRegistry {
                 }
             }
 
-            // Recover launcher instances whose provider update or pin callback was lost.
-            // Existing platform widgets are never deleted, even if recovery finds >2.
-            (activeIds - registeredIds).forEach { id ->
-                val providerInfo = manager.getAppWidgetInfo(id) ?: return@forEach
-                val providerClass = providerInfo.provider.className
-                val size = if (providerClass.contains("4x3")) "4x3" else "4x2"
-                val reservation = db.query(
-                    TABLE_RESERVATIONS,
-                    arrayOf("token", "theme_id", "design_id"),
-                    "widget_size = ?", arrayOf(size), null, null, "created_at ASC"
-                ).use { cursor ->
-                    if (!cursor.moveToFirst()) null else Triple(
-                        cursor.getString(0), cursor.getString(1), cursor.getString(2)
+            // Recover unregistered launcher IDs. Only pair a pin token when there is
+            // exactly one pending reservation and one unregistered ID of that size.
+            // Ambiguous recovery is retained as a conflict; no existing widget is deleted.
+            val missingBySize = (activeIds - registeredIds).groupBy { id ->
+                val className = manager.getAppWidgetInfo(id)?.provider?.className.orEmpty()
+                if (className.contains("4x3")) "4x3" else "4x2"
+            }
+            missingBySize.forEach { (size, ids) ->
+                val reservations = mutableListOf<Triple<String, String, String>>()
+                db.query(TABLE_RESERVATIONS, arrayOf("token", "theme_id", "design_id"),
+                    "widget_size = ?", arrayOf(size), null, null, "created_at ASC").use { cursor ->
+                    while (cursor.moveToNext()) reservations.add(
+                        Triple(cursor.getString(0), cursor.getString(1), cursor.getString(2))
                     )
                 }
-                val themeId = reservation?.second ?: "dragon-ball-z"
-                val designId = reservation?.third ?: "widget-1"
-                val now = System.currentTimeMillis()
-                db.insertWithOnConflict(TABLE_WIDGETS, null, ContentValues().apply {
-                    put("app_widget_id", id)
-                    put("provider_class", providerClass)
-                    put("created_at", now)
-                    put("internal_uuid", UUID.randomUUID().toString())
-                    put("theme_id", themeId)
-                    put("design_id", designId)
-                    put("widget_size", size)
-                    put("lifecycle_state", "ACTIVE")
-                    putNull("pending_pin_token")
-                    put("updated_at", now)
-                }, SQLiteDatabase.CONFLICT_IGNORE)
-                reservation?.first?.let { token ->
-                    db.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))
+                val canPairReservation = reservations.size == 1 && ids.size == 1
+                ids.forEach { id ->
+                    val providerClass = manager.getAppWidgetInfo(id)?.provider?.className
+                        ?: "unknown"
+                    val duplicateDefault = db.query(
+                        TABLE_WIDGETS, arrayOf("app_widget_id"),
+                        "theme_id = ? AND design_id = ?",
+                        arrayOf("dragon-ball-z", "widget-1"), null, null, null
+                    ).use { it.moveToFirst() }
+                    val ambiguous = (reservations.isNotEmpty() && !canPairReservation) ||
+                        (reservations.isEmpty() && duplicateDefault)
+                    val reservation = if (canPairReservation) reservations.single() else null
+                    val themeId = reservation?.second ?: if (ambiguous) "recovery-conflict" else "dragon-ball-z"
+                    val designId = reservation?.third ?: if (ambiguous) "appwidget-$id" else "widget-1"
+                    val now = System.currentTimeMillis()
+                    db.insertWithOnConflict(TABLE_WIDGETS, null, ContentValues().apply {
+                        put("app_widget_id", id)
+                        put("provider_class", providerClass)
+                        put("created_at", now)
+                        put("internal_uuid", UUID.randomUUID().toString())
+                        put("theme_id", themeId)
+                        put("design_id", designId)
+                        put("widget_size", size)
+                        put("lifecycle_state", if (ambiguous) "RECOVERY_CONFLICT" else "ACTIVE")
+                        putNull("pending_pin_token")
+                        put("updated_at", now)
+                    }, SQLiteDatabase.CONFLICT_IGNORE)
+                    reservation?.first?.let { token ->
+                        db.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))
+                    }
                 }
             }
             pruneExpiredReservations(db)
