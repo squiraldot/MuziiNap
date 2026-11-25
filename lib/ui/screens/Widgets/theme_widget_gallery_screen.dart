@@ -45,24 +45,6 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
     }
   }
 
-  Future<void> _requestPin(String size) async {
-    setState(() => _message = null);
-    try {
-      final accepted = await _channel.invokeMethod<bool>('requestPin', <String, Object>{
-        'themeId': 'dragon-ball-z',
-        'designId': 'widget-1',
-        'widgetSize': size,
-      });
-      if (!mounted) return;
-      setState(() => _message = accepted == true
-          ? 'Android launcher pin request opened. Complete it in the launcher.'
-          : 'This launcher does not support pin requests. Add the widget from its widget picker.');
-      await _refresh();
-    } on PlatformException catch (error) {
-      if (mounted) setState(() => _message = error.message ?? 'Could not request this widget.');
-      await _refresh();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
