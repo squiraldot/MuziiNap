@@ -24,6 +24,7 @@ import 'components/custom_expansion_tile.dart';
 import 'settings_screen_controller.dart';
 import '../../player/player_controller.dart';
 import 'youtube_login_screen.dart';
+import '../Widgets/theme_widget_gallery_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, this.isBottomNavActive = false});
@@ -52,6 +53,15 @@ class SettingsScreen extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 200, top: 20),
             children: [
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.widgets_outlined),
+                  title: const Text('Widgets & Themes'),
+                  subtitle: const Text('Browse theme packs and manage launcher widgets'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Get.to(() => const ThemeWidgetGalleryScreen()),
+                ),
+              ),
               Offstage(
                 offstage: true,
                 child: CustomExpansionTile(
