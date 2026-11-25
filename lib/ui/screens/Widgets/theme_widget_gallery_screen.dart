@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../services/theme_widget_catalog.dart';
 
 class ThemeWidgetGalleryScreen extends StatefulWidget {
   const ThemeWidgetGalleryScreen({super.key});
@@ -117,11 +118,11 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
             const SizedBox(height: 20),
             Text('Theme Packs', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            Card(
+            ...bundledThemeWidgetCatalog.map((pack) => Card(
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => const _ThemePackDetailScreen(),
+                  builder: (_) => _ThemePackDetailScreen(pack: pack),
                 )),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -137,15 +138,15 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
                         child: const Icon(Icons.palette_outlined, size: 32),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Dragon Ball Z', style: TextStyle(fontWeight: FontWeight.bold)),
-                            SizedBox(height: 4),
-                            Text('1 bundled design · Open pack'),
-                            SizedBox(height: 4),
-                            Text('Installed', style: TextStyle(fontSize: 12)),
+                            Text(pack.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text('${pack.designs.length} registered design(s) · Open pack'),
+                            const SizedBox(height: 4),
+                            const Text('Bundled', style: TextStyle(fontSize: 12)),
                           ],
                         ),
                       ),
@@ -154,7 +155,7 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
                   ),
                 ),
               ),
-            ),
+            )),
             if (_message != null) ...[
               const SizedBox(height: 12),
               Text(_message!, style: Theme.of(context).textTheme.bodyMedium),
@@ -171,36 +172,65 @@ class _ThemeWidgetGalleryScreenState extends State<ThemeWidgetGalleryScreen>
 }
 
 class _ThemePackDetailScreen extends StatelessWidget {
-  const _ThemePackDetailScreen();
+  const _ThemePackDetailScreen({required this.pack});
+
+  final ThemeWidgetPackDefinition pack;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dragon Ball Z')),
+      appBar: AppBar(title: Text(pack.name)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text('Designs', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
-          Card(
+          ...pack.designs.map((design) => Card(
             child: ListTile(
               leading: const Icon(Icons.widgets_outlined),
-              title: const Text('Widget 1'),
-              subtitle: const Text('Bundled design · 4×2 assets available'),
+              title: Text(design.name),
+              subtitle: Text('Bundled design · ${design.supportedSizes.join(', ')} available'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => const _ThemeDesignDetailScreen(),
+                builder: (_) => _ThemeDesignDetailScreen(pack: pack, design: design),
               )),
             ),
-          ),
+          )),
         ],
       ),
     );
   }
 }
 
+class _PreviewPlaceholder extends StatelessWidget {
+  const _PreviewPlaceholder();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.image_not_supported_outlined, size: 36),
+              SizedBox(height: 8),
+              Text('Preview unavailable'),
+              Text('No remote preview is registered for this design.',
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+}
+
 class _ThemeDesignDetailScreen extends StatefulWidget {
-  const _ThemeDesignDetailScreen();
+  const _ThemeDesignDetailScreen({required this.pack, required this.design});
+
+  final ThemeWidgetPackDefinition pack;
+  final ThemeWidgetDesignDefinition design;
 
   @override
   State<_ThemeDesignDetailScreen> createState() => _ThemeDesignDetailScreenState();
@@ -219,8 +249,8 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
     });
     try {
       final accepted = await _channel.invokeMethod<bool>('requestPin', <String, Object>{
-        'themeId': 'dragon-ball-z',
-        'designId': 'widget-1',
+        'themeId': widget.pack.themeId,
+        'designId': widget.design.designId,
         'widgetSize': _selectedSize,
       });
       if (mounted) setState(() => _message = accepted == true
@@ -236,48 +266,45 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Widget 1')),
+      appBar: AppBar(title: Text(widget.design.name)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          AspectRatio(
-            aspectRatio: 2,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          if (widget.design.remotePreviewUrl != null)
+            AspectRatio(
+              aspectRatio: 2,
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.image_not_supported_outlined, size: 36),
-                    SizedBox(height: 8),
-                    Text('Preview unavailable'),
-                    Text('No remote preview is registered for this design.',
-                        textAlign: TextAlign.center),
-                  ],
+                child: Image.network(
+                  widget.design.remotePreviewUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const _PreviewPlaceholder(),
                 ),
               ),
+            )
+          else
+            AspectRatio(
+              aspectRatio: 2,
+              child: _PreviewPlaceholder(),
             ),
-          ),
           const SizedBox(height: 20),
           Text('Widget size', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          RadioListTile<String>(
-            value: '4x2',
+          ...widget.design.supportedSizes.map((size) => RadioListTile<String>(
+            value: size,
             groupValue: _selectedSize,
             onChanged: (value) => setState(() => _selectedSize = value!),
-            title: const Text('4 × 2'),
+            title: Text(size == '4x2' ? '4 × 2' : '4 × 3'),
             subtitle: const Text('Available'),
-          ),
-          const RadioListTile<String>(
-            value: '4x3',
-            groupValue: '4x2',
-            onChanged: null,
-            title: Text('4 × 3'),
-            subtitle: Text('Unavailable · size-specific assets are not bundled yet'),
-          ),
+          )),
+          if (!widget.design.supportedSizes.contains('4x3'))
+            const RadioListTile<String>(
+              value: '4x3',
+              groupValue: '4x2',
+              onChanged: null,
+              title: Text('4 × 3'),
+              subtitle: Text('Unavailable · size-specific assets are not bundled yet'),
+            ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _requesting ? null : _addWidget,
