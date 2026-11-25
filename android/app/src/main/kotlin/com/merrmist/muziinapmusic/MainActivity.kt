@@ -45,6 +45,7 @@ class MainActivity : AudioServiceActivity() {
     @Volatile private var bgutilsSetupThread: Thread? = null
     private var notificationPermissionRequestScheduled = false
     private var pendingThemeWidgetAction: String? = null
+    private var themeWidgetChannel: MethodChannel? = null
 
     /**
      * Ask once on the first app launch on Android 13+. Notification denial
@@ -91,6 +92,7 @@ class MainActivity : AudioServiceActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingThemeWidgetAction = intent.getStringExtra(ThemeWidgetActionReceiver.EXTRA_PENDING_ACTION)
+        pendingThemeWidgetAction?.let { themeWidgetChannel?.invokeMethod("widgetActionAvailable", it) }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -277,8 +279,10 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "muziinap/theme_music_widget")
-            .setMethodCallHandler { call, result ->
+        themeWidgetChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger, "muziinap/theme_music_widget"
+        )
+        themeWidgetChannel?.setMethodCallHandler { call, result ->
                 when (call.method) {
                     "consumePendingWidgetAction" -> {
                         result.success(pendingThemeWidgetAction.also { pendingThemeWidgetAction = null })

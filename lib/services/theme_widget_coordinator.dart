@@ -78,6 +78,12 @@ class ThemeWidgetCoordinator extends GetxService {
   Future<void> start() async {
     if (_started || _closed) return;
     _started = true;
+    _revision = DateTime.now().microsecondsSinceEpoch;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'widgetActionAvailable') {
+        await _applyWidgetAction(call.arguments as String?);
+      }
+    });
     _mediaItemSubscription = _audioHandler.mediaItem.listen(
       (item) {
         _mediaItem = item;
@@ -102,6 +108,14 @@ class ThemeWidgetCoordinator extends GetxService {
   Future<void> _consumePendingWidgetAction() async {
     try {
       final command = await _channel.invokeMethod<String>('consumePendingWidgetAction');
+      await _applyWidgetAction(command);
+    } on PlatformException catch (error) {
+      debugPrint('Could not consume native widget command: ${error.message}');
+    }
+  }
+
+  Future<void> _applyWidgetAction(String? command) async {
+    try {
       if (command == 'shuffle') {
         final enabled = _playbackState?.shuffleMode != AudioServiceShuffleMode.none;
         await _audioHandler.setShuffleMode(
