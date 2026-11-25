@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../services/theme_widget_catalog.dart';
+import '../../../services/theme_widget_availability.dart';
 
 class ThemeWidgetGalleryScreen extends StatefulWidget {
   const ThemeWidgetGalleryScreen({super.key});
@@ -240,9 +241,61 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
   static const MethodChannel _channel = MethodChannel('muziinap/theme_music_widget');
   String _selectedSize = '4x2';
   String? _message;
+  String? _statusError;
   bool _requesting = false;
+  bool _loadingStatus = true;
+  ThemeWidgetAvailability? _availability;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAvailability();
+  }
+
+  Future<void> _refreshAvailability() async {
+    if (mounted) setState(() {
+      _loadingStatus = true;
+      _statusError = null;
+    });
+    try {
+      final status = await _channel.invokeMapMethod<String, dynamic>('getWidgetStatus');
+      if (status == null) throw PlatformException(
+        code: 'empty_status', message: 'Widget status was unavailable.',
+      );
+      if (mounted) setState(() {
+        _availability = ThemeWidgetAvailability.fromStatus(status);
+        _loadingStatus = false;
+      });
+    } on PlatformException catch (error) {
+      if (mounted) setState(() {
+        _statusError = error.message ?? 'Could not verify widget availability.';
+        _loadingStatus = false;
+      });
+    }
+  }
+
+  bool get _designSupportsSelectedSize =>
+      widget.design.supportedSizes.contains(_selectedSize);
+
+  bool get _canAdd {
+    final availability = _availability;
+    return !_loadingStatus &&
+        _statusError == null &&
+        !_requesting &&
+        _designSupportsSelectedSize &&
+        availability != null &&
+        availability.canAdd(widget.pack.themeId, widget.design.designId);
+  }
+
+  String? get _availabilityMessage {
+    if (_loadingStatus) return 'Checking available widget slots…';
+    if (_statusError != null) return _statusError;
+    if (!_designSupportsSelectedSize) return 'Assets for this widget size are not bundled yet.';
+    return _availability?.reasonFor(widget.pack.themeId, widget.design.designId);
+  }
 
   Future<void> _addWidget() async {
+    if (!_canAdd) return;
     setState(() {
       _requesting = true;
       _message = null;
@@ -256,6 +309,7 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
       if (mounted) setState(() => _message = accepted == true
           ? 'Finish the pin request in your launcher.'
           : 'Pinning is not supported by this launcher.');
+      await _refreshAvailability();
     } on PlatformException catch (error) {
       if (mounted) setState(() => _message = error.message ?? 'Unable to add widget.');
     } finally {
@@ -307,10 +361,15 @@ class _ThemeDesignDetailScreenState extends State<_ThemeDesignDetailScreen> {
             ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: _requesting ? null : _addWidget,
+            onPressed: _canAdd ? _addWidget : null,
             icon: const Icon(Icons.add),
             label: Text(_requesting ? 'Requesting…' : 'Add widget'),
           ),
+          if (_availabilityMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(_availabilityMessage!,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
           if (_message != null) ...[
             const SizedBox(height: 12),
             Text(_message!),
