@@ -29,7 +29,7 @@ class ThemeWidgetAvailability {
       activeCount: active,
       pendingCount: pending,
       remainingCapacity: (status['remainingCapacity'] as num?)?.toInt() ??
-          (2 - active - pending).clamp(0, 2),
+          (2 - active - pending).clamp(0, 2).toInt(),
       recoveryConflict: status['recoveryConflict'] == true,
       registeredIdentities: identities,
       pendingIdentities: pendingIdentities,
