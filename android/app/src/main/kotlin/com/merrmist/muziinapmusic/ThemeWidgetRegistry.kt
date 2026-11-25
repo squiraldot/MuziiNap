@@ -1,5 +1,7 @@
 package com.merrmist.muziinapmusic
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -39,6 +41,42 @@ internal object ThemeWidgetRegistry {
         return databaseHelper ?: synchronized(this) {
             databaseHelper ?: WidgetDatabase(context.applicationContext).also { databaseHelper = it }
         }
+    }
+
+    fun reconcile(context: Context) {
+        val manager = AppWidgetManager.getInstance(context)
+        val activeIds = (manager.getAppWidgetIds(
+            ComponentName(context, MusicThemeWidget4x2Provider::class.java)
+        ) + manager.getAppWidgetIds(
+            ComponentName(context, MusicThemeWidget4x3Provider::class.java)
+        )).toSet()
+        val db = helper(context).writableDatabase
+        db.beginTransaction()
+        try {
+            db.query(TABLE_WIDGETS, arrayOf("app_widget_id"), null, null, null, null, null).use { cursor ->
+                val staleIds = mutableListOf<Int>()
+                while (cursor.moveToNext()) {
+                    val id = cursor.getInt(0)
+                    if (id !in activeIds) staleIds.add(id)
+                }
+                staleIds.forEach { id ->
+                    db.delete(TABLE_WIDGETS, "app_widget_id = ?", arrayOf(id.toString()))
+                }
+            }
+            pruneExpiredReservations(db)
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    fun isRegisteredWidget(context: Context, widgetId: Int): Boolean =
+        findWidget(helper(context).readableDatabase, widgetId) != null
+
+    private fun pruneExpiredReservations(db: SQLiteDatabase) {
+        // Allow launchers a day to deliver their pin callback before releasing a lost reservation.
+        val expiry = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+        db.delete(TABLE_RESERVATIONS, "created_at < ?", arrayOf(expiry.toString()))
     }
 
     fun registerWidget(
