@@ -22,7 +22,10 @@ import com.ryanheise.just_audio.MuziiNapDspController
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.ConcurrentHashMap\nimport java.util.UUID\nimport android.appwidget.AppWidgetManager\nimport android.content.ComponentName
+import java.util.concurrent.ConcurrentHashMap
+import java.util.UUID
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.hypot
 
