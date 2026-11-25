@@ -92,6 +92,7 @@ internal object ThemeWidgetRegistry {
         val db = helper(context).writableDatabase
         db.beginTransaction()
         try {
+            pruneExpiredReservations(db)
             val existing = findWidget(db, widgetId)
             if (existing != null) {
                 db.setTransactionSuccessful()
@@ -139,6 +140,7 @@ internal object ThemeWidgetRegistry {
         val db = helper(context).writableDatabase
         db.beginTransaction()
         try {
+            pruneExpiredReservations(db)
             if (db.query(TABLE_RESERVATIONS, arrayOf("token"), "token = ?",
                     arrayOf(token), null, null, null).use { it.moveToFirst() }) {
                 db.setTransactionSuccessful()

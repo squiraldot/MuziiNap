@@ -81,6 +81,7 @@ class MainActivity : AudioServiceActivity() {
         // Retain the unparsed Android URL before Dart Uri normalization.
         intent?.dataString?.let(pendingDeepLinks::addLast)
         super.onCreate(savedInstanceState)
+        ThemeWidgetRegistry.reconcile(applicationContext)
         ApkIntegrityVerifier.verifyAtStartup(this)
     }
 
