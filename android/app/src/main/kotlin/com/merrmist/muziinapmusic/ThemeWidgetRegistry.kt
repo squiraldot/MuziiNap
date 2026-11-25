@@ -249,7 +249,7 @@ internal object ThemeWidgetRegistry {
                     put("design_id", reservation.second)
                     put("widget_size", reservation.third)
                     put("lifecycle_state", "ACTIVE")
-                    put("pending_pin_token", token)
+                    putNull("pending_pin_token")
                     put("updated_at", System.currentTimeMillis())
                 }, "app_widget_id = ?", arrayOf(widgetId.toString()))
                 db.delete(TABLE_RESERVATIONS, "token = ?", arrayOf(token))

@@ -22,11 +22,12 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         appWidgetIds.forEach { id ->
-            if (ThemeMusicWidgetRenderer.assetsAvailable(context, id, widgetFolder) &&
-                ThemeWidgetRegistry.registerWidget(context, id, javaClass.name)) {
-                ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout, widgetFolder)
-            } else {
-                ThemeMusicWidgetRenderer.renderUnavailable(context, manager, id, widgetLayout)
+            when {
+                !ThemeMusicWidgetRenderer.assetsAvailable(context, id, widgetFolder) ->
+                    ThemeMusicWidgetRenderer.renderUnavailable(context, manager, id, widgetLayout)
+                ThemeWidgetRegistry.registerWidget(context, id, javaClass.name) ->
+                    ThemeMusicWidgetRenderer.render(context, manager, id, widgetLayout, widgetFolder)
+                else -> ThemeMusicWidgetRenderer.renderLimitReached(context, manager, id, widgetLayout)
             }
         }
     }
@@ -40,11 +41,12 @@ abstract class ThemeMusicWidgetProvider : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(
         context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: android.os.Bundle
     ) {
-        if (ThemeMusicWidgetRenderer.assetsAvailable(context, appWidgetId, widgetFolder) &&
-            ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name)) {
-            ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout, widgetFolder)
-        } else {
-            ThemeMusicWidgetRenderer.renderUnavailable(context, manager, appWidgetId, widgetLayout)
+        when {
+            !ThemeMusicWidgetRenderer.assetsAvailable(context, appWidgetId, widgetFolder) ->
+                ThemeMusicWidgetRenderer.renderUnavailable(context, manager, appWidgetId, widgetLayout)
+            ThemeWidgetRegistry.registerWidget(context, appWidgetId, javaClass.name) ->
+                ThemeMusicWidgetRenderer.render(context, manager, appWidgetId, widgetLayout, widgetFolder)
+            else -> ThemeMusicWidgetRenderer.renderLimitReached(context, manager, appWidgetId, widgetLayout)
         }
         super.onAppWidgetOptionsChanged(context, manager, appWidgetId, newOptions)
     }
@@ -253,11 +255,12 @@ internal object ThemeMusicWidgetRenderer {
         )
         providers.forEach { provider ->
             manager.getAppWidgetIds(ComponentName(context, provider.javaClass)).forEach { id ->
-                if (assetsAvailable(context, id, provider.widgetFolder) &&
-                    ThemeWidgetRegistry.registerWidget(context, id, provider.javaClass.name)) {
-                    render(context, manager, id, provider.widgetLayout, provider.widgetFolder)
-                } else {
-                    renderUnavailable(context, manager, id, provider.widgetLayout)
+                when {
+                    !assetsAvailable(context, id, provider.widgetFolder) ->
+                        renderUnavailable(context, manager, id, provider.widgetLayout)
+                    ThemeWidgetRegistry.registerWidget(context, id, provider.javaClass.name) ->
+                        render(context, manager, id, provider.widgetLayout, provider.widgetFolder)
+                    else -> renderLimitReached(context, manager, id, provider.widgetLayout)
                 }
             }
         }
